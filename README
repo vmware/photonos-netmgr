@@ -1,0 +1,11 @@
+Description
+
+    netmgmt is a library of routines used to configure the network on Photon.
+
+How to Build ?
+
+    mkdir build && cd build
+    autoreconf ..
+    ../configure --prefix /opt/vmware
+    make
+
