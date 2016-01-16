@@ -176,6 +176,45 @@ error:
 }
 
 uint32_t
+ini_cfg_create_config(
+    PCONFIG_INI* ppConfig
+    )
+{
+    uint32_t err = 0;
+    PCONFIG_INI pConfig = NULL;
+    char szPath[1024];
+
+    if (!ppConfig)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = ini_cfg_alloc(sizeof(CONFIG_INI), (void*)&pConfig);
+    bail_on_error(err);
+
+    sprintf(szPath, "/tmp/%s", tmpnam(NULL));
+
+    err = ini_cfg_alloc_string(szPath, &pConfig->pszPath);
+    bail_on_error(err);
+
+    *ppConfig = pConfig;
+
+cleanup:
+
+    return err;
+
+error:
+
+    if (ppConfig)
+    {
+        *ppConfig = NULL;
+    }
+
+    goto cleanup;
+}
+
+uint32_t
 ini_cfg_add_section(
     PCONFIG_INI pConfig,
     const char* pszName,

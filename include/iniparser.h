@@ -30,6 +30,11 @@ ini_cfg_read(
     );
 
 uint32_t
+ini_cfg_create_config(
+    PCONFIG_INI* ppConfig
+    );
+
+uint32_t
 ini_cfg_add_section(
     PCONFIG_INI pConfig,
     const char* pszName,
