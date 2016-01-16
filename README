@@ -4,8 +4,5 @@ Description
 
 How to Build ?
 
-    mkdir build && cd build
-    autoreconf ..
-    ../configure --prefix /opt/vmware
-    make
+    cd build && make -f Makefile.bootstrap
 
