@@ -58,27 +58,21 @@ ini_cfg_read(
     if (!pszPath || !*pszPath || !ppConfig)
     {
         err = EINVAL;
-        goto error;
+        bail_on_error(err);
     }
 
     fp = fopen(pszPath, "r");
     if (!fp)
     {
         err = errno;
-        goto error;
+        bail_on_error(err);
     }
 
     err = ini_cfg_alloc(sizeof(CONFIG_INI), (void*)&pConfig);
-    if (err)
-    {
-        goto error;
-    }
+    bail_on_error(err);
 
     err = ini_cfg_alloc_string(pszPath, &pConfig->pszPath);
-    if (err)
-    {
-        goto error;
-    }
+    bail_on_error(err);
 
     while(!feof(fp))
     {
@@ -88,7 +82,7 @@ ini_cfg_read(
         if (!fgets(buffer, sizeof(buffer), fp))
         {
             err = errno;
-            goto error;
+            bail_on_error(err);
         }
 
         pszCursor = &buffer[0];
@@ -112,23 +106,17 @@ ini_cfg_read(
             }
 
             err = ini_cfg_parse_section_name(pszCursor, &pszName);
-            if (err)
-            {
-                goto error;
-            }
+            bail_on_error(err);
 
             err = ini_cfg_add_section(pConfig, pszName, &pSection);
-            if (err)
-            {
-                goto error;
-            }
+            bail_on_error(err);
         }
         else // key value pair
         {
             if (!pSection)
             {
                 err = EBADMSG;
-                goto error;
+                bail_on_error(err);
             }
 
             if (pszKey)
@@ -143,16 +131,10 @@ ini_cfg_read(
             }
 
             err = ini_cfg_parse_key_value(pszCursor, &pszKey, &pszValue);
-            if (err)
-            {
-                goto error;
-            }
+            bail_on_error(err);
 
             err = ini_cfg_add_key(pSection, pszKey, pszValue);
-            if (err)
-            {
-                goto error;
-            }
+            bail_on_error(err);
         }
     }
 
@@ -207,20 +189,14 @@ ini_cfg_add_section(
     if (!pConfig || !pszName || !*pszName || !ppSection)
     {
         err = EINVAL;
-        goto error;
+        bail_on_error(err);
     }
 
     err = ini_cfg_alloc(sizeof(SECTION_INI), (void*)&pSection);
-    if (err)
-    {
-        goto error;
-    }
+    bail_on_error(err);
 
     err = ini_cfg_alloc_string(pszName, &pSection->pszName);
-    if (err)
-    {
-        goto error;
-    }
+    bail_on_error(err);
 
     pCursor = pConfig->pSection;
     while (pCursor && pCursor->pNext != NULL)
@@ -274,7 +250,7 @@ ini_cfg_find_sections(
     if (!pConfig || !pszName || !*pszName || !pppSections || !pdwNumSections)
     {
         err = EINVAL;
-        goto error;
+        bail_on_error(err);
     }
 
     for (pCursor = pConfig->pSection; pCursor; pCursor = pCursor->pNext)
@@ -291,10 +267,7 @@ ini_cfg_find_sections(
     }
 
     err = ini_cfg_alloc(sizeof(PSECTION_INI) * nSections, (void*)&ppSections);
-    if (err)
-    {
-        goto error; 
-    }
+    bail_on_error(err);
 
     for (pCursor = pConfig->pSection; pCursor; pCursor = pCursor->pNext)
     {
@@ -353,7 +326,7 @@ ini_cfg_delete_sections(
     if (!pConfig || !pszName || !*pszName)
     {
         err = EINVAL;
-        goto error;
+        bail_on_error(err);
     }
 
     pCursor = pConfig->pSection; 
@@ -427,30 +400,23 @@ ini_cfg_add_key(
     if (!pSection || !pszKey || !*pszKey || !pszValue || !*pszValue)
     {
         err = EINVAL;
-        goto error;
+        bail_on_error(err);
     }
 
     if (ini_cfg_find_key(pSection, pszKey))
     {
         err = EEXIST;
-        goto error;
+        bail_on_error(err);
     }
 
     err = ini_cfg_alloc(sizeof(KEYVALUE_INI), (void*)&pKeyValue);
-    if (err)
-    {
-        goto error;
-    }
+    bail_on_error(err);
+
     err = ini_cfg_alloc_string(pszKey, &pKeyValue->pszKey);
-    if (err)
-    {
-        goto error;
-    }
+    bail_on_error(err);
+
     err = ini_cfg_alloc_string(pszValue, &pKeyValue->pszValue);
-    if (err)
-    {
-        goto error;
-    }
+    bail_on_error(err);
 
     pCursor = pSection->pKeyValue;
     while (pCursor && pCursor->pNext != NULL)
@@ -495,21 +461,18 @@ ini_cfg_set_value(
     if (!pSection || !pszKey || !*pszKey || !pszValue || !*pszValue)
     {
         err = EINVAL;
-        goto error;
+        bail_on_error(err);
     }
 
     pCandidate = ini_cfg_find_key(pSection, pszKey);
     if (!pCandidate)
     {
         err = ENOENT;
-        goto error;
+        bail_on_error(err);
     }
 
     err = ini_cfg_alloc_string(pszValue, &pszNewValue);
-    if (err)
-    {
-        goto error;
-    }
+    bail_on_error(err);
 
     if (pCandidate->pszValue)
     {
@@ -535,7 +498,7 @@ ini_cfg_delete_key(
     if (!pSection || !pszKey || !*pszKey)
     {
         err = EINVAL;
-        goto error;
+        bail_on_error(err);
     }
 
     pCursor = pSection->pKeyValue;
@@ -583,16 +546,13 @@ ini_cfg_save(
     if (!pszPath || !*pszPath || !pConfig) 
     {
         err = EINVAL;
-        goto error;
+        bail_on_error(err);
     }
 
     err = ini_cfg_alloc(
             strlen(pszPath)+strlen(pszSuffix)+1,
             (void*)&pszTmpPath);
-    if (err)
-    {
-        goto error;
-    }
+    bail_on_error(err);
 
     sprintf(pszTmpPath, "%s%s", pszPath, pszSuffix);
 
@@ -600,7 +560,7 @@ ini_cfg_save(
     if (!fp)
     {
         err = errno;
-        goto error;
+        bail_on_error(err);
     }
 
     for (pSection = pConfig->pSection; pSection; pSection = pSection->pNext)
@@ -621,7 +581,7 @@ ini_cfg_save(
     if (rename(pszTmpPath, pszPath) < 0)
     {
         err = errno;
-        goto error;
+        bail_on_error(err);
     }
         
 cleanup:
@@ -687,7 +647,7 @@ ini_cfg_parse_section_name(
     if (!pszCursor || !*pszCursor || *pszCursor != '[')
     {
         err = EBADMSG;
-        goto error;
+        bail_on_error(err);
     }
     // skip prefix
     pszCursor++;
@@ -700,7 +660,7 @@ ini_cfg_parse_section_name(
     if (!pszNameMarker || !*pszNameMarker)
     {
         err = EBADMSG;
-        goto error;
+        bail_on_error(err);
     }
     // allow only (('a'-'z') || ('A'-'Z'))+
     while (pszCursor && *pszCursor && isalpha((int)*pszCursor))
@@ -717,7 +677,7 @@ ini_cfg_parse_section_name(
     if (!pszCursor || !*pszCursor || *pszCursor != ']')
     {
         err = EBADMSG;
-        goto error;
+        bail_on_error(err);
     }
     // skip suffix
     pszCursor++;
@@ -730,14 +690,11 @@ ini_cfg_parse_section_name(
     if ((pszCursor && *pszCursor) || !len)
     {
         err = EBADMSG;
-        goto error;
+        bail_on_error(err);
     }
 
     err = ini_cfg_alloc_string_len(pszNameMarker, len, &pszName);
-    if (err)
-    {
-        goto error;
-    }
+    bail_on_error(err);
 
     *ppszName = pszName;
 
@@ -785,7 +742,7 @@ ini_cfg_parse_key_value(
     if (!pszKeyMarker || !*pszKeyMarker)
     {
         err = EBADMSG;
-        goto error;
+        bail_on_error(err);
     }
     // allow only (('a'-'z') || ('A'-'Z') || ('0'-'9'))+
     while (pszCursor && *pszCursor && (isalpha((int)*pszCursor) || isdigit((int)*pszCursor)))
@@ -802,7 +759,7 @@ ini_cfg_parse_key_value(
     if (!pszCursor || !*pszCursor || *pszCursor != '=')
     {
         err = EBADMSG;
-        goto error;
+        bail_on_error(err);
     }
     // skip operator
     pszCursor++;
@@ -815,7 +772,7 @@ ini_cfg_parse_key_value(
     if (!pszValueMarker || !*pszValueMarker)
     {
         err = EBADMSG;
-        goto error;
+        bail_on_error(err);
     }
     while (pszCursor && *pszCursor && !isspace((int)*pszCursor))
     {
@@ -830,19 +787,14 @@ ini_cfg_parse_key_value(
     if ((pszCursor && *pszCursor) || !len_key || !len_value)
     {
         err = EBADMSG;
-        goto error;
+        bail_on_error(err);
     }
 
     err = ini_cfg_alloc_string_len(pszKeyMarker, len_key, &pszKey);
-    if (err)
-    {
-        goto error;
-    }
+    bail_on_error(err);
+
     err = ini_cfg_alloc_string_len(pszValueMarker, len_value, &pszValue);
-    if (err)
-    {
-        goto error;
-    }
+    bail_on_error(err);
 
     *ppszKey = pszKey;
     *ppszValue = pszValue;

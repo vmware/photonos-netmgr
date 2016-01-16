@@ -26,12 +26,13 @@ ini_cfg_alloc(
     if (!ppMemory || size <= 0)
     {
         err = EINVAL;
-        goto error;
+        bail_on_error(err);
     }
     pMemory = calloc(1, size);
     if (!pMemory)
     {
         err = ENOMEM;
+        bail_on_error(err);
     }
 
     *ppMemory = pMemory;
@@ -63,16 +64,13 @@ ini_cfg_alloc_string(
     if (!pszSrc || !ppszDst)
     {
         err = EINVAL;
-        goto error;
+        bail_on_error(err);
     }
 
     len = strlen(pszSrc);
 
     err = ini_cfg_alloc(len+1, (void*)&pszDst);
-    if (err)
-    {
-        goto error;
-    }
+    bail_on_error(err);
 
     if (len)
     {
@@ -111,14 +109,11 @@ ini_cfg_alloc_string_len(
     if (!pszSrc || !ppszDst || len < 0)
     {
         err = EINVAL;
-        goto error;
+        bail_on_error(err);
     }
 
     err = ini_cfg_alloc(len+1, (void*)&pszDst);
-    if (err)
-    {
-        goto error;
-    }
+    bail_on_error(err);
 
     if (len)
     {

@@ -18,7 +18,7 @@
 
 #include <iniparser.h>
 
+#include "defines.h"
 #include "structs.h"
-
 #include "prototypes.h"
 
