@@ -12,14 +12,11 @@
  * under the License.
  */
 
-#include <config.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <errno.h>
 
-#include <getopt.h>
-
-#include <netmgmtsys.h>
-
-#include "../common/prototypes.h"
-#include <netmgr.h>
 #include "defines.h"
-#include "structs.h"
 #include "prototypes.h"

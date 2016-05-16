@@ -1,0 +1,65 @@
+# automake
+
+Makefile
+Makefile.in
+
+*.guess
+*.sub
+*.status
+*.log
+
+
+# autoconf
+/autom4te.cache
+/aclocal.m4
+/compile
+/configure
+/depcomp
+/install-sh
+/missing
+/stamp-h1
+/m4
+ltmain.sh
+libtool
+ar-lib
+
+/include/config.h.in
+/include/stamp*
+/common/.deps
+/common/.libs
+/src/.deps
+/src/.libs
+/tools/netmgr/.deps
+/tools/netmgr/.libs
+/tools/netmgr/netmgr
+build/*
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex

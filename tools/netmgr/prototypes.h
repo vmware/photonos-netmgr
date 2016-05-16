@@ -12,14 +12,46 @@
  * under the License.
  */
 
-#include <config.h>
+#pragma once
 
-#include <getopt.h>
+void
+show_version(
+    );
 
-#include <netmgmtsys.h>
+uint32_t
+cmd_help(
+    PNETMGR_CMD_ARGS pCmdArgs
+    );
 
-#include "../common/prototypes.h"
-#include <netmgr.h>
-#include "defines.h"
-#include "structs.h"
-#include "prototypes.h"
+uint32_t
+cmd_ifup(
+    PNETMGR_CMD_ARGS pCmdArgs
+    );
+
+uint32_t
+cmd_ifdown(
+    PNETMGR_CMD_ARGS pCmdArgs
+    );
+
+uint32_t
+cmd_list(
+    PNETMGR_CMD_ARGS pCmdArgs
+    );
+//parse_args.c
+uint32_t
+parse_args(
+    int argc,
+    char** argv,
+    PNETMGR_CMD_ARGS* ppCmdArgs
+    );
+
+uint32_t
+copy_cmd_args(
+    PNETMGR_CMD_ARGS pOptions,
+    PNETMGR_CMD_ARGS pCmdArgs
+    );
+
+void
+free_cmd_args(
+    PNETMGR_CMD_ARGS pCmdArgs
+    );
