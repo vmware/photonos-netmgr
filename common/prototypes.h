@@ -12,14 +12,29 @@
  * under the License.
  */
 
-#include <config.h>
+// memory.c
 
-#include <getopt.h>
+uint32_t
+netmgr_alloc(
+    size_t size,
+    void** pMemory
+    );
 
-#include <netmgmtsys.h>
+uint32_t
+netmgr_alloc_string(
+    const char* pszSrc,
+    char**      ppszDst
+    );
 
-#include "../common/prototypes.h"
-#include <netmgr.h>
-#include "defines.h"
-#include "structs.h"
-#include "prototypes.h"
+uint32_t
+netmgr_alloc_string_len(
+    const char* pszSrc,
+    size_t      len,
+    char**      ppszDst
+    );
+
+void
+netmgr_free(
+    void* pMemory
+    );
+

@@ -15,7 +15,7 @@
 #include "includes.h"
 
 uint32_t
-ini_cfg_alloc(
+netmgr_alloc(
     size_t size,
     void** ppMemory
     )
@@ -52,7 +52,7 @@ error:
 }
 
 uint32_t
-ini_cfg_alloc_string(
+netmgr_alloc_string(
     const char* pszSrc,
     char**      ppszDst
     )
@@ -69,7 +69,7 @@ ini_cfg_alloc_string(
 
     len = strlen(pszSrc);
 
-    err = ini_cfg_alloc(len+1, (void*)&pszDst);
+    err = netmgr_alloc(len+1, (void*)&pszDst);
     bail_on_error(err);
 
     if (len)
@@ -91,13 +91,13 @@ error:
     }
     if (pszDst)
     {
-        ini_cfg_free(pszDst);
+        netmgr_free(pszDst);
     }
     goto cleanup;
 }
 
 uint32_t
-ini_cfg_alloc_string_len(
+netmgr_alloc_string_len(
     const char* pszSrc,
     size_t      len,
     char**      ppszDst
@@ -112,7 +112,7 @@ ini_cfg_alloc_string_len(
         bail_on_error(err);
     }
 
-    err = ini_cfg_alloc(len+1, (void*)&pszDst);
+    err = netmgr_alloc(len+1, (void*)&pszDst);
     bail_on_error(err);
 
     if (len)
@@ -134,14 +134,14 @@ error:
     }
     if (pszDst)
     {
-        ini_cfg_free(pszDst);
+        netmgr_free(pszDst);
     }
 
     goto cleanup;
 }
 
 void
-ini_cfg_free(
+netmgr_free(
     void* pMemory
     )
 {
