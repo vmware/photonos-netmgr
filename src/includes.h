@@ -12,12 +12,19 @@
  * under the License.
  */
 
+#include <glib.h>
+#include <glib/gstdio.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+
 #include <config.h>
 
 #include <netmgmtsys.h>
 
+
 #include <iniparser.h>
 
+#include "../common/prototypes.h"
 #include "defines.h"
 #include "structs.h"
 #include "prototypes.h"

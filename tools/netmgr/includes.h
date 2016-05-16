@@ -12,9 +12,14 @@
  * under the License.
  */
 
+#include <getopt.h>
+
 #include <config.h>
 
 #include <netmgmtsys.h>
 
+#include "../common/prototypes.h"
 #include <netmgr.h>
-
+#include "defines.h"
+#include "structs.h"
+#include "prototypes.h"

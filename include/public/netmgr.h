@@ -15,5 +15,20 @@
 #ifndef __NETMGR_H__
 #define __NETMGR_H__
 
+uint32_t
+enum_interfaces(
+    int nFamily
+    );
+
+uint32_t
+ifup(
+    const char* pszInterfaceName
+    );
+
+uint32_t
+ifdown(
+    const char* pszInterfaceName
+    );
+
 #endif /* __NETMGR_H__ */
 
