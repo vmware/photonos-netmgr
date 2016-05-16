@@ -68,10 +68,10 @@ ini_cfg_read(
         bail_on_error(err);
     }
 
-    err = ini_cfg_alloc(sizeof(CONFIG_INI), (void*)&pConfig);
+    err = netmgr_alloc(sizeof(CONFIG_INI), (void*)&pConfig);
     bail_on_error(err);
 
-    err = ini_cfg_alloc_string(pszPath, &pConfig->pszPath);
+    err = netmgr_alloc_string(pszPath, &pConfig->pszPath);
     bail_on_error(err);
 
     while(!feof(fp))
@@ -101,7 +101,7 @@ ini_cfg_read(
         {
             if (pszName)
             {
-                ini_cfg_free(pszName);
+                netmgr_free(pszName);
                 pszName = NULL;
             }
 
@@ -121,12 +121,12 @@ ini_cfg_read(
 
             if (pszKey)
             {
-                ini_cfg_free(pszKey);
+                netmgr_free(pszKey);
                 pszKey = NULL;
             }
             if (pszValue)
             {
-                ini_cfg_free(pszValue);
+                netmgr_free(pszValue);
                 pszValue = NULL;
             }
 
@@ -148,15 +148,15 @@ cleanup:
     }
     if (pszName)
     {
-        ini_cfg_free(pszName);
+        netmgr_free(pszName);
     }
     if (pszKey)
     {
-        ini_cfg_free(pszKey);
+        netmgr_free(pszKey);
     }
     if (pszValue)
     {
-        ini_cfg_free(pszValue);
+        netmgr_free(pszValue);
     }
 
     return err;
@@ -190,12 +190,12 @@ ini_cfg_create_config(
         bail_on_error(err);
     }
 
-    err = ini_cfg_alloc(sizeof(CONFIG_INI), (void*)&pConfig);
+    err = netmgr_alloc(sizeof(CONFIG_INI), (void*)&pConfig);
     bail_on_error(err);
 
     sprintf(szPath, "/tmp/%s", tmpnam(NULL));
 
-    err = ini_cfg_alloc_string(szPath, &pConfig->pszPath);
+    err = netmgr_alloc_string(szPath, &pConfig->pszPath);
     bail_on_error(err);
 
     *ppConfig = pConfig;
@@ -231,10 +231,10 @@ ini_cfg_add_section(
         bail_on_error(err);
     }
 
-    err = ini_cfg_alloc(sizeof(SECTION_INI), (void*)&pSection);
+    err = netmgr_alloc(sizeof(SECTION_INI), (void*)&pSection);
     bail_on_error(err);
 
-    err = ini_cfg_alloc_string(pszName, &pSection->pszName);
+    err = netmgr_alloc_string(pszName, &pSection->pszName);
     bail_on_error(err);
 
     pCursor = pConfig->pSection;
@@ -305,14 +305,14 @@ ini_cfg_find_sections(
         goto cleanup;
     }
 
-    err = ini_cfg_alloc(sizeof(PSECTION_INI) * nSections, (void*)&ppSections);
+    err = netmgr_alloc(sizeof(PSECTION_INI) * nSections, (void*)&ppSections);
     bail_on_error(err);
 
     for (pCursor = pConfig->pSection; pCursor; pCursor = pCursor->pNext)
     {
         if (!strcmp(pCursor->pszName, pszName))
         {
-            ppSections[iSection++] = pCursor; 
+            ppSections[iSection++] = pCursor;
         }
     }
 
@@ -335,7 +335,7 @@ error:
     }
     if (ppSections)
     {
-        ini_cfg_free(ppSections);
+        netmgr_free(ppSections);
     }
 
     goto cleanup;
@@ -349,7 +349,7 @@ ini_cfg_free_sections(
 {
     if (ppSections)
     {
-        ini_cfg_free(ppSections);
+        netmgr_free(ppSections);
     }
 }
 
@@ -448,13 +448,13 @@ ini_cfg_add_key(
         bail_on_error(err);
     }
 
-    err = ini_cfg_alloc(sizeof(KEYVALUE_INI), (void*)&pKeyValue);
+    err = netmgr_alloc(sizeof(KEYVALUE_INI), (void*)&pKeyValue);
     bail_on_error(err);
 
-    err = ini_cfg_alloc_string(pszKey, &pKeyValue->pszKey);
+    err = netmgr_alloc_string(pszKey, &pKeyValue->pszKey);
     bail_on_error(err);
 
-    err = ini_cfg_alloc_string(pszValue, &pKeyValue->pszValue);
+    err = netmgr_alloc_string(pszValue, &pKeyValue->pszValue);
     bail_on_error(err);
 
     pCursor = pSection->pKeyValue;
@@ -510,12 +510,12 @@ ini_cfg_set_value(
         bail_on_error(err);
     }
 
-    err = ini_cfg_alloc_string(pszValue, &pszNewValue);
+    err = netmgr_alloc_string(pszValue, &pszNewValue);
     bail_on_error(err);
 
     if (pCandidate->pszValue)
     {
-        ini_cfg_free(pCandidate->pszValue);
+        netmgr_free(pCandidate->pszValue);
     }
 
     pCandidate->pszValue = pszNewValue;
@@ -582,13 +582,13 @@ ini_cfg_save(
     FILE* fp = NULL;
     PSECTION_INI pSection = NULL;
 
-    if (!pszPath || !*pszPath || !pConfig) 
+    if (!pszPath || !*pszPath || !pConfig)
     {
         err = EINVAL;
         bail_on_error(err);
     }
 
-    err = ini_cfg_alloc(
+    err = netmgr_alloc(
             strlen(pszPath)+strlen(pszSuffix)+1,
             (void*)&pszTmpPath);
     bail_on_error(err);
@@ -622,12 +622,12 @@ ini_cfg_save(
         err = errno;
         bail_on_error(err);
     }
-        
+
 cleanup:
 
     if (pszTmpPath)
     {
-        ini_cfg_free(pszTmpPath);
+        netmgr_free(pszTmpPath);
     }
     if (fp)
     {
@@ -650,7 +650,7 @@ ini_cfg_free_config(
     {
         if (pConfig->pszPath)
         {
-            ini_cfg_free(pConfig->pszPath);
+            netmgr_free(pConfig->pszPath);
         }
         while (pConfig->pSection)
         {
@@ -660,7 +660,7 @@ ini_cfg_free_config(
 
             ini_cfg_free_section(pSection);
         }
-        ini_cfg_free(pConfig);
+        netmgr_free(pConfig);
     }
 }
 
@@ -732,7 +732,7 @@ ini_cfg_parse_section_name(
         bail_on_error(err);
     }
 
-    err = ini_cfg_alloc_string_len(pszNameMarker, len, &pszName);
+    err = netmgr_alloc_string_len(pszNameMarker, len, &pszName);
     bail_on_error(err);
 
     *ppszName = pszName;
@@ -749,7 +749,7 @@ error:
     }
     if (pszName)
     {
-        ini_cfg_free(pszName);
+        netmgr_free(pszName);
     }
 
     goto cleanup;
@@ -829,10 +829,10 @@ ini_cfg_parse_key_value(
         bail_on_error(err);
     }
 
-    err = ini_cfg_alloc_string_len(pszKeyMarker, len_key, &pszKey);
+    err = netmgr_alloc_string_len(pszKeyMarker, len_key, &pszKey);
     bail_on_error(err);
 
-    err = ini_cfg_alloc_string_len(pszValueMarker, len_value, &pszValue);
+    err = netmgr_alloc_string_len(pszValueMarker, len_value, &pszValue);
     bail_on_error(err);
 
     *ppszKey = pszKey;
@@ -854,11 +854,11 @@ error:
     }
     if (pszKey)
     {
-        ini_cfg_free(pszKey);
+        netmgr_free(pszKey);
     }
     if (pszValue)
     {
-        ini_cfg_free(pszValue);
+        netmgr_free(pszValue);
     }
 
     goto cleanup;
@@ -874,7 +874,7 @@ ini_cfg_free_section(
     {
         if (pSection->pszName)
         {
-            ini_cfg_free(pSection->pszName);
+            netmgr_free(pSection->pszName);
         }
         while (pSection->pKeyValue)
         {
@@ -884,7 +884,7 @@ ini_cfg_free_section(
 
             ini_cfg_free_keyvalue(pKeyValue);
         }
-        ini_cfg_free(pSection);
+        netmgr_free(pSection);
     }
 }
 
@@ -898,13 +898,13 @@ ini_cfg_free_keyvalue(
     {
         if (pKeyValue->pszKey)
         {
-            ini_cfg_free(pKeyValue->pszKey);
+            netmgr_free(pKeyValue->pszKey);
         }
         if (pKeyValue->pszValue)
         {
-            ini_cfg_free(pKeyValue->pszValue);
+            netmgr_free(pKeyValue->pszValue);
         }
-        ini_cfg_free(pKeyValue);
+        netmgr_free(pKeyValue);
     }
 }
 

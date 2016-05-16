@@ -15,5 +15,32 @@
 #ifndef __NETMGR_H__
 #define __NETMGR_H__
 
+typedef struct _NETMGR_INTERFACE
+{
+    char* pszName;
+    struct _NETMGR_INTERFACE* pNext;
+}NETMGR_INTERFACE, *PNETMGR_INTERFACE;
+
+uint32_t
+enum_interfaces(
+    int nFamily,
+    PNETMGR_INTERFACE* ppInterface
+    );
+
+void
+free_interface(
+    PNETMGR_INTERFACE pInterface
+    );
+
+uint32_t
+ifup(
+    const char* pszInterfaceName
+    );
+
+uint32_t
+ifdown(
+    const char* pszInterfaceName
+    );
+
 #endif /* __NETMGR_H__ */
 
