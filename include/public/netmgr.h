@@ -34,13 +34,49 @@ free_interface(
 
 uint32_t
 ifup(
-    const char* pszInterfaceName
+    const char *pszInterfaceName
     );
 
 uint32_t
 ifdown(
-    const char* pszInterfaceName
+    const char * pszInterfaceName
     );
+
+int
+set_iaid(
+    const char *pszInterfaceName,
+    const uint32_t iaid
+);
+
+int
+get_iaid(
+    const char *pszInterfaceName,
+    uint32_t *iaid
+);
+
+int
+set_duid(
+    const char *pszInterfaceName,
+    const char *pszDuid
+);
+
+int
+get_duid(
+    const char *pszInterfaceName,
+    char *pszDuid
+);
+
+int
+set_dns_servers(
+    const char *pszInterfaceName,
+    const char *pszDnsServers
+);
+
+int
+get_dns_servers(
+    const char *pszInterfaceName,
+    char *pszDnsServers
+);
 
 #endif /* __NETMGR_H__ */
 
