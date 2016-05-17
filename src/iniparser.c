@@ -81,6 +81,10 @@ ini_cfg_read(
 
         if (!fgets(buffer, sizeof(buffer), fp))
         {
+            if (feof(fp))
+            {
+                break;
+            }
             err = errno;
             bail_on_error(err);
         }
@@ -291,6 +295,9 @@ ini_cfg_find_sections(
         err = EINVAL;
         bail_on_error(err);
     }
+
+    *pdwNumSections = 0;
+    *pppSections = NULL;
 
     for (pCursor = pConfig->pSection; pCursor; pCursor = pCursor->pNext)
     {
