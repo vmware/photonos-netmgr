@@ -14,7 +14,19 @@
 
 #define IsNullOrEmptyString(str) (!(str) || !(*str))
 
+#ifndef __DEFINES_H__
+#define __DEFINES_H__
+
+
+#define MAX_LINE                       128
+
+#define SYSTEMD_PATH                   "/etc/systemd/"
+#define SYSTEMD_NET_PATH               "/etc/systemd/network/"
+
+
 #define bail_on_error(errcode) \
     if (errcode) { \
         goto error; \
     }
+
+#endif /* __DEFINES_H__ */
