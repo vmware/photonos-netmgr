@@ -37,6 +37,37 @@ uint32_t
 cmd_list(
     PNETMGR_CMD_ARGS pCmdArgs
     );
+
+uint32_t
+cmd_set_iaid(
+    PNETMGR_CMD_ARGS pCmdArgs
+    );
+
+uint32_t
+cmd_get_iaid(
+    PNETMGR_CMD_ARGS pCmdArgs
+    );
+
+uint32_t
+cmd_set_duid(
+    PNETMGR_CMD_ARGS pCmdArgs
+    );
+
+uint32_t
+cmd_get_duid(
+    PNETMGR_CMD_ARGS pCmdArgs
+    );
+
+uint32_t
+cmd_set_dns_servers(
+    PNETMGR_CMD_ARGS pCmdArgs
+    );
+
+uint32_t
+cmd_get_dns_servers(
+    PNETMGR_CMD_ARGS pCmdArgs
+    );
+
 //parse_args.c
 uint32_t
 parse_args(
