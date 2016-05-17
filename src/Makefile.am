@@ -7,7 +7,8 @@ AM_CFLAGS += $(GLIB_CFLAGS)
 
 libnetmgr_la_SOURCES = \
     iniparser.c \
-    netmgr.c
+    netmgr.c \
+    utils.c
 
 libnetmgr_la_LIBADD = \
     @top_builddir@/common/libcommon.la \
