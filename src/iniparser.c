@@ -820,15 +820,15 @@ ini_cfg_parse_key_value(
         err = EBADMSG;
         bail_on_error(err);
     }
-    while (pszCursor && *pszCursor && !isspace((int)*pszCursor))
+    while (pszCursor && *pszCursor)
     {
+        if (*pszCursor == '\n')
+        {
+            pszCursor = NULL;
+            break;
+        }
         pszCursor++;
         len_value++;
-    }
-    // skip whitespace
-    while (pszCursor && *pszCursor && isspace((int)*pszCursor))
-    {
-        pszCursor++;
     }
     if ((pszCursor && *pszCursor) || !len_key || !len_value)
     {
