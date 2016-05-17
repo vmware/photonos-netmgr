@@ -110,7 +110,7 @@ free_interface(
 
 uint32_t
 ifup(
-    const char* pszInterfaceName
+    const char *pszInterfaceName
     )
 {
     uint32_t err = 0;
@@ -131,7 +131,7 @@ error:
 
 uint32_t
 ifdown(
-    const char* pszInterfaceName
+    const char *pszInterfaceName
     )
 {
     uint32_t err = 0;
@@ -148,3 +148,231 @@ error:
     goto cleanup;
 }
 
+int
+set_iaid(
+    const char *pszInterfaceName,
+    const uint32_t iaid
+)
+{
+    uint32_t err = 0;
+    char cfgFileName[MAX_LINE];
+    const char szSectionName[] = "Link";
+    const char szKey[] = "IAID";
+    char szValue[MAX_LINE] = "";
+
+    if (!pszInterfaceName)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    sprintf(cfgFileName, "%s10-%s.network", SYSTEMD_NET_PATH, pszInterfaceName);
+    sprintf(szValue, "%u", iaid);
+
+    if (iaid > 0)
+    {
+        err = set_key_value(cfgFileName, szSectionName, szKey, szValue, 0);
+    }
+    else
+    {
+        err = set_key_value(cfgFileName, szSectionName, szKey, NULL, 0);
+    }
+
+    bail_on_error(err);
+
+error:
+    return err;
+}
+
+int
+get_iaid(
+    const char *pszInterfaceName,
+    uint32_t *iaid
+)
+{
+    uint32_t err = 0;
+    char cfgFileName[MAX_LINE];
+    const char szSectionName[] = "Link";
+    const char szKey[] = "IAID";
+    char szIaid[MAX_LINE];
+
+    if (!pszInterfaceName)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    sprintf(cfgFileName, "%s10-%s.network", SYSTEMD_NET_PATH, pszInterfaceName);
+
+    err = get_key_value(cfgFileName, szSectionName, szKey, szIaid);
+    bail_on_error(err);
+
+    sscanf(szIaid, "%u", iaid);
+
+error:
+    return err;
+}
+
+int
+set_duid(
+    const char *pszInterfaceName,
+    const char *pszDuid
+)
+{
+    uint32_t err = 0;
+    char cfgFileName[MAX_LINE];
+    const char szSectionName[] = "DUID";
+    const char szKey[] = "RawData";
+
+    if (pszInterfaceName != NULL)
+    {
+        /* TODO: Add support */
+        err = ENOTSUP;
+        bail_on_error(err);
+    }
+    else
+    {
+        sprintf(cfgFileName, "%snetworkd.conf", SYSTEMD_PATH);
+    }
+
+    if (strlen(pszDuid) == 0)
+    {
+        err = set_key_value(cfgFileName, szSectionName, szKey, NULL, 0);
+    }
+    else
+    {
+        err = set_key_value(cfgFileName, szSectionName, szKey, pszDuid, 0);
+    }
+    bail_on_error(err);
+
+error:
+    return err;
+}
+
+int
+get_duid(
+    const char *pszInterfaceName,
+    char *pszDuid
+)
+{
+
+    uint32_t err = 0;
+    char cfgFileName[MAX_LINE];
+    const char szSectionName[] = "DUID";
+    const char szKey[] = "RawData";
+
+    if (pszInterfaceName != NULL)
+    {
+        /* TODO: Add support */
+        err = ENOTSUP;
+        bail_on_error(err);
+    }
+    else
+    {
+        sprintf(cfgFileName, "%snetworkd.conf", SYSTEMD_PATH);
+    }
+
+    err = get_key_value(cfgFileName, szSectionName, szKey, pszDuid);
+    bail_on_error(err);
+
+error:
+    return err;
+}
+
+int
+set_dns_servers(
+    const char *pszInterfaceName,
+    const char *pszDnsServers
+)
+{
+    uint32_t err = 0;
+    char cfgFileName[MAX_LINE];
+    char szSectionName[MAX_LINE];
+    char szKey[MAX_LINE] = "DNS";
+    char szValue[MAX_LINE];
+    DIR *dirFile = NULL;
+    struct dirent *hFile;
+
+    if (pszInterfaceName != NULL)
+    {
+        sprintf(cfgFileName, "%s10-%s.network", SYSTEMD_NET_PATH, pszInterfaceName);
+        sprintf(szSectionName, "Network");
+    }
+    else
+    {
+        sprintf(cfgFileName, "%sresolved.conf", SYSTEMD_PATH);
+        sprintf(szSectionName, "Resolve");
+    }
+
+    if (strlen(pszDnsServers) == 0)
+    {
+        sprintf(szValue, "true");
+        err = set_key_value(cfgFileName, szSectionName, szKey, NULL, 0);
+    }
+    else
+    {
+        sprintf(szValue, "false");
+        err = set_key_value(cfgFileName, szSectionName, szKey, pszDnsServers, 0);
+    }
+    bail_on_error(err);
+
+    /* For each .network file - set 'UseDNS=false' */
+    if (pszInterfaceName == NULL)
+    {
+        dirFile = opendir(SYSTEMD_NET_PATH);
+        if (dirFile != NULL)
+        {
+            errno = 0;
+            sprintf(szSectionName, "DHCP");
+            sprintf(szKey, "UseDNS");
+            while ((hFile = readdir(dirFile)) != NULL)
+            {
+                if (!strcmp(hFile->d_name, ".")) continue;
+                if (!strcmp(hFile->d_name, "..")) continue;
+                if (hFile->d_name[0] == '.') continue;
+                if (strstr(hFile->d_name, ".network"))
+                {
+                    sprintf(cfgFileName, "%s%s", SYSTEMD_NET_PATH, hFile->d_name);
+                    err = set_key_value(cfgFileName, szSectionName, szKey, szValue, 0);
+                    bail_on_error(err);
+                }
+            }
+        }
+    }
+
+error:
+    if (dirFile != NULL)
+    {
+        closedir(dirFile);
+    }
+    return err;
+}
+
+int
+get_dns_servers(
+    const char *pszInterfaceName,
+    char *pszDnsServers
+)
+{
+    uint32_t err = 0;
+    char cfgFileName[MAX_LINE];
+    char szSectionName[MAX_LINE];
+    char szKey[MAX_LINE] = "DNS";
+
+    if (pszInterfaceName != NULL)
+    {
+        sprintf(cfgFileName, "%s10-%s.network", SYSTEMD_NET_PATH, pszInterfaceName);
+        sprintf(szSectionName, "Network");
+    }
+    else
+    {
+        sprintf(cfgFileName, "%sresolved.conf", SYSTEMD_PATH);
+        sprintf(szSectionName, "Resolve");
+    }
+
+    err = get_key_value(cfgFileName, szSectionName, szKey, pszDnsServers);
+    bail_on_error(err);
+
+error:
+    return err;
+}
