@@ -23,7 +23,7 @@ ltmain.sh
 libtool
 ar-lib
 
-/include/config.h.in
+/include/config.h.in*
 /include/stamp*
 /common/.deps
 /common/.libs

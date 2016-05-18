@@ -14,23 +14,68 @@
 
 #include "includes.h"
 
+//name of command,
+//pointer to command invoke
+//parameters if any
+//help message
+NETMGR_CLI_CMD_MAP arCmdMap[] =
+{
+    {"help",
+     cmd_help,
+     "",
+     "show this message"
+    },
+    {"ifup",
+     cmd_ifup,
+     "<interfacename>",
+     "bring up the specified interface if it is currently down."
+    },
+    {"ifdown",
+     cmd_ifdown,
+     "<interfacename>",
+     "bring down the specified interface if it is currently up."
+    },
+    {"list",
+     cmd_list,
+     "-4 or -6",
+     "shows list of available interfaces. -4 is the default"
+    }, 
+    {"set_iaid",
+     cmd_set_iaid,
+     "<interfacename> <IAID>",
+     "set IAID"
+    },
+    {"get_iaid",
+     cmd_get_iaid,
+     "<interfacename>",
+     "get IAID"
+    },
+    {"set_duid",
+     cmd_set_duid,
+     "<interfacename> <DUID>",
+     "set DUID"
+    },
+    {"get_duid",
+     cmd_get_duid,
+     "<interfacename>",
+     "get DUID"
+    },
+    {"set_dns_servers",
+     cmd_set_dns_servers,
+     "<dns servers list>",
+     "set dns servers"
+    },
+    {"get_dns_servers",
+     cmd_get_dns_servers,
+     "",
+     "get dns servers"
+    },
+};
+
 int main(int argc, char* argv[])
 {
     uint32_t err = 0;
     PNETMGR_CMD_ARGS pCmdArgs = NULL;
-    NETMGR_CLI_CMD_MAP arCmdMap[] =
-    {
-        {"help",    cmd_help},
-        {"ifup",    cmd_ifup},
-        {"ifdown",  cmd_ifdown},
-        {"list",    cmd_list},
-        {"set_iaid",  cmd_set_iaid},
-        {"get_iaid",  cmd_get_iaid},
-        {"set_duid",  cmd_set_duid},
-        {"get_duid",  cmd_get_duid},
-        {"set_dns_servers",  cmd_set_dns_servers},
-        {"get_dns_servers",  cmd_get_dns_servers},
-    };
 
     int nCommandCount = sizeof(arCmdMap)/sizeof(NETMGR_CLI_CMD_MAP);
     const char* pszCmd = NULL;
@@ -94,16 +139,22 @@ cmd_help(
     PNETMGR_CMD_ARGS pCmdArgs
     )
 {
+    int i = 0;
+    int nCommandCount = sizeof(arCmdMap)/sizeof(NETMGR_CLI_CMD_MAP);
     fprintf(stdout, "Usage: netmgr [options] command\n");
     fprintf(stdout, "\n");
 
     fprintf(stdout, "List of commands\n");
     fprintf(stdout, "\n");
 
-    fprintf(stdout, "help\tshows this message\n");
-    fprintf(stdout, "ifup <interfacename>\tbring up the specified interface if it is currently down.\n");
-    fprintf(stdout, "ifdown <interfacename>\tbring down the specified interface if it is currently up.\n");
-    fprintf(stdout, "list\tshows list of available interfaces. use -6 to show ipv6 only\n");
+    for(i = 0; i < nCommandCount; ++i)
+    {
+        fprintf(stdout,
+                "%s %s\t%s\n",
+                arCmdMap[i].pszCmdName,
+                arCmdMap[i].pszParams,
+                arCmdMap[i].pszHelpMessage);
+    }
 
     return 0;
 }
