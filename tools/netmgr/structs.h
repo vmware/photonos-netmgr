@@ -36,6 +36,8 @@ typedef struct _NETMGR_CLI_CMD_MAP
 {
     char* pszCmdName;
     uint32_t (*pFnCmd)(PNETMGR_CMD_ARGS);
+    char* pszParams;
+    char* pszHelpMessage;
 }NETMGR_CLI_CMD_MAP, *PNETMGR_CLI_CMD_MAP;
 
 #ifdef __cplusplus
