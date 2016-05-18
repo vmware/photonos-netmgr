@@ -39,6 +39,7 @@ cd build && make install DESTDIR=$RPM_BUILD_ROOT
 
 %exclude %{_lib64dir}/libnetmgr.a
 %exclude %{_lib64dir}/libnetmgr.la
+%exclude %{_includedir}/*
 
 # %doc ChangeLog README COPYING
 
