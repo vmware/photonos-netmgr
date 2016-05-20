@@ -106,7 +106,7 @@ netmgr_alloc_string_len(
     uint32_t err = 0;
     char* pszDst = NULL;
 
-    if (!pszSrc || !ppszDst || len < 0)
+    if (!pszSrc || !ppszDst)
     {
         err = EINVAL;
         bail_on_error(err);

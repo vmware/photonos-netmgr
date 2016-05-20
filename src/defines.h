@@ -25,8 +25,10 @@
 
 
 #define bail_on_error(errcode) \
-    if (errcode) { \
-        goto error; \
-    }
+    do { \
+       if (errcode) { \
+          goto error; \
+       } \
+    } while(0)
 
 #endif /* __DEFINES_H__ */

@@ -186,7 +186,6 @@ ini_cfg_create_config(
 {
     uint32_t err = 0;
     PCONFIG_INI pConfig = NULL;
-    char szPath[1024];
 
     if (!ppConfig)
     {
@@ -195,11 +194,6 @@ ini_cfg_create_config(
     }
 
     err = netmgr_alloc(sizeof(CONFIG_INI), (void*)&pConfig);
-    bail_on_error(err);
-
-    sprintf(szPath, "/tmp/%s", tmpnam(NULL));
-
-    err = netmgr_alloc_string(szPath, &pConfig->pszPath);
     bail_on_error(err);
 
     *ppConfig = pConfig;
@@ -213,6 +207,10 @@ error:
     if (ppConfig)
     {
         *ppConfig = NULL;
+    }
+    if (pConfig)
+    {
+        ini_cfg_free_config(pConfig);
     }
 
     goto cleanup;
@@ -613,11 +611,19 @@ ini_cfg_save(
     {
         PKEYVALUE_INI pKeyValue = pSection->pKeyValue;
 
-        fprintf(fp, "\n[%s]\n", pSection->pszName);
+        if(fprintf(fp, "\n[%s]\n", pSection->pszName) < 0)
+        {
+            err = EBADF;
+            bail_on_error(err);
+        }
 
         for (; pKeyValue; pKeyValue = pKeyValue->pNext)
         {
-            fprintf(fp, "%s=%s\n", pKeyValue->pszKey, pKeyValue->pszValue);
+            if(fprintf(fp, "%s=%s\n", pKeyValue->pszKey, pKeyValue->pszValue) < 0)
+            {
+                err = EBADF;
+                bail_on_error(err);
+            }
         }
     }
 
