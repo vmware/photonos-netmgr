@@ -30,7 +30,7 @@ enum_interfaces(
     PNETMGR_INTERFACE pInterfaces = NULL;
     PNETMGR_INTERFACE pInterface = NULL;
 
-    if(nFamily != PF_INET && nFamily != PF_INET6)
+    if(nFamily != PF_INET && nFamily != PF_INET6 && !ppInterfaces)
     {
         err = EINVAL;
         bail_on_error(err);
@@ -72,9 +72,13 @@ enum_interfaces(
     *ppInterfaces = pInterfaces;
 
 clean:
+    if(fd >= 0)
+    {
+       close(fd);
+    }
     return err;
 error:
-    if(!ppInterfaces)
+    if(ppInterfaces)
     {
         *ppInterfaces = NULL;
     }
