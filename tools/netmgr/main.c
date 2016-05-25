@@ -102,7 +102,7 @@ int main(int argc, char* argv[])
             {
                 err = arCmdMap[nCommandCount].pFnCmd(pCmdArgs);
                 bail_on_error(err);
-                nFound = 0;
+                nFound = 1;
                 break;
             }
         }
