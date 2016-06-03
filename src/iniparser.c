@@ -600,7 +600,7 @@ ini_cfg_save(
 
     sprintf(pszTmpPath, "%s%s", pszPath, pszSuffix);
 
-    fp = fopen(pszTmpPath, "w");
+    fp = fopen(pszTmpPath, "w+");
     if (!fp)
     {
         err = errno;
@@ -629,6 +629,11 @@ ini_cfg_save(
 
     fclose(fp);
     fp = NULL;
+
+    if (chmod(pszTmpPath, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH) != 0)
+    {
+        bail_on_error(errno);
+    }
 
     if (rename(pszTmpPath, pszPath) < 0)
     {

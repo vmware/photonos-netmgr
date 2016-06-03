@@ -241,11 +241,13 @@ set_duid(
 
     if (strlen(pszDuid) == 0)
     {
-        err = set_key_value(cfgFileName, szSectionName, szKey, NULL, 0);
+        err = set_key_value(cfgFileName, szSectionName, szKey, NULL,
+                            F_CREATE_CFG_FILE);
     }
     else
     {
-        err = set_key_value(cfgFileName, szSectionName, szKey, pszDuid, 0);
+        err = set_key_value(cfgFileName, szSectionName, szKey, pszDuid,
+                            F_CREATE_CFG_FILE);
     }
     bail_on_error(err);
 
