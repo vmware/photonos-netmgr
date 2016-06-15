@@ -537,7 +537,8 @@ ini_cfg_delete_key(
     )
 {
     uint32_t err = 0;
-    PKEYVALUE_INI pCursor = NULL;
+    PKEYVALUE_INI *pCursor = NULL;
+    PKEYVALUE_INI pCandidate = NULL;
 
     if (!pSection || !pszKey || !*pszKey)
     {
@@ -545,29 +546,22 @@ ini_cfg_delete_key(
         bail_on_error(err);
     }
 
-    pCursor = pSection->pKeyValue;
-    while (pCursor)
+    pCursor = &pSection->pKeyValue;
+    while (*pCursor)
     {
-        PKEYVALUE_INI pCandidate = NULL;
-
-        if (!strcmp(pCursor->pszKey, pszKey))
+        if (!strcmp((*pCursor)->pszKey, pszKey))
         {
-            pCandidate = pCursor;
-
-            if (pCursor == pSection->pKeyValue)
-            {
-                pSection->pKeyValue = pCursor->pNext;
-            }
+            pCandidate = *pCursor;
+            *pCursor = pCandidate->pNext;
+            break;
         }
+        pCursor = &(*pCursor)->pNext;
+    }
 
-        pCursor = pCursor->pNext;
-
-        if (pCandidate)
-        {
-            pCandidate->pNext = NULL;
-
-            ini_cfg_free_keyvalue(pCandidate);
-        }
+    if (pCandidate)
+    {
+        pCandidate->pNext = NULL;
+        ini_cfg_free_keyvalue(pCandidate);
     }
 
 error:
