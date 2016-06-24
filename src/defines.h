@@ -23,6 +23,11 @@
 #define SYSTEMD_PATH                   "/etc/systemd/"
 #define SYSTEMD_NET_PATH               "/etc/systemd/network/"
 
+#define SECTION_DHCP                   "DHCP"
+#define KEY_IAID                       "IAID"
+#define KEY_DUID_TYPE                  "DUIDType"
+#define KEY_DUID_RAWDATA               "DUIDRawData"
+
 
 #define bail_on_error(errcode) \
     do { \
