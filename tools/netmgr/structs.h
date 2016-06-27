@@ -12,14 +12,34 @@
  * under the License.
  */
 
-#include <config.h>
+#pragma once
 
-#include <getopt.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#include <netmgmtsys.h>
+typedef struct _NETMGR_CMD_ARGS
+{
+    //options
+    int nIPv4;
+    int nIPv6;
+    int nVersion;
+    int nHelp;
+    int nVerbose;
+    //command args
+    char** ppszCmds;
+    int nCmdCount;
+}NETMGR_CMD_ARGS, *PNETMGR_CMD_ARGS;
 
-#include "../common/prototypes.h"
-#include <netmgr.h>
-#include "defines.h"
-#include "structs.h"
-#include "prototypes.h"
+//Map command name to client function
+typedef struct _NETMGR_CLI_CMD_MAP
+{
+    char* pszCmdName;
+    uint32_t (*pFnCmd)(PNETMGR_CMD_ARGS);
+    char* pszParams;
+    char* pszHelpMessage;
+}NETMGR_CLI_CMD_MAP, *PNETMGR_CLI_CMD_MAP;
+
+#ifdef __cplusplus
+}
+#endif

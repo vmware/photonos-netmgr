@@ -1,6 +1,6 @@
 AC_PREREQ(2.59)
 
-AC_INIT([netmgmt], [1.0.0], [support@vmware.com])
+AC_INIT([netmgmt], [1.0.2], [support@vmware.com])
 AC_CANONICAL_SYSTEM
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 AC_CONFIG_HEADERS([include/config.h])
@@ -55,10 +55,14 @@ AC_CHECK_FUNCS(strerror)
 AC_CHECK_LIB([dl], [dlopen], [DL_LIBS="-ldl"])
 AC_CHECK_LIB([pthread], [pthread_self], [PTHREAD_LIBS="-lpthread"])
 
+PKG_CHECK_MODULES([GLIB], [glib-2.0], [have_libglib=yes], [have_libglib=no])
+AM_CONDITIONAL([GLIB],  [test "$have_libglib" = "yes"])
+
 AC_SUBST(DL_LIBS)
 AC_SUBST(PTHREAD_LIBS)
 
 AC_CONFIG_FILES([Makefile
+                 common/Makefile
                  src/Makefile
                  tools/Makefile
                  tools/netmgr/Makefile

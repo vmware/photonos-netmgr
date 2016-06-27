@@ -14,11 +14,20 @@
 
 #include <config.h>
 
+#include <glib.h>
+#include <glib/gstdio.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+
+#include <constants.h>
 #include <netmgmtsys.h>
 
+#include <netmgr.h>
 #include <iniparser.h>
 
+#include "../common/prototypes.h"
 #include "defines.h"
 #include "structs.h"
 #include "prototypes.h"
+#include "utils.h"
 

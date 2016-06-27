@@ -12,29 +12,3 @@
  * under the License.
  */
 
-// memory.c
-
-uint32_t
-ini_cfg_alloc(
-    size_t size,
-    void** pMemory
-    );
-
-uint32_t
-ini_cfg_alloc_string(
-    const char* pszSrc,
-    char**      ppszDst
-    );
-
-uint32_t
-ini_cfg_alloc_string_len(
-    const char* pszSrc,
-    size_t      len,
-    char**      ppszDst
-    );
-
-void
-ini_cfg_free(
-    void* pMemory
-    );
-
