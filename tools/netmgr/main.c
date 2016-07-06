@@ -39,7 +39,7 @@ NETMGR_CLI_CMD_MAP arCmdMap[] =
      cmd_list,
      "-4 or -6",
      "shows list of available interfaces. -4 is the default"
-    }, 
+    },
     {"set_iaid",
      cmd_set_iaid,
      "<interfacename> <IAID>",
@@ -69,6 +69,16 @@ NETMGR_CLI_CMD_MAP arCmdMap[] =
      cmd_get_dns_servers,
      "",
      "get dns servers"
+    },
+    {"set_dns_servers_v2",
+     cmd_set_dns_servers_v2,
+     "<DNS mode> <dns servers list>",
+     "set dns mode and servers list"
+    },
+    {"get_dns_servers_v2",
+     cmd_get_dns_servers_v2,
+     "",
+     "get dns mode and servers list"
     },
 };
 
@@ -464,6 +474,154 @@ cmd_get_dns_servers(
     bail_on_error(err);
 
     fprintf(stdout, "DNS=%s\n", dnsServers);
+cleanup:
+    return err;
+error:
+    if(err == EDOM)
+    {
+        fprintf(
+               stderr,
+               "Usage: get_dns_servers\n");
+    }
+    goto cleanup;
+}
+
+uint32_t
+cmd_set_dns_servers_v2(
+    PNETMGR_CMD_ARGS pCmdArgs
+    )
+{
+    uint32_t err = 0;
+    size_t i = 0, count = 0;
+    NET_DNS_MODE mode;
+    char *s1, *s2, **szDnsServersList = NULL;
+    char szDnsServers[1024];
+
+    if(!pCmdArgs)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if(pCmdArgs->nCmdCount < 3)
+    {
+        err = EDOM;
+        bail_on_error(err);
+    }
+
+    if (!strcmp(pCmdArgs->ppszCmds[1], "dhcp"))
+    {
+        mode = DHCP_DNS;
+    }
+    else if (!strcmp(pCmdArgs->ppszCmds[1], "static"))
+    {
+        mode = STATIC_DNS;
+    }
+    else
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    strcpy(szDnsServers, pCmdArgs->ppszCmds[2]);
+    if (strlen(szDnsServers) > 0)
+    {
+        s2 = pCmdArgs->ppszCmds[2];
+        do {
+            s1 = strsep(&s2, " ");
+            if (strlen(s1) > 0)
+            {
+                count++;
+            }
+        } while (s2 != NULL);
+    }
+
+    if (count > 0)
+    {
+        err = netmgr_alloc((count * sizeof(char *)), (void *)&szDnsServersList);
+        bail_on_error(err);
+        memset(szDnsServersList, 0, (count * sizeof(char *)));
+
+        s2 = szDnsServers;
+        do {
+            s1 = strsep(&s2, " ");
+            if (strlen(s1) > 0)
+            {
+                err = netmgr_alloc_string(s1, &(szDnsServersList[i++]));
+                bail_on_error(err);
+            }
+        } while (s2 != NULL);
+    }
+
+    err = set_dns_servers_v2(NULL, mode, count, (const char **)szDnsServersList, 0);
+    bail_on_error(err);
+
+cleanup:
+    /* Free allocated memory */
+    if (szDnsServersList != NULL)
+    {
+        for (i = 0; i < count; i++)
+        {
+            if (szDnsServersList[i] != NULL)
+            {
+                netmgr_free(szDnsServersList[i]);
+            }
+            netmgr_free(szDnsServersList);
+        }
+    }
+    return err;
+error:
+    if(err == EDOM)
+    {
+        fprintf(
+               stderr,
+               "Usage: set_dns_servers <dns mode> <dns server list>\n");
+    }
+    goto cleanup;
+}
+
+uint32_t
+cmd_get_dns_servers_v2(
+    PNETMGR_CMD_ARGS pCmdArgs
+    )
+{
+    uint32_t err = 0;
+    NET_DNS_MODE mode;
+    size_t i, count;
+    char **dnsServers;
+
+    if(!pCmdArgs)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if(pCmdArgs->nCmdCount < 1)
+    {
+        err = EDOM;
+        bail_on_error(err);
+    }
+
+    err = get_dns_servers_v2(NULL, 0, &mode, &count, &dnsServers);
+    bail_on_error(err);
+
+    if (mode == STATIC_DNS)
+    {
+        fprintf(stdout, "DNSMode=static\n");
+    }
+    else
+    {
+        fprintf(stdout, "DNSMode=dhcp\n");
+    }
+    fprintf(stdout, "DNSServers=");
+    for (i = 0; i < count; i++)
+    {
+        fprintf(stdout, "%s ", dnsServers[i]);
+        netmgr_free(dnsServers[i]);
+    }
+    netmgr_free(dnsServers);
+    fprintf(stdout, "\n");
+
 cleanup:
     return err;
 error:

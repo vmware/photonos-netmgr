@@ -153,7 +153,8 @@ get_key_value(
         err = ENOENT;
         bail_on_error(err);
     }
-    sscanf(pKeyValue->pszValue, "%s", pszValue);
+    /* TODO: Change to malloc return memory model */
+    strncpy(pszValue, pKeyValue->pszValue, MAX_LINE);
 
 error:
     if (ppSections != NULL)

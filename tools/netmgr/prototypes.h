@@ -68,6 +68,16 @@ cmd_get_dns_servers(
     PNETMGR_CMD_ARGS pCmdArgs
     );
 
+uint32_t
+cmd_set_dns_servers_v2(
+    PNETMGR_CMD_ARGS pCmdArgs
+    );
+
+uint32_t
+cmd_get_dns_servers_v2(
+    PNETMGR_CMD_ARGS pCmdArgs
+    );
+
 //parse_args.c
 uint32_t
 parse_args(
