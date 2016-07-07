@@ -153,9 +153,396 @@ error:
 }
 
 int
+set_link_info(
+    const char *pszInterfaceName,
+    const char *pszMacAddress,
+    uint32_t mtu
+)
+{
+    return 0;
+}
+
+int
+set_link_mode(
+    const char *pszInterfaceName,
+    NET_LINK_MODE mode
+)
+{
+    return 0;
+}
+
+int
+set_link_state(
+    const char *pszInterfaceName,
+    NET_LINK_STATE state
+)
+{
+    return 0;
+}
+
+int
+get_link_info(
+    const char *pszInterfaceName,
+    size_t *pCount,
+    NET_LINK_INFO **ppLinkInfo
+)
+{
+    return 0;
+}
+
+
+/*
+ * IP Address configuration APIs
+ */
+
+int
+set_static_ipv4_addr(
+    const char *pszInterfaceName,
+    const char *pszIPv4Addr,
+    uint8_t prefix,
+    uint32_t flags
+)
+{
+    return 0;
+}
+
+int
+delete_static_ipv4_addr(
+    const char *pszInterfaceName
+)
+{
+    return 0;
+}
+
+int
+add_static_ipv6_addr(
+    const char *pszInterfaceName,
+    const char *pszIPv6Addr,
+    uint8_t prefix,
+    uint32_t flags
+)
+{
+    return 0;
+}
+
+int
+delete_static_ipv6_addr(
+    const char *pszInterfaceName,
+    const char *pszIPv6Addr,
+    uint8_t prefix,
+    uint32_t flags
+)
+{
+    return 0;
+}
+
+int
+set_ip_dhcp_mode(
+    const char *pszInterfaceName,
+    uint32_t dhcpModeFlags
+)
+{
+    return 0;
+}
+
+int
+get_ip_addr_info(
+    const char *pszInterfaceName,
+    uint32_t flags,
+    size_t *pCount,
+    NET_IP_ADDR **ppAddrList
+)
+{
+    return 0;
+}
+
+/*
+ * Route configuration APIs
+ */
+
+int
+set_ip_route(
+    const char *pszInterfaceName,
+    const char *pszDestAddr,
+    uint8_t prefix,
+    const char *pszGateway,
+    uint32_t metric,
+    uint32_t flags
+)
+{
+    return 0;
+}
+
+int
+delete_ip_route(
+    const char *pszInterfaceName,
+    const char *pszDestAddr,
+    uint8_t prefix,
+    uint32_t flags
+)
+{
+    return 0;
+}
+
+int
+get_ip_route_info(
+    size_t *pCount,
+    NET_IP_ROUTE **ppRouteList
+)
+{
+    return 0;
+}
+
+
+/*
+ * DNS configuration APIs
+ */
+
+int
+set_dns_servers_v2(
+    const char *pszInterfaceName,
+    NET_DNS_MODE mode,
+    size_t count,
+    const char **ppDnsServers,
+    uint32_t flags
+)
+{
+    uint32_t err = 0;
+    char cfgFileName[MAX_LINE];
+    char szSectionName[MAX_LINE];
+    char szUseDnsValue[MAX_LINE];
+    char *szDnsServersValue = NULL;
+    DIR *dirFile = NULL;
+    struct dirent *hFile;
+    size_t i, bytes = 0;
+
+    if (pszInterfaceName != NULL)
+    {
+        sprintf(cfgFileName, "%s10-%s.network", SYSTEMD_NET_PATH,
+                pszInterfaceName);
+        sprintf(szSectionName, SECTION_NETWORK);
+    }
+    else
+    {
+        sprintf(cfgFileName, "%sresolved.conf", SYSTEMD_PATH);
+        sprintf(szSectionName, SECTION_RESOLVE);
+    }
+
+    if (count > 0)
+    {
+        if (ppDnsServers == NULL)
+        {
+            err = EINVAL;
+            bail_on_error(err);
+        }
+        for (i = 0; i < count; i++)
+        {
+            bytes += strlen(ppDnsServers[i]) + 1;
+            /* TODO: Check IP addresses are valid. */
+        }
+        err = netmgr_alloc(bytes, (void *)&szDnsServersValue);
+        bail_on_error(err);
+        strcpy(szDnsServersValue, ppDnsServers[0]);
+        for (i = 1; i < count; i++)
+        {
+            sprintf(szDnsServersValue, "%s %s", szDnsServersValue, ppDnsServers[i]);
+        }
+    }
+
+    err = EINVAL;
+    if (mode == DHCP_DNS)
+    {
+        sprintf(szUseDnsValue, "true");
+        if (count == 0)
+        {
+            err = set_key_value(cfgFileName, szSectionName, KEY_DNS, NULL, 0);
+        }
+    }
+    else if (mode == STATIC_DNS)
+    {
+        sprintf(szUseDnsValue, "false");
+        if (count == 0)
+        {
+            err = set_key_value(cfgFileName, szSectionName, KEY_DNS, NULL, 0);
+        }
+        else
+        {
+            err = set_key_value(cfgFileName, szSectionName, KEY_DNS,
+                                szDnsServersValue, 0);
+        }
+    }
+    bail_on_error(err);
+
+    /* For each .network file - set 'UseDNS=false' */
+    if (pszInterfaceName == NULL)
+    {
+        dirFile = opendir(SYSTEMD_NET_PATH);
+        if (dirFile != NULL)
+        {
+            errno = 0;
+            while ((hFile = readdir(dirFile)) != NULL)
+            {
+                if (!strcmp(hFile->d_name, ".")) continue;
+                if (!strcmp(hFile->d_name, "..")) continue;
+                if (hFile->d_name[0] == '.') continue;
+                if (strstr(hFile->d_name, ".network"))
+                {
+                    sprintf(cfgFileName, "%s%s", SYSTEMD_NET_PATH, hFile->d_name);
+                    err = set_key_value(cfgFileName, SECTION_DHCP, KEY_USE_DNS,
+                                        szUseDnsValue, 0);
+                    bail_on_error(err);
+                }
+            }
+        }
+    }
+
+error:
+    if (dirFile != NULL)
+    {
+        closedir(dirFile);
+    }
+    if (szDnsServersValue != NULL)
+    {
+        netmgr_free(szDnsServersValue);
+    }
+    return err;
+}
+
+int
+get_dns_servers_v2(
+    const char *pszInterfaceName,
+    uint32_t flags,
+    NET_DNS_MODE *pMode,
+    size_t *pCount,
+    char ***ppDnsServers
+)
+{
+    uint32_t err = 0;
+    char cfgFileName[MAX_LINE];
+    char szSectionName[MAX_LINE];
+    char szUseDnsValue[MAX_LINE];
+    char szDnsServersValue[MAX_LINE];
+    char szDnsServersValue2[MAX_LINE];
+    char *s1, *s2 = szDnsServersValue;
+    size_t i = 0, count = 0;
+    char **szDnsServersList = NULL;
+    *pCount = 0;
+    *ppDnsServers = NULL;
+
+    /* Determine DNS mode from UseDNS value in 10-eth0.network */
+    sprintf(cfgFileName, "%s10-eth0.network", SYSTEMD_NET_PATH);
+    err = get_key_value(cfgFileName, SECTION_DHCP, KEY_USE_DNS, szUseDnsValue);
+    if ((err == ENOENT) || !strcmp(szUseDnsValue, "true"))
+    {
+        *pMode = DHCP_DNS;
+        err = 0;
+    }
+    else if (!strcmp(szUseDnsValue, "false"))
+    {
+        *pMode = STATIC_DNS;
+    }
+    else
+    {
+        err = EINVAL;
+    }
+    bail_on_error(err);
+
+    if (pszInterfaceName != NULL)
+    {
+        sprintf(cfgFileName, "%s10-%s.network", SYSTEMD_NET_PATH, pszInterfaceName);
+        sprintf(szSectionName, SECTION_NETWORK);
+    }
+    else
+    {
+        sprintf(cfgFileName, "%sresolved.conf", SYSTEMD_PATH);
+        sprintf(szSectionName, SECTION_RESOLVE);
+    }
+
+    /* Parse szDnsServersValue */
+    err = get_key_value(cfgFileName, szSectionName, KEY_DNS, szDnsServersValue);
+    if (err == ENOENT)
+    {
+        err = 0;
+        goto error;
+    }
+    bail_on_error(err);
+    strncpy(szDnsServersValue2, szDnsServersValue, MAX_LINE);
+
+    do {
+        s1 = strsep(&s2, " ");
+        if (strlen(s1) > 0)
+        {
+            count++;
+        }
+    } while (s2 != NULL);
+
+    if (count > 0)
+    {
+        err = netmgr_alloc((count * sizeof(char *)), (void *)&szDnsServersList);
+        bail_on_error(err);
+
+        s2 = szDnsServersValue2;
+        do {
+            s1 = strsep(&s2, " ");
+            if (strlen(s1) > 0)
+            {
+                err = netmgr_alloc_string(s1, &(szDnsServersList[i++]));
+                bail_on_error(err);
+            }
+        } while (s2 != NULL);
+
+        *pCount = count;
+        *ppDnsServers = szDnsServersList;
+        szDnsServersList = NULL;
+    }
+
+error:
+    /* Free allocated memory on error */
+    if (szDnsServersList != NULL)
+    {
+        for (i = 0; i < count; i++)
+        {
+            if (szDnsServersList[i] != NULL)
+            {
+                netmgr_free(szDnsServersList[i]);
+            }
+        }
+        netmgr_free(szDnsServersList);
+    }
+    return err;
+}
+
+int
+set_dns_domains(
+    const char *pszInterfaceName,
+    size_t count,
+    const char **ppDnsDomains,
+    uint32_t flags
+)
+{
+    return 0;
+}
+
+int
+get_dns_domains(
+    const char *pszInterfaceName,
+    uint32_t flags,
+    size_t *pCount,
+    char **ppDnsDomains
+)
+{
+    return 0;
+}
+
+
+/*
+ * DHCP options, DUID, IAID configuration APIs
+ */
+
+int
 set_iaid(
     const char *pszInterfaceName,
-    const uint32_t iaid
+    uint32_t iaid
 )
 {
     uint32_t err = 0;
@@ -189,7 +576,7 @@ error:
 int
 get_iaid(
     const char *pszInterfaceName,
-    uint32_t *iaid
+    uint32_t *pIaid
 )
 {
     uint32_t err = 0;
@@ -207,7 +594,7 @@ get_iaid(
     err = get_key_value(cfgFileName, SECTION_DHCP, KEY_IAID, szIaid);
     bail_on_error(err);
 
-    sscanf(szIaid, "%u", iaid);
+    sscanf(szIaid, "%u", pIaid);
 
 error:
     return err;
