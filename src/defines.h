@@ -18,7 +18,7 @@
 #define __DEFINES_H__
 
 
-#define MAX_LINE                       1024
+#define MAX_LINE                       512
 
 #define SYSTEMD_PATH                   "/etc/systemd/"
 #define SYSTEMD_NET_PATH               "/etc/systemd/network/"

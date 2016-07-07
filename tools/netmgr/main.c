@@ -60,23 +60,18 @@ NETMGR_CLI_CMD_MAP arCmdMap[] =
      "<interfacename>",
      "get DUID"
     },
-    {"set_dns_servers",
-     cmd_set_dns_servers,
+    {"set_dns_servers_v0",
+     cmd_set_dns_servers_v0,
      "<dns servers list>",
      "set dns servers"
     },
-    {"get_dns_servers",
-     cmd_get_dns_servers,
-     "",
-     "get dns servers"
-    },
-    {"set_dns_servers_v2",
-     cmd_set_dns_servers_v2,
+    {"set_dns_servers",
+     cmd_set_dns_servers,
      "<DNS mode> <dns servers list>",
      "set dns mode and servers list"
     },
-    {"get_dns_servers_v2",
-     cmd_get_dns_servers_v2,
+    {"get_dns_servers",
+     cmd_get_dns_servers,
      "",
      "get dns mode and servers list"
     },
@@ -301,6 +296,7 @@ cmd_set_iaid(
 
 cleanup:
     return err;
+
 error:
     if(err == EDOM)
     {
@@ -334,8 +330,10 @@ cmd_get_iaid(
     bail_on_error(err);
 
     fprintf(stdout, "IAID=%u\n", iaid);
+
 cleanup:
     return err;
+
 error:
     if(err == EDOM)
     {
@@ -370,6 +368,7 @@ cmd_set_duid(
 
 cleanup:
     return err;
+
 error:
     if(err == EDOM)
     {
@@ -386,7 +385,7 @@ cmd_get_duid(
     )
 {
     uint32_t err = 0;
-    char duid[256];
+    char *duid = NULL;
 
     if(!pCmdArgs)
     {
@@ -400,12 +399,18 @@ cmd_get_duid(
         bail_on_error(err);
     }
 
-    err = get_duid(NULL, duid);
+    err = get_duid(NULL, &duid);
     bail_on_error(err);
 
     fprintf(stdout, "DUID=%s\n", duid);
+
 cleanup:
+    if (duid != NULL)
+    {
+        netmgr_free(duid);
+    }
     return err;
+
 error:
     if(err == EDOM)
     {
@@ -417,7 +422,7 @@ error:
 }
 
 uint32_t
-cmd_set_dns_servers(
+cmd_set_dns_servers_v0(
     PNETMGR_CMD_ARGS pCmdArgs
     )
 {
@@ -435,59 +440,24 @@ cmd_set_dns_servers(
         bail_on_error(err);
     }
 
-    err = set_dns_servers(NULL, pCmdArgs->ppszCmds[1]);
+    err = set_dns_servers_v0(NULL, pCmdArgs->ppszCmds[1]);
     bail_on_error(err);
 
 cleanup:
     return err;
+
 error:
     if(err == EDOM)
     {
         fprintf(
                stderr,
-               "Usage: set_dns_servers <dns server list>\n");
+               "Usage: set_dns_servers_v0 <dns server list>\n");
     }
     goto cleanup;
 }
 
 uint32_t
-cmd_get_dns_servers(
-    PNETMGR_CMD_ARGS pCmdArgs
-    )
-{
-    uint32_t err = 0;
-    char dnsServers[1024];
-
-    if(!pCmdArgs)
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    if(pCmdArgs->nCmdCount < 1)
-    {
-        err = EDOM;
-        bail_on_error(err);
-    }
-
-    err = get_dns_servers(NULL, dnsServers);
-    bail_on_error(err);
-
-    fprintf(stdout, "DNS=%s\n", dnsServers);
-cleanup:
-    return err;
-error:
-    if(err == EDOM)
-    {
-        fprintf(
-               stderr,
-               "Usage: get_dns_servers\n");
-    }
-    goto cleanup;
-}
-
-uint32_t
-cmd_set_dns_servers_v2(
+cmd_set_dns_servers(
     PNETMGR_CMD_ARGS pCmdArgs
     )
 {
@@ -552,7 +522,7 @@ cmd_set_dns_servers_v2(
         } while (s2 != NULL);
     }
 
-    err = set_dns_servers_v2(NULL, mode, count, (const char **)szDnsServersList, 0);
+    err = set_dns_servers(NULL, mode, count, (const char **)szDnsServersList, 0);
     bail_on_error(err);
 
 cleanup:
@@ -569,6 +539,7 @@ cleanup:
         netmgr_free(szDnsServersList);
     }
     return err;
+
 error:
     if(err == EDOM)
     {
@@ -580,7 +551,7 @@ error:
 }
 
 uint32_t
-cmd_get_dns_servers_v2(
+cmd_get_dns_servers(
     PNETMGR_CMD_ARGS pCmdArgs
     )
 {
@@ -601,7 +572,7 @@ cmd_get_dns_servers_v2(
         bail_on_error(err);
     }
 
-    err = get_dns_servers_v2(NULL, 0, &mode, &count, &dnsServers);
+    err = get_dns_servers(NULL, 0, &mode, &count, &dnsServers);
     bail_on_error(err);
 
     if (mode == STATIC_DNS)
@@ -612,6 +583,7 @@ cmd_get_dns_servers_v2(
     {
         fprintf(stdout, "DNSMode=dhcp\n");
     }
+
     fprintf(stdout, "DNSServers=");
     for (i = 0; i < count; i++)
     {
@@ -623,6 +595,7 @@ cmd_get_dns_servers_v2(
 
 cleanup:
     return err;
+
 error:
     if(err == EDOM)
     {

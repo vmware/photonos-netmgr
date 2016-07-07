@@ -227,7 +227,7 @@ typedef enum _NET_DNS_MODE
 
 #define fAPPEND_DNS_SERVERS_LIST       0x00000001
 int
-set_dns_servers_v2(
+set_dns_servers(
     const char *pszInterfaceName,
     NET_DNS_MODE mode,
     size_t count,
@@ -237,7 +237,7 @@ set_dns_servers_v2(
 
 #define fRESOLVED_CONF_DNS_SERVERS
 int
-get_dns_servers_v2(
+get_dns_servers(
     const char *pszInterfaceName,
     uint32_t flags,
     NET_DNS_MODE *pMode,
@@ -289,19 +289,13 @@ set_duid(
 int
 get_duid(
     const char *pszInterfaceName,
-    char *pszDuid
+    char **ppszDuid
 );
 
 int
-set_dns_servers(
+set_dns_servers_v0(
     const char *pszInterfaceName,
     const char *pszDnsServers
-);
-
-int
-get_dns_servers(
-    const char *pszInterfaceName,
-    char *pszDnsServers
 );
 
 #endif /* __NETMGR_H__ */

@@ -299,7 +299,7 @@ get_ip_route_info(
  */
 
 int
-set_dns_servers_v2(
+set_dns_servers(
     const char *pszInterfaceName,
     NET_DNS_MODE mode,
     size_t count,
@@ -409,7 +409,7 @@ error:
 }
 
 int
-get_dns_servers_v2(
+get_dns_servers(
     const char *pszInterfaceName,
     uint32_t flags,
     NET_DNS_MODE *pMode,
@@ -420,24 +420,27 @@ get_dns_servers_v2(
     uint32_t err = 0;
     char cfgFileName[MAX_LINE];
     char szSectionName[MAX_LINE];
-    char szUseDnsValue[MAX_LINE];
-    char szDnsServersValue[MAX_LINE];
-    char szDnsServersValue2[MAX_LINE];
-    char *s1, *s2 = szDnsServersValue;
+    char *pszUseDnsValue = NULL;
+    char *pszDnsServersValue = NULL;
+    char *pszDnsServersValue2 = NULL;
+    char *s1, *s2, **szDnsServersList = NULL;
     size_t i = 0, count = 0;
-    char **szDnsServersList = NULL;
-    *pCount = 0;
-    *ppDnsServers = NULL;
+
+    if ((pMode == NULL) || (pCount == NULL) || (ppDnsServers == NULL))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
 
     /* Determine DNS mode from UseDNS value in 10-eth0.network */
     sprintf(cfgFileName, "%s10-eth0.network", SYSTEMD_NET_PATH);
-    err = get_key_value(cfgFileName, SECTION_DHCP, KEY_USE_DNS, szUseDnsValue);
-    if ((err == ENOENT) || !strcmp(szUseDnsValue, "true"))
+    err = get_key_value(cfgFileName, SECTION_DHCP, KEY_USE_DNS, &pszUseDnsValue);
+    if ((err == ENOENT) || !strcmp(pszUseDnsValue, "true"))
     {
         *pMode = DHCP_DNS;
         err = 0;
     }
-    else if (!strcmp(szUseDnsValue, "false"))
+    else if (!strcmp(pszUseDnsValue, "false"))
     {
         *pMode = STATIC_DNS;
     }
@@ -458,16 +461,18 @@ get_dns_servers_v2(
         sprintf(szSectionName, SECTION_RESOLVE);
     }
 
-    /* Parse szDnsServersValue */
-    err = get_key_value(cfgFileName, szSectionName, KEY_DNS, szDnsServersValue);
+    /* Parse pszDnsServersValue */
+    err = get_key_value(cfgFileName, szSectionName, KEY_DNS, &pszDnsServersValue);
     if (err == ENOENT)
     {
         err = 0;
         goto error;
     }
     bail_on_error(err);
-    strncpy(szDnsServersValue2, szDnsServersValue, MAX_LINE);
+    err = netmgr_alloc_string(pszDnsServersValue, &pszDnsServersValue2);
+    bail_on_error(err);
 
+    s2 = pszDnsServersValue;
     do {
         s1 = strsep(&s2, " ");
         if (strlen(s1) > 0)
@@ -481,7 +486,7 @@ get_dns_servers_v2(
         err = netmgr_alloc((count * sizeof(char *)), (void *)&szDnsServersList);
         bail_on_error(err);
 
-        s2 = szDnsServersValue2;
+        s2 = pszDnsServersValue2;
         do {
             s1 = strsep(&s2, " ");
             if (strlen(s1) > 0)
@@ -490,11 +495,24 @@ get_dns_servers_v2(
                 bail_on_error(err);
             }
         } while (s2 != NULL);
-
-        *pCount = count;
-        *ppDnsServers = szDnsServersList;
-        szDnsServersList = NULL;
     }
+    *pCount = count;
+    *ppDnsServers = szDnsServersList;
+
+clean:
+    if (pszDnsServersValue2 != NULL)
+    {
+        netmgr_free(pszDnsServersValue2);
+    }
+    if (pszDnsServersValue != NULL)
+    {
+        netmgr_free(pszDnsServersValue);
+    }
+    if (pszUseDnsValue != NULL)
+    {
+        netmgr_free(pszUseDnsValue);
+    }
+    return err;
 
 error:
     /* Free allocated memory on error */
@@ -509,7 +527,15 @@ error:
         }
         netmgr_free(szDnsServersList);
     }
-    return err;
+    if (pCount != NULL)
+    {
+        *pCount = 0;
+    }
+    if (ppDnsServers != NULL)
+    {
+        *ppDnsServers = NULL;
+    }
+    goto clean;
 }
 
 int
@@ -581,9 +607,9 @@ get_iaid(
 {
     uint32_t err = 0;
     char cfgFileName[MAX_LINE];
-    char szIaid[MAX_LINE];
+    char *pszIaid = NULL;
 
-    if (!pszInterfaceName)
+    if (!pszInterfaceName || !pIaid)
     {
         err = EINVAL;
         bail_on_error(err);
@@ -591,13 +617,24 @@ get_iaid(
 
     sprintf(cfgFileName, "%s10-%s.network", SYSTEMD_NET_PATH, pszInterfaceName);
 
-    err = get_key_value(cfgFileName, SECTION_DHCP, KEY_IAID, szIaid);
+    err = get_key_value(cfgFileName, SECTION_DHCP, KEY_IAID, &pszIaid);
     bail_on_error(err);
 
-    sscanf(szIaid, "%u", pIaid);
+    sscanf(pszIaid, "%u", pIaid);
+
+clean:
+    if (pszIaid != NULL)
+    {
+        netmgr_free(pszIaid);
+    }
+    return err;
 
 error:
-    return err;
+    if (pIaid != NULL)
+    {
+        *pIaid = 0;
+    }
+    goto clean;
 }
 
 static const char * duid_strtype_from_type(uint16_t type)
@@ -632,7 +669,7 @@ set_duid(
     char cfgFileName[MAX_LINE];
     const char *duidType;
     uint16_t n1, n2;
-    char szDuid[MAX_DUID_SIZE];
+    char szDuid[MAX_LINE];
 
     if (pszInterfaceName != NULL)
     {
@@ -645,7 +682,7 @@ set_duid(
         sprintf(cfgFileName, "%snetworkd.conf", SYSTEMD_PATH);
     }
 
-    if (strlen(pszDuid) == 0)
+    if ((pszDuid == NULL) || (strlen(pszDuid) == 0))
     {
         err = set_key_value(cfgFileName, SECTION_DHCP, KEY_DUID_TYPE, NULL,
                             F_CREATE_CFG_FILE);
@@ -686,13 +723,20 @@ error:
 int
 get_duid(
     const char *pszInterfaceName,
-    char *pszDuid
+    char **ppszDuid
 )
 {
     uint32_t err = 0;
     char cfgFileName[MAX_LINE];
     uint16_t duidType;
-    char szDuidType[MAX_LINE];
+    char *pszDuidType = NULL;
+    char *pszDuid = NULL;
+
+    if (ppszDuid == NULL)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
 
     if (pszInterfaceName != NULL)
     {
@@ -705,27 +749,44 @@ get_duid(
         sprintf(cfgFileName, "%snetworkd.conf", SYSTEMD_PATH);
     }
 
-    err = get_key_value(cfgFileName, SECTION_DHCP, KEY_DUID_TYPE, szDuidType);
+    err = get_key_value(cfgFileName, SECTION_DHCP, KEY_DUID_TYPE, &pszDuidType);
     bail_on_error(err);
 
-    duidType = duid_type_from_strtype(szDuidType);
+    duidType = duid_type_from_strtype(pszDuidType);
     if (duidType == 0)
     {
         err = EINVAL;
         bail_on_error(err);
     }
-    sprintf(pszDuid, "00:%02hu:", duidType);
 
-    err = get_key_value(cfgFileName, SECTION_DHCP, KEY_DUID_RAWDATA,
-                        &pszDuid[6]);
+    err = get_key_value(cfgFileName, SECTION_DHCP, KEY_DUID_RAWDATA, &pszDuid);
     bail_on_error(err);
 
-error:
+    err = netmgr_alloc((strlen(pszDuid) + 8), (void *)ppszDuid);
+    bail_on_error(err);
+    sprintf(*ppszDuid, "00:%02hu:%s", duidType, pszDuid);
+
+clean:
+    if (pszDuid != NULL)
+    {
+        netmgr_free(pszDuid);
+    }
+    if (pszDuidType != NULL)
+    {
+        netmgr_free(pszDuidType);
+    }
     return err;
+
+error:
+    if (ppszDuid != NULL)
+    {
+        *ppszDuid = NULL;
+    }
+    goto clean;
 }
 
 int
-set_dns_servers(
+set_dns_servers_v0(
     const char *pszInterfaceName,
     const char *pszDnsServers
 )
@@ -749,7 +810,7 @@ set_dns_servers(
         sprintf(szSectionName, "Resolve");
     }
 
-    if (strlen(pszDnsServers) == 0)
+    if ((pszDnsServers == NULL) || (strlen(pszDnsServers) == 0))
     {
         sprintf(szValue, "true");
         err = set_key_value(cfgFileName, szSectionName, szKey, NULL, 0);
@@ -793,31 +854,3 @@ error:
     return err;
 }
 
-int
-get_dns_servers(
-    const char *pszInterfaceName,
-    char *pszDnsServers
-)
-{
-    uint32_t err = 0;
-    char cfgFileName[MAX_LINE];
-    char szSectionName[MAX_LINE];
-    char szKey[MAX_LINE] = "DNS";
-
-    if (pszInterfaceName != NULL)
-    {
-        sprintf(cfgFileName, "%s10-%s.network", SYSTEMD_NET_PATH, pszInterfaceName);
-        sprintf(szSectionName, "Network");
-    }
-    else
-    {
-        sprintf(cfgFileName, "%sresolved.conf", SYSTEMD_PATH);
-        sprintf(szSectionName, "Resolve");
-    }
-
-    err = get_key_value(cfgFileName, szSectionName, szKey, pszDnsServers);
-    bail_on_error(err);
-
-error:
-    return err;
-}
