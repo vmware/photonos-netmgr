@@ -289,7 +289,7 @@ set_duid(
 int
 get_duid(
     const char *pszInterfaceName,
-    char *pszDuid
+    char **ppszDuid
 );
 
 int
@@ -301,7 +301,7 @@ set_dns_servers(
 int
 get_dns_servers(
     const char *pszInterfaceName,
-    char *pszDnsServers
+    char **ppszDnsServers
 );
 
 #endif /* __NETMGR_H__ */

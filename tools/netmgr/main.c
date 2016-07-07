@@ -301,6 +301,7 @@ cmd_set_iaid(
 
 cleanup:
     return err;
+
 error:
     if(err == EDOM)
     {
@@ -334,8 +335,10 @@ cmd_get_iaid(
     bail_on_error(err);
 
     fprintf(stdout, "IAID=%u\n", iaid);
+
 cleanup:
     return err;
+
 error:
     if(err == EDOM)
     {
@@ -370,6 +373,7 @@ cmd_set_duid(
 
 cleanup:
     return err;
+
 error:
     if(err == EDOM)
     {
@@ -386,7 +390,7 @@ cmd_get_duid(
     )
 {
     uint32_t err = 0;
-    char duid[256];
+    char *duid = NULL;
 
     if(!pCmdArgs)
     {
@@ -400,12 +404,18 @@ cmd_get_duid(
         bail_on_error(err);
     }
 
-    err = get_duid(NULL, duid);
+    err = get_duid(NULL, &duid);
     bail_on_error(err);
 
     fprintf(stdout, "DUID=%s\n", duid);
+
 cleanup:
+    if (duid != NULL)
+    {
+        netmgr_free(duid);
+    }
     return err;
+
 error:
     if(err == EDOM)
     {
@@ -440,6 +450,7 @@ cmd_set_dns_servers(
 
 cleanup:
     return err;
+
 error:
     if(err == EDOM)
     {
@@ -456,7 +467,7 @@ cmd_get_dns_servers(
     )
 {
     uint32_t err = 0;
-    char dnsServers[1024];
+    char *dnsServers = NULL;
 
     if(!pCmdArgs)
     {
@@ -470,12 +481,18 @@ cmd_get_dns_servers(
         bail_on_error(err);
     }
 
-    err = get_dns_servers(NULL, dnsServers);
+    err = get_dns_servers(NULL, &dnsServers);
     bail_on_error(err);
 
     fprintf(stdout, "DNS=%s\n", dnsServers);
+
 cleanup:
+    if (dnsServers != NULL)
+    {
+        netmgr_free(dnsServers);
+    }
     return err;
+
 error:
     if(err == EDOM)
     {
@@ -569,6 +586,7 @@ cleanup:
         netmgr_free(szDnsServersList);
     }
     return err;
+
 error:
     if(err == EDOM)
     {
@@ -612,6 +630,7 @@ cmd_get_dns_servers_v2(
     {
         fprintf(stdout, "DNSMode=dhcp\n");
     }
+
     fprintf(stdout, "DNSServers=");
     for (i = 0; i < count; i++)
     {
@@ -623,6 +642,7 @@ cmd_get_dns_servers_v2(
 
 cleanup:
     return err;
+
 error:
     if(err == EDOM)
     {
