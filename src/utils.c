@@ -113,15 +113,16 @@ get_key_value(
     const char *pszConfigFileName,
     const char *pszSection,
     const char *pszKey,
-    char *pszValue
+    char **ppszValue
 )
 {
     uint32_t err = 0, dwNumSections = 0;
     PCONFIG_INI pConfig = NULL;
     PSECTION_INI *ppSections = NULL, pSection = NULL;
     PKEYVALUE_INI pKeyValue = NULL;
+    *ppszValue = NULL;
 
-    if (!pszConfigFileName || !pszSection || !pszKey || !pszValue)
+    if (!pszConfigFileName || !pszSection || !pszKey)
     {
         err = EINVAL;
         bail_on_error(err);
@@ -153,7 +154,8 @@ get_key_value(
         err = ENOENT;
         bail_on_error(err);
     }
-    sscanf(pKeyValue->pszValue, "%s", pszValue);
+    /* malloc return memory - caller to free */
+    err = netmgr_alloc_string(pKeyValue->pszValue, ppszValue);
 
 error:
     if (ppSections != NULL)

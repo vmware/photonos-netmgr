@@ -31,7 +31,7 @@ get_key_value(
     const char *pszConfigFileName,
     const char *pszSection,
     const char *pszKey,
-    char *pszValue
+    char **ppszValue
 );
 
 #endif /* __UTILS_H__ */
