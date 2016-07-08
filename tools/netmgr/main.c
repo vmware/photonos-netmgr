@@ -461,7 +461,7 @@ cmd_set_dns_servers(
     PNETMGR_CMD_ARGS pCmdArgs
     )
 {
-    uint32_t err = 0;
+    uint32_t err = 0, flags = 0;
     size_t i = 0, count = 0;
     NET_DNS_MODE mode;
     char *s1, *s2, **szDnsServersList = NULL;
@@ -473,17 +473,22 @@ cmd_set_dns_servers(
         bail_on_error(err);
     }
 
-    if(pCmdArgs->nCmdCount < 3)
+    if(pCmdArgs->nCmdCount < 4)
     {
         err = EDOM;
         bail_on_error(err);
     }
 
-    if (!strcmp(pCmdArgs->ppszCmds[1], "dhcp"))
+    if (!strcmp(pCmdArgs->ppszCmds[1], "1"))
+    {
+        flags |= fAPPEND_DNS_SERVERS_LIST;
+    }
+
+    if (!strcmp(pCmdArgs->ppszCmds[2], "dhcp"))
     {
         mode = DHCP_DNS;
     }
-    else if (!strcmp(pCmdArgs->ppszCmds[1], "static"))
+    else if (!strcmp(pCmdArgs->ppszCmds[2], "static"))
     {
         mode = STATIC_DNS;
     }
@@ -493,10 +498,10 @@ cmd_set_dns_servers(
         bail_on_error(err);
     }
 
-    strcpy(szDnsServers, pCmdArgs->ppszCmds[2]);
+    strcpy(szDnsServers, pCmdArgs->ppszCmds[3]);
     if (strlen(szDnsServers) > 0)
     {
-        s2 = pCmdArgs->ppszCmds[2];
+        s2 = pCmdArgs->ppszCmds[3];
         do {
             s1 = strsep(&s2, " ");
             if (strlen(s1) > 0)
@@ -522,7 +527,8 @@ cmd_set_dns_servers(
         } while (s2 != NULL);
     }
 
-    err = set_dns_servers(NULL, mode, count, (const char **)szDnsServersList, 0);
+    err = set_dns_servers(NULL, mode, count, (const char **)szDnsServersList,
+                          flags);
     bail_on_error(err);
 
 cleanup:
@@ -545,7 +551,7 @@ error:
     {
         fprintf(
                stderr,
-               "Usage: set_dns_servers <dns mode> <dns server list>\n");
+               "Usage: set_dns_servers <append [1|0]> <dns mode> <dns server list>\n");
     }
     goto cleanup;
 }
