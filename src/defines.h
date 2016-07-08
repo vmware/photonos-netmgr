@@ -41,4 +41,7 @@
        } \
     } while(0)
 
+#define SET_FLAG(v,f) ((v) | (f))
+#define TEST_FLAG(v,f) (((v) & (f)) != 0)
+
 #endif /* __DEFINES_H__ */

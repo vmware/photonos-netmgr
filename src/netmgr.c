@@ -311,6 +311,7 @@ set_dns_servers(
     char cfgFileName[MAX_LINE];
     char szSectionName[MAX_LINE];
     char szUseDnsValue[MAX_LINE];
+    char *szCurrentDnsServers = NULL;
     char *szDnsServersValue = NULL;
     DIR *dirFile = NULL;
     struct dirent *hFile;
@@ -340,12 +341,35 @@ set_dns_servers(
             bytes += strlen(ppDnsServers[i]) + 1;
             /* TODO: Check IP addresses are valid. */
         }
+
+        if (TEST_FLAG(flags, fAPPEND_DNS_SERVERS_LIST))
+        {
+            err = get_key_value(cfgFileName, szSectionName, KEY_DNS,
+                                &szCurrentDnsServers);
+           if (err != ENOENT)
+           {
+               bail_on_error(err);
+           }
+        }
+        if (szCurrentDnsServers != NULL)
+        {
+            bytes += strlen(szCurrentDnsServers) + 1;
+        }
         err = netmgr_alloc(bytes, (void *)&szDnsServersValue);
         bail_on_error(err);
-        strcpy(szDnsServersValue, ppDnsServers[0]);
-        for (i = 1; i < count; i++)
+
+        if (szCurrentDnsServers != NULL)
         {
-            sprintf(szDnsServersValue, "%s %s", szDnsServersValue, ppDnsServers[i]);
+            strcpy(szDnsServersValue, szCurrentDnsServers);
+        }
+        for (i = 0; i < count; i++)
+        {
+            /* TODO: Eliminate duplicates */
+            if (strlen(szDnsServersValue) > 0)
+            {
+                strcat(szDnsServersValue, " ");
+            }
+            strcat(szDnsServersValue, ppDnsServers[i]);
         }
     }
 
