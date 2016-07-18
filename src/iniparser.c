@@ -419,7 +419,7 @@ ini_cfg_find_key(
 
     for (; !pKeyValue && pCursor; pCursor = pCursor->pNext)
     {
-        if (!strcmp(pCursor->pszKey, pszKey))
+        if (!strcmp(pCursor->pszKey, pszKey) && (pCursor->pszValue != NULL))
         {
             pKeyValue = pCursor;
         }
@@ -441,7 +441,7 @@ ini_cfg_add_key(
     PKEYVALUE_INI pKeyValue = NULL;
     PKEYVALUE_INI pCursor = NULL;
 
-    if (!pSection || !pszKey || !*pszKey || !pszValue || !*pszValue)
+    if (!pSection || !pszKey || !*pszKey)
     {
         err = EINVAL;
         bail_on_error(err);
@@ -459,8 +459,11 @@ ini_cfg_add_key(
     err = netmgr_alloc_string(pszKey, &pKeyValue->pszKey);
     bail_on_error(err);
 
-    err = netmgr_alloc_string(pszValue, &pKeyValue->pszValue);
-    bail_on_error(err);
+    if ((pszValue != NULL) && (strlen(pszValue) > 0))
+    {
+        err = netmgr_alloc_string(pszValue, &pKeyValue->pszValue);
+        bail_on_error(err);
+    }
 
     pCursor = pSection->pKeyValue;
     while (pCursor && pCursor->pNext != NULL)
@@ -502,7 +505,7 @@ ini_cfg_set_value(
     char* pszNewValue = NULL;
     PKEYVALUE_INI pCandidate = NULL;
 
-    if (!pSection || !pszKey || !*pszKey || !pszValue || !*pszValue)
+    if (!pSection || !pszKey || !*pszKey)
     {
         err = EINVAL;
         bail_on_error(err);
@@ -515,8 +518,11 @@ ini_cfg_set_value(
         bail_on_error(err);
     }
 
-    err = netmgr_alloc_string(pszValue, &pszNewValue);
-    bail_on_error(err);
+    if ((pszValue != NULL) && (strlen(pszValue) > 0))
+    {
+        err = netmgr_alloc_string(pszValue, &pszNewValue);
+        bail_on_error(err);
+    }
 
     if (pCandidate->pszValue)
     {
@@ -613,6 +619,10 @@ ini_cfg_save(
 
         for (; pKeyValue; pKeyValue = pKeyValue->pNext)
         {
+            if (pKeyValue->pszValue == NULL)
+            {
+                continue;
+            }
             if(fprintf(fp, "%s=%s\n", pKeyValue->pszKey, pKeyValue->pszValue) < 0)
             {
                 err = EBADF;
@@ -820,7 +830,7 @@ ini_cfg_parse_key_value(
         pszCursor++;
     }
     pszValueMarker = pszCursor;
-    if (!pszValueMarker || !*pszValueMarker)
+    if (!pszValueMarker)
     {
         err = EBADMSG;
         bail_on_error(err);
@@ -835,7 +845,7 @@ ini_cfg_parse_key_value(
         pszCursor++;
         len_value++;
     }
-    if ((pszCursor && *pszCursor) || !len_key || !len_value)
+    if ((pszCursor && *pszCursor) || !len_key)
     {
         err = EBADMSG;
         bail_on_error(err);
@@ -844,8 +854,11 @@ ini_cfg_parse_key_value(
     err = netmgr_alloc_string_len(pszKeyMarker, len_key, &pszKey);
     bail_on_error(err);
 
-    err = netmgr_alloc_string_len(pszValueMarker, len_value, &pszValue);
-    bail_on_error(err);
+    if (len_value > 0)
+    {
+        err = netmgr_alloc_string_len(pszValueMarker, len_value, &pszValue);
+        bail_on_error(err);
+    }
 
     *ppszKey = pszKey;
     *ppszValue = pszValue;
