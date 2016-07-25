@@ -5,4 +5,5 @@ pkginclude_HEADERS=include/public/netmgr.h
 SUBDIRS = \
     common \
     src \
+    tests \
     tools

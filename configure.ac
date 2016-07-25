@@ -3,6 +3,9 @@ AC_PREREQ(2.59)
 AC_INIT([netmgmt], [1.0.1], [support@vmware.com])
 AC_CANONICAL_SYSTEM
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
+
+AC_CONFIG_TESTDIR(tests)
+
 AC_CONFIG_HEADERS([include/config.h])
 AC_CONFIG_MACRO_DIR([m4])
 m4_pattern_allow([AM_PROG_AR])
@@ -64,6 +67,7 @@ AC_SUBST(PTHREAD_LIBS)
 AC_CONFIG_FILES([Makefile
                  common/Makefile
                  src/Makefile
+                 tests/Makefile
                  tools/Makefile
                  tools/netmgr/Makefile
                 ])

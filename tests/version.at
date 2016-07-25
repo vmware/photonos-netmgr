@@ -1,0 +1,15 @@
+#
+# Copyright (C) 2015 VMware, Inc. All Rights Reserved.
+#
+
+AT_BANNER([netmgr tests start])
+
+AT_SETUP([version])
+AT_KEYWORDS([version])
+AT_CHECK([$abs_top_builddir/tools/netmgr/netmgr --version],
+[0],
+[AT_PACKAGE_NAME: AT_PACKAGE_VERSION
+],
+[ignore])
+AT_CLEANUP
+

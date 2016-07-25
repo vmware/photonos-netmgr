@@ -1,0 +1,18 @@
+#
+# Copyright (C) 2015 VMware, Inc. All Rights Reserved.
+#
+
+AT_TESTED([netmgr])
+
+m4_define([NETMGMT_CLI],[[$abs_top_builddir/tools/netmgr/netmgr]])
+
+m4_define([NETMGMT_CHROOT_INIT],[[
+rm -rf $abs_top_builddir/tests/testroot
+mkdir $abs_top_builddir/tests/testroot
+]])
+
+m4_define([NETMGMT_CHROOT_CLEAN],[[
+rm -rf $abs_top_builddir/tests/testroot
+]])
+
+AT_INIT

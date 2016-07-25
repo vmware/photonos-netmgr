@@ -1,0 +1,6 @@
+#
+# Copyright (C) 2015 VMware, Inc. All Rights Reserved.
+#
+#
+m4_include([init.at])
+m4_include([version.at])
