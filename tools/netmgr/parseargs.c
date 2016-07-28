@@ -36,7 +36,7 @@ parse_args(
     )
 {
     uint32_t err = 0;
-    int nOptionIndex = 0;
+    int i, nOptionIndex = 0;
     int nOption = 0;
     int nIndex = 0;
 
@@ -50,6 +50,16 @@ parse_args(
 
     err = netmgr_alloc(sizeof(NETMGR_CMD_ARGS), (void*)&pCmdArgs);
     bail_on_error(err);
+
+    /* Deep copy original argc / argv */
+    err = netmgr_alloc(((argc + 1) * sizeof(char*)), (void **)&pCmdArgs->argv);
+    bail_on_error(err);
+    for (i = 0; i < argc; i++)
+    {
+        err = netmgr_alloc_string(argv[i], &pCmdArgs->argv[i]);
+        bail_on_error(err);
+    }
+    pCmdArgs->argc = argc;
 
     opterr = 0;//tell getopt to not print errors
     while (1)
@@ -79,9 +89,8 @@ parse_args(
                 _opt.nVerbose= 1;
             break;
             case '?':
-                fprintf(stderr, "no such command or option\n");
-                err = 1;
-                bail_on_error(err);
+            /* Option not handled here. Ignore. */
+            break;
         }
     }
     err = copy_cmd_args(&_opt, pCmdArgs);
@@ -118,7 +127,6 @@ error:
     {
         free_cmd_args(pCmdArgs);
     }
-    
     goto cleanup;
 }
 
@@ -164,6 +172,14 @@ free_cmd_args(
         if(pCmdArgs->ppszCmds)
         {
             netmgr_free(pCmdArgs->ppszCmds);
+        }
+        if (pCmdArgs->argv != NULL)
+        {
+            for (i = 0; i < pCmdArgs->argc; i++)
+            {
+                netmgr_free(pCmdArgs->argv[i]);
+            }
+            netmgr_free(pCmdArgs->argv);
         }
         netmgr_free(pCmdArgs);
     }

@@ -298,6 +298,187 @@ get_ip_route_info(
  * DNS configuration APIs
  */
 
+static int
+parse_dns_servers(
+    size_t count,
+    const char **ppDnsServers,
+    const char *szCurrentDnsServers,
+    char **szDnsServersValue
+)
+{
+    uint32_t err = 0;
+    size_t i, bytes = 0;
+    char *pszServers = NULL;
+
+    if (szDnsServersValue == NULL)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if (count > 0)
+    {
+        if (ppDnsServers == NULL)
+        {
+            err = EINVAL;
+            bail_on_error(err);
+        }
+        for (i = 0; i < count; i++)
+        {
+            bytes += strlen(ppDnsServers[i]) + 1;
+            /* TODO: Check IP addresses are valid. */
+        }
+
+        if (szCurrentDnsServers != NULL)
+        {
+            bytes += strlen(szCurrentDnsServers) + 1;
+        }
+        err = netmgr_alloc(bytes, (void *)&pszServers);
+        bail_on_error(err);
+
+        if (szCurrentDnsServers != NULL)
+        {
+            strcpy(pszServers, szCurrentDnsServers);
+        }
+        for (i = 0; i < count; i++)
+        {
+            /* TODO: Eliminate duplicates */
+            if (strlen(pszServers) > 0)
+            {
+                strcat(pszServers, " ");
+            }
+            strcat(pszServers, ppDnsServers[i]);
+        }
+    }
+
+    *szDnsServersValue = pszServers;
+cleanup:
+    return err;
+
+error:
+    if (pszServers != NULL)
+    {
+        netmgr_free(pszServers);
+    }
+    *szDnsServersValue = NULL;
+    goto cleanup;
+}
+
+static int
+get_dns_mode(
+    const char *pszInterfaceName,
+    NET_DNS_MODE *pMode
+)
+{
+    uint32_t err = 0;
+    NET_DNS_MODE mode;
+    char cfgFileName[MAX_LINE];
+    char *pszUseDnsValue = NULL;
+
+    if (pMode == NULL)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    sprintf(cfgFileName, "%s10-%s.network", SYSTEMD_NET_PATH, pszInterfaceName);
+    err = get_key_value(cfgFileName, SECTION_DHCP, KEY_USE_DNS, &pszUseDnsValue);
+    if ((err == ENOENT) || !strcmp(pszUseDnsValue, "true"))
+    {
+        mode = DHCP_DNS;
+        err = 0;
+    }
+    else if (!strcmp(pszUseDnsValue, "false"))
+    {
+        mode = STATIC_DNS;
+    }
+    else
+    {
+        err = EINVAL;
+    }
+    bail_on_error(err);
+    *pMode = mode;
+cleanup:
+    if (pszUseDnsValue != NULL)
+    {
+        netmgr_free(pszUseDnsValue);
+    }
+    return err;
+error:
+    *pMode = DNS_MODE_INVALID;
+    goto cleanup;
+}
+
+int
+add_dns_servers(
+    const char *pszInterfaceName,
+    size_t count,
+    const char **ppDnsServers
+)
+{
+    uint32_t err = 0;
+    NET_DNS_MODE mode;
+    char cfgFileName[MAX_LINE];
+    char szSectionName[MAX_LINE];
+    char *szCurrentDnsServers = NULL;
+    char *szNewDnsServersList = NULL;
+
+    if ((count == 0) || (ppDnsServers == NULL))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    /* Determine DNS mode from UseDNS value in 10-eth0.network */
+    err = get_dns_mode("eth0", &mode);
+    bail_on_error(err);
+
+    if (mode == DHCP_DNS)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if (pszInterfaceName != NULL)
+    {
+        sprintf(cfgFileName, "%s10-%s.network", SYSTEMD_NET_PATH,
+                pszInterfaceName);
+        sprintf(szSectionName, SECTION_NETWORK);
+    }
+    else
+    {
+        sprintf(cfgFileName, "%sresolved.conf", SYSTEMD_PATH);
+        sprintf(szSectionName, SECTION_RESOLVE);
+    }
+
+    err = get_key_value(cfgFileName, szSectionName, KEY_DNS,
+                        &szCurrentDnsServers);
+    if (err != ENOENT)
+    {
+        bail_on_error(err);
+    }
+
+    err = parse_dns_servers(count, ppDnsServers, szCurrentDnsServers,
+                            &szNewDnsServersList);
+    bail_on_error(err);
+
+    err = set_key_value(cfgFileName, szSectionName, KEY_DNS,
+                        szNewDnsServersList, 0);
+
+cleanup:
+    if (szCurrentDnsServers != NULL)
+    {
+        netmgr_free(szCurrentDnsServers);
+    }
+    if (szNewDnsServersList != NULL)
+    {
+        netmgr_free(szNewDnsServersList);
+    }
+    return err;
+error:
+    goto cleanup;
+}
+
 int
 set_dns_servers(
     const char *pszInterfaceName,
@@ -315,7 +496,6 @@ set_dns_servers(
     char *szDnsServersValue = NULL;
     DIR *dirFile = NULL;
     struct dirent *hFile;
-    size_t i, bytes = 0;
 
     if (pszInterfaceName != NULL)
     {
@@ -329,49 +509,19 @@ set_dns_servers(
         sprintf(szSectionName, SECTION_RESOLVE);
     }
 
-    if (count > 0)
+    if (TEST_FLAG(flags, fAPPEND_DNS_SERVERS_LIST))
     {
-        if (ppDnsServers == NULL)
+        err = get_key_value(cfgFileName, szSectionName, KEY_DNS,
+                            &szCurrentDnsServers);
+        if (err != ENOENT)
         {
-            err = EINVAL;
             bail_on_error(err);
         }
-        for (i = 0; i < count; i++)
-        {
-            bytes += strlen(ppDnsServers[i]) + 1;
-            /* TODO: Check IP addresses are valid. */
-        }
-
-        if (TEST_FLAG(flags, fAPPEND_DNS_SERVERS_LIST))
-        {
-            err = get_key_value(cfgFileName, szSectionName, KEY_DNS,
-                                &szCurrentDnsServers);
-           if (err != ENOENT)
-           {
-               bail_on_error(err);
-           }
-        }
-        if (szCurrentDnsServers != NULL)
-        {
-            bytes += strlen(szCurrentDnsServers) + 1;
-        }
-        err = netmgr_alloc(bytes, (void *)&szDnsServersValue);
-        bail_on_error(err);
-
-        if (szCurrentDnsServers != NULL)
-        {
-            strcpy(szDnsServersValue, szCurrentDnsServers);
-        }
-        for (i = 0; i < count; i++)
-        {
-            /* TODO: Eliminate duplicates */
-            if (strlen(szDnsServersValue) > 0)
-            {
-                strcat(szDnsServersValue, " ");
-            }
-            strcat(szDnsServersValue, ppDnsServers[i]);
-        }
     }
+
+    err = parse_dns_servers(count, ppDnsServers, szCurrentDnsServers,
+                            &szDnsServersValue);
+    bail_on_error(err);
 
     err = EINVAL;
     if (mode == DHCP_DNS)
@@ -461,21 +611,7 @@ get_dns_servers(
     }
 
     /* Determine DNS mode from UseDNS value in 10-eth0.network */
-    sprintf(cfgFileName, "%s10-eth0.network", SYSTEMD_NET_PATH);
-    err = get_key_value(cfgFileName, SECTION_DHCP, KEY_USE_DNS, &pszUseDnsValue);
-    if ((err == ENOENT) || !strcmp(pszUseDnsValue, "true"))
-    {
-        *pMode = DHCP_DNS;
-        err = 0;
-    }
-    else if (!strcmp(pszUseDnsValue, "false"))
-    {
-        *pMode = STATIC_DNS;
-    }
-    else
-    {
-        err = EINVAL;
-    }
+    err = get_dns_mode("eth0", pMode);
     bail_on_error(err);
 
     if (pszInterfaceName != NULL)

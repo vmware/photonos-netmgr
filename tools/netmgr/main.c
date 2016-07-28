@@ -75,6 +75,11 @@ NETMGR_CLI_CMD_MAP arCmdMap[] =
      "",
      "get dns mode and servers list"
     },
+    {"dns_servers",
+     cmd_dns_servers,
+     "--set --mode [dhcp|static] --servers <DNS servers list>",
+     "get or set DNS mode, DNS servers list"
+    },
 };
 
 int main(int argc, char* argv[])
@@ -608,6 +613,195 @@ error:
         fprintf(
                stderr,
                "Usage: get_dns_servers\n");
+    }
+    goto cleanup;
+}
+
+typedef enum _CMD_OP
+{
+    OP_INVALID = 0,
+    OP_GET,
+    OP_SET,
+    OP_MAX
+} CMD_OP;
+
+static struct option dnsServerOptions[] =
+{
+    {"set",          no_argument,          0,    's'},
+    {"get",          no_argument,          0,    'g'},
+    {"mode",         required_argument,    0,    'm'},
+    {"servers",      required_argument,    0,     0 },
+    {"interface",    required_argument,    0,    'i'},
+    {0, 0, 0, 0}
+};
+
+uint32_t
+cmd_dns_servers(
+    PNETMGR_CMD_ARGS pCmdArgs
+    )
+{
+    uint32_t err = 0;
+    int nOptionIndex = 0;
+    int nOption = 0;
+    CMD_OP op = OP_INVALID;
+    size_t i = 0, count = 0;
+    int add_servers = 0;
+    NET_DNS_MODE mode = DNS_MODE_INVALID;
+    char *s1, *s2, **szDnsServersList = NULL;
+    char szServers[2048];
+
+    if(!pCmdArgs || (pCmdArgs->argc < 3))
+    {
+        err = EDOM;
+        bail_on_error(err);
+    }
+
+    opterr = 0;
+    optind = 1;
+    while (1)
+    {
+        nOption = getopt_long(pCmdArgs->argc,
+                              pCmdArgs->argv,
+                              "sgm:i:",
+                              dnsServerOptions,
+                              &nOptionIndex);
+        if (nOption == -1)
+            break;
+
+        switch(nOption)
+        {
+            case 's':
+                op = OP_SET;
+                break;
+            case 'g':
+                op = OP_GET;
+                break;
+            case 'm':
+                if (!strcmp(optarg, "dhcp"))
+                {
+                    mode = DHCP_DNS;
+                }
+                else if (!strcmp(optarg, "static"))
+                {
+                    mode = STATIC_DNS;
+                }
+                else
+                {
+                    mode = DNS_MODE_INVALID;
+                }
+                break;
+            case 0:
+                /* --servers option */
+                strcpy(szServers, optarg);
+                if (strlen(szServers) > 0)
+                {
+                    s2 = szServers;
+                    do {
+                        s1 = strsep(&s2, ",");
+                        if (strlen(s1) > 0)
+                        {
+                            count++;
+                        }
+                    } while (s2 != NULL);
+                }
+                if (count == 0)
+                {
+                    break;
+                }
+                err = netmgr_alloc((count * sizeof(char *)),
+                                   (void *)&szDnsServersList);
+                bail_on_error(err);
+                strcpy(szServers, optarg);
+                s2 = szServers;
+                do {
+                    s1 = strsep(&s2, ",");
+                    if (strlen(s1) > 0)
+                    {
+                        if ((i == 0) && !strcmp(s1,"+"))
+                        {
+                            add_servers = 1;
+                            count -= 1;
+                            continue;
+                        }
+                        err = netmgr_alloc_string(s1, &(szDnsServersList[i++]));
+                        bail_on_error(err);
+                    }
+                } while (s2 != NULL);
+                break;
+            case '?':
+                /* Option not handled here. Ignore. */
+                break;
+        }
+    }
+
+    if (op == OP_INVALID)
+    {
+        err = EDOM;
+        bail_on_error(err);
+    }
+
+    if (op == OP_SET)
+    {
+        if (mode == DNS_MODE_INVALID)
+        {
+            err = EDOM;
+            bail_on_error(err);
+        }
+        if (add_servers == 0)
+        {
+            err = set_dns_servers(NULL, mode, count,
+                                  (const char **)szDnsServersList, 0);
+        }
+        else
+        {
+            err = add_dns_servers(NULL, count, (const char **)szDnsServersList);
+        }
+        bail_on_error(err);
+    }
+
+    if (op == OP_GET)
+    {
+        char **szDnsServers = NULL;
+        err = get_dns_servers(NULL, 0, &mode, &count, &szDnsServers);
+        bail_on_error(err);
+
+        if (mode == STATIC_DNS)
+        {
+            fprintf(stdout, "DNSMode=static\n");
+        }
+        else
+        {
+            fprintf(stdout, "DNSMode=dhcp\n");
+        }
+
+        fprintf(stdout, "DNSServers=");
+        for (i = 0; i < count; i++)
+        {
+            fprintf(stdout, "%s ", szDnsServers[i]);
+            netmgr_free(szDnsServers[i]);
+        }
+        netmgr_free(szDnsServers);
+        fprintf(stdout, "\n");
+    }
+
+cleanup:
+    /* Free allocated memory */
+    if (szDnsServersList != NULL)
+    {
+        for (i = 0; i < count; i++)
+        {
+            netmgr_free(szDnsServersList[i]);
+        }
+        netmgr_free(szDnsServersList);
+    }
+    return err;
+
+error:
+    if(err == EDOM)
+    {
+        fprintf(stderr,
+                "Usage:\ndns_servers --get\ndns_servers --set --mode "
+                 "dhcp|static --servers <server1,server2,...>\n");
     }
     goto cleanup;
 }
