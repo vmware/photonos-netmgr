@@ -29,6 +29,8 @@ typedef struct _NETMGR_CMD_ARGS
     //command args
     char** ppszCmds;
     int nCmdCount;
+    int argc;
+    char **argv;
 }NETMGR_CMD_ARGS, *PNETMGR_CMD_ARGS;
 
 //Map command name to client function

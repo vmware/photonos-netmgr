@@ -221,8 +221,10 @@ get_ip_route_info(
 
 typedef enum _NET_DNS_MODE
 {
-    STATIC_DNS = 0,
+    DNS_MODE_INVALID = 0,
+    STATIC_DNS,
     DHCP_DNS,
+    DNS_MODE_MAX,
 } NET_DNS_MODE;
 
 #define fAPPEND_DNS_SERVERS_LIST       0x00000001
@@ -233,6 +235,13 @@ set_dns_servers(
     size_t count,
     const char **ppDnsServers,
     uint32_t flags
+);
+
+int
+add_dns_servers(
+    const char *pszInterfaceName,
+    size_t count,
+    const char **ppDnsServers
 );
 
 #define fRESOLVED_CONF_DNS_SERVERS
