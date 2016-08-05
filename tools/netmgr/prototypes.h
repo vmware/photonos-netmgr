@@ -73,10 +73,10 @@ cmd_set_dns_servers_v0(
     PNETMGR_CMD_ARGS pCmdArgs
     );
 
-uint32_t
-cmd_dns_servers(
-    PNETMGR_CMD_ARGS pCmdArgs
-    );
+//uint32_t
+//cmd_dns_servers(
+//    PNETMGR_CMD_ARGS pCmdArgs
+//    );
 
 //parse_args.c
 uint32_t

@@ -75,63 +75,165 @@ NETMGR_CLI_CMD_MAP arCmdMap[] =
      "",
      "get dns mode and servers list"
     },
-    {"dns_servers",
-     cmd_dns_servers,
-     "--set --mode [dhcp|static] --servers <DNS servers list>",
-     "get or set DNS mode, DNS servers list"
-    },
+//    {"dns_servers",
+//     cmd_dns_servers,
+//     "--set --mode [dhcp|static] --servers <DNS servers list>",
+//     "get or set DNS mode, DNS servers list"
+//    },
 };
+
+
+static uint32_t
+cmd_dns_servers(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    size_t i = 0, count = 0;
+    int add_servers = 0;
+    NET_DNS_MODE mode = DNS_MODE_INVALID;
+    char *pszMode, *pszServers, *s1, *s2, **szDnsServersList = NULL;
+    char szServers[2048];
+
+    if (pCmd->op == OP_SET)
+    {
+        err = netmgrcli_find_cmdopt(pCmd, "mode", &pszMode);
+        bail_on_error(err);
+        if (!strcmp(pszMode, "dhcp"))
+        {
+            mode = DHCP_DNS;
+        }
+        else if (!strcmp(pszMode, "static"))
+        {
+            mode = STATIC_DNS;
+        }
+
+        err = netmgrcli_find_cmdopt(pCmd, "servers", &pszServers);
+        bail_on_error(err);
+        strcpy(szServers, pszServers);
+        if (strlen(szServers) > 0)
+        {
+            s2 = szServers;
+            do {
+                s1 = strsep(&s2, ",");
+                if (strlen(s1) > 0)
+                {
+                    count++;
+                }
+            } while (s2 != NULL);
+        }
+        if (count > 0)
+        {
+            err = netmgr_alloc((count * sizeof(char*)),
+                               (void *)&szDnsServersList);
+            bail_on_error(err);
+            strcpy(szServers, pszServers);
+            s2 = szServers;
+            do {
+                s1 = strsep(&s2, ",");
+                if (strlen(s1) > 0)
+                {
+                    if ((i == 0) && !strcmp(s1,"+"))
+                    {
+                        add_servers = 1;
+                        count -= 1;
+                        continue;
+                    }
+                    err = netmgr_alloc_string(s1, &(szDnsServersList[i++]));
+                    bail_on_error(err);
+                }
+            } while (s2 != NULL);
+        }
+
+        if (add_servers == 0)
+        {
+            err = set_dns_servers(NULL, mode, count,
+                                  (const char **)szDnsServersList, 0);
+        }
+        else
+        {
+            err = add_dns_servers(NULL, count, (const char **)szDnsServersList);
+        }
+        bail_on_error(err);
+    }
+
+    if (pCmd->op == OP_GET)
+    {
+        char **szDnsServers = NULL;
+        err = get_dns_servers(NULL, 0, &mode, &count, &szDnsServers);
+        bail_on_error(err);
+
+        if (mode == STATIC_DNS)
+        {
+            fprintf(stdout, "DNSMode=static\n");
+        }
+        else
+        {
+            fprintf(stdout, "DNSMode=dhcp\n");
+        }
+
+        fprintf(stdout, "DNSServers=");
+        for (i = 0; i < count; i++)
+        {
+            fprintf(stdout, "%s ", szDnsServers[i]);
+            netmgr_free(szDnsServers[i]);
+        }
+        netmgr_free(szDnsServers);
+        fprintf(stdout, "\n");
+    }
+
+cleanup:
+    /* Free allocated memory */
+    if (szDnsServersList != NULL)
+    {
+        for (i = 0; i < count; i++)
+        {
+            netmgr_free(szDnsServersList[i]);
+        }
+        netmgr_free(szDnsServersList);
+    }
+    return err;
+
+error:
+    if(err == EDOM)
+    {
+        fprintf(stderr,
+                "Usage:\ndns_servers --get\ndns_servers --set --mode "
+                 "dhcp|static --servers <server1,server2,...>\n");
+    }
+    goto cleanup;
+}
+
+typedef struct _NETMGR_CLI_HANDLER
+{
+    char* pszCmdName;
+    uint32_t (*pFnCmd)(PNETMGR_CMD);
+} NETMGR_CLI_HANDLER, *PNETMGR_CLI_HANDLER;
+
+NETMGR_CLI_HANDLER cmdHandler[] =
+{
+    { "dns_servers",           cmd_dns_servers },
+};
+
 
 int main(int argc, char* argv[])
 {
     uint32_t err = 0;
-    PNETMGR_CMD_ARGS pCmdArgs = NULL;
+    PNETMGR_CMD pCmd = NULL;
+    size_t i, cmdCount = sizeof(cmdHandler)/sizeof(NETMGR_CLI_HANDLER);
 
-    int nCommandCount = sizeof(arCmdMap)/sizeof(NETMGR_CLI_CMD_MAP);
-    const char* pszCmd = NULL;
-    int nFound = 0;
-
-    err = parse_args(argc, argv, &pCmdArgs);
+    err = netmgrcli_parse_cmdline(argc, argv, &pCmd);
     bail_on_error(err);
 
-    //If --version, show version and exit
-    if(pCmdArgs->nVersion)
+    for (i = 0; i < cmdCount; i++)
     {
-        show_version();
-    }
-    else if(pCmdArgs->nHelp)
-    {
-        cmd_help(pCmdArgs);
-    }
-    else if(pCmdArgs->nCmdCount > 0)
-    {
-        pszCmd = pCmdArgs->ppszCmds[0];
-        while(nCommandCount--)
+        if (!strcmp(pCmd->pszCmd, cmdHandler[i].pszCmdName))
         {
-            if(!strcmp(pszCmd, arCmdMap[nCommandCount].pszCmdName))
-            {
-                err = arCmdMap[nCommandCount].pFnCmd(pCmdArgs);
-                bail_on_error(err);
-                nFound = 1;
-                break;
-            }
+            cmdHandler[i].pFnCmd(pCmd);
+            break;
         }
-        if(!nFound)
-        {
-            err = 1;
-            bail_on_error(err);
-        }
-    }
-    else
-    {
-        cmd_help(pCmdArgs);
     }
 
 cleanup:
-    if(pCmdArgs)
-    {
-        free_cmd_args(pCmdArgs);
-    }
+    netmgrcli_free_cmd(pCmd);
     return err;
 error:
     goto cleanup;
@@ -617,6 +719,7 @@ error:
     goto cleanup;
 }
 
+#if 0
 typedef enum _CMD_OP
 {
     OP_INVALID = 0,
@@ -805,4 +908,4 @@ error:
     }
     goto cleanup;
 }
-
+#endif
