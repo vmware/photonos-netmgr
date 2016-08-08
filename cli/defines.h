@@ -12,14 +12,11 @@
  * under the License.
  */
 
-#include <config.h>
+#pragma once
 
-#include <getopt.h>
-
-#include <netmgmtsys.h>
-
-#include "../common/prototypes.h"
-#include <netmgr.h>
-#include "defines.h"
-#include "structs.h"
-#include "netmgrcli.h"
+#define bail_on_error(errcode) \
+    do { \
+       if (errcode) { \
+          goto error; \
+       } \
+    } while(0)
