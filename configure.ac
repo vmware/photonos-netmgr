@@ -66,6 +66,7 @@ AC_SUBST(PTHREAD_LIBS)
 
 AC_CONFIG_FILES([Makefile
                  common/Makefile
+                 cli/Makefile
                  src/Makefile
                  tests/Makefile
                  tools/Makefile
