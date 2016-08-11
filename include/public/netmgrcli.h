@@ -53,6 +53,8 @@ typedef struct _NETMGR_CMD
     POPTIONKV pCmdOpt;
 } NETMGR_CMD, *PNETMGR_CMD;
 
+void
+netmgrcli_show_version();
 
 uint32_t
 netmgrcli_parse_cmdline(

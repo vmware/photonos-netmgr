@@ -1,6 +1,6 @@
 Name:    netmgmt
 Summary: Network Management Utilities
-Version: 1.0.0
+Version: 1.0.4
 Release: 0
 Group:   Applications/System
 Vendor:  VMware, Inc.
@@ -36,9 +36,12 @@ cd build && make install DESTDIR=$RPM_BUILD_ROOT
 %defattr(-,root,root)
 %{_bindir}/netmgr
 %{_lib64dir}/libnetmgr.so*
+%{_lib64dir}/libnetmgrcli.so*
 
 %exclude %{_lib64dir}/libnetmgr.a
 %exclude %{_lib64dir}/libnetmgr.la
+%exclude %{_lib64dir}/libnetmgrcli.a
+%exclude %{_lib64dir}/libnetmgrcli.la
 %exclude %{_includedir}/*
 
 # %doc ChangeLog README COPYING

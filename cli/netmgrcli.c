@@ -423,7 +423,11 @@ show_help()
     return 0;
 }
 
-extern void show_version();
+void
+netmgrcli_show_version()
+{
+    fprintf(stdout, "%s: %s\n", PACKAGE_NAME, PACKAGE_VERSION);
+}
 
 uint32_t
 netmgrcli_parse_cmdline(
@@ -452,7 +456,7 @@ netmgrcli_parse_cmdline(
     if (!strcmp(argv[1], "-v") || !strcmp(argv[1], "--version"))
     {
         /* print version and exit */
-        show_version();
+        netmgrcli_show_version();
         exit(0);
     }
 
