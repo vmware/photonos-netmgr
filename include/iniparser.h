@@ -67,6 +67,20 @@ ini_cfg_find_key(
     const char*   pszKey
     );
 
+PKEYVALUE_INI
+ini_cfg_find_next_key(
+    PSECTION_INI  pSection,
+    PKEYVALUE_INI pKeyValue,
+    const char*   pszKey
+    );
+
+PKEYVALUE_INI
+ini_cfg_find_key_value(
+    PSECTION_INI  pSection,
+    const char*   pszKey,
+    const char*   pszValue
+    );
+
 uint32_t
 ini_cfg_add_key(
     PSECTION_INI  pSection,
@@ -86,7 +100,13 @@ ini_cfg_delete_key(
     PSECTION_INI  pSection,
     const char*   pszKey
     );
-     
+
+uint32_t
+ini_cfg_delete_key_value(
+    PSECTION_INI  pSection,
+    PKEYVALUE_INI pKeyValue
+    );
+
 uint32_t
 ini_cfg_save(
     const char*   pszPath,

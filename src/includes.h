@@ -18,6 +18,7 @@
 #include <glib/gstdio.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
+#include <arpa/inet.h>
 
 #include <constants.h>
 #include <netmgmtsys.h>

@@ -426,7 +426,64 @@ ini_cfg_find_key(
     }
 
 cleanup:
+    return pKeyValue;
+}
 
+PKEYVALUE_INI
+ini_cfg_find_next_key(
+    PSECTION_INI  pSection,
+    PKEYVALUE_INI pKeyValue,
+    const char*   pszKey
+    )
+{
+    PKEYVALUE_INI pNextKeyVal = NULL;
+    PKEYVALUE_INI pCursor;
+
+    if (!pszKey || !*pszKey)
+    {
+        goto cleanup;
+    }
+
+    pCursor = (pKeyValue == NULL) ? pSection->pKeyValue : pKeyValue->pNext;
+
+    for (; !pNextKeyVal && pCursor; pCursor = pCursor->pNext)
+    {
+        if (!strcmp(pCursor->pszKey, pszKey) && (pCursor->pszValue != NULL))
+        {
+            pNextKeyVal = pCursor;
+            break;
+        }
+    }
+
+cleanup:
+    return pNextKeyVal;
+}
+
+PKEYVALUE_INI
+ini_cfg_find_key_value(
+    PSECTION_INI  pSection,
+    const char*   pszKey,
+    const char*   pszValue
+    )
+{
+    PKEYVALUE_INI pKeyValue = NULL;
+    PKEYVALUE_INI pCursor = pSection->pKeyValue;
+
+    if (!pszKey || !*pszKey || !pszValue || !*pszValue)
+    {
+        goto cleanup;
+    }
+
+    for (; !pKeyValue && pCursor; pCursor = pCursor->pNext)
+    {
+        if (!strcmp(pCursor->pszKey, pszKey) && (pCursor->pszValue != NULL)
+            && !strcmp(pCursor->pszValue, pszValue))
+        {
+            pKeyValue = pCursor;
+        }
+    }
+
+cleanup:
     return pKeyValue;
 }
 
@@ -444,12 +501,6 @@ ini_cfg_add_key(
     if (!pSection || !pszKey || !*pszKey)
     {
         err = EINVAL;
-        bail_on_error(err);
-    }
-
-    if (ini_cfg_find_key(pSection, pszKey))
-    {
-        err = EEXIST;
         bail_on_error(err);
     }
 
@@ -569,6 +620,44 @@ ini_cfg_delete_key(
 
 error:
 
+    return err;
+}
+     
+uint32_t
+ini_cfg_delete_key_value(
+    PSECTION_INI  pSection,
+    PKEYVALUE_INI pKeyValue
+    )
+{
+    uint32_t err = 0;
+    PKEYVALUE_INI *pCursor = NULL;
+    PKEYVALUE_INI pCandidate = NULL;
+
+    if (!pSection || !pKeyValue)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    pCursor = &pSection->pKeyValue;
+    while (*pCursor)
+    {
+        if (*pCursor == pKeyValue)
+        {
+            pCandidate = *pCursor;
+            *pCursor = pCandidate->pNext;
+            break;
+        }
+        pCursor = &(*pCursor)->pNext;
+    }
+
+    if (pCandidate)
+    {
+        pCandidate->pNext = NULL;
+        ini_cfg_free_keyvalue(pCandidate);
+    }
+
+error:
     return err;
 }
      

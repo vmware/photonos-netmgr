@@ -27,6 +27,24 @@ set_key_value(
 );
 
 int
+add_key_value(
+    const char *pszConfigFileName,
+    const char *pszSection,
+    const char *pszKey,
+    const char *pszValue,
+    uint32_t flags
+);
+
+int
+delete_key_value(
+    const char *pszConfigFileName,
+    const char *pszSection,
+    const char *pszKey,
+    const char *pszValue,
+    uint32_t flags
+);
+
+int
 get_key_value(
     const char *pszConfigFileName,
     const char *pszSection,

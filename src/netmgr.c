@@ -195,6 +195,127 @@ get_link_info(
  * IP Address configuration APIs
  */
 
+static uint32_t
+is_ipv4_addr(const char *pszIpAddr)
+{
+    struct sockaddr_in sa;
+    return (inet_pton(AF_INET, pszIpAddr, &(sa.sin_addr)) != 0);
+}
+
+static uint32_t
+is_ipv6_addr(const char *pszIpAddr)
+{
+    struct sockaddr_in6 sa;
+    return (inet_pton(AF_INET6, pszIpAddr, &(sa.sin6_addr)) != 0);
+}
+
+int
+set_ip_dhcp_mode(
+    const char *pszInterfaceName,
+    uint32_t dhcpModeFlags
+)
+{
+    uint32_t err = 0;
+    char cfgFileName[MAX_LINE], szDhcpValue[] = "ipv4";
+
+    if (!pszInterfaceName)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    sprintf(cfgFileName, "%s10-%s.network", SYSTEMD_NET_PATH, pszInterfaceName);
+
+    if (TEST_FLAG(dhcpModeFlags, fDHCP_IPV4) && TEST_FLAG(dhcpModeFlags, fDHCP_IPV6))
+    {
+        strcpy(szDhcpValue, "yes");
+    }
+    else if (TEST_FLAG(dhcpModeFlags, fDHCP_IPV6))
+    {
+        strcpy(szDhcpValue, "ipv6");
+    }
+    else if (TEST_FLAG(dhcpModeFlags, fDHCP_IPV4))
+    {
+        strcpy(szDhcpValue, "ipv4");
+    }
+    else if (dhcpModeFlags == 0)
+    {
+        strcpy(szDhcpValue, "no");
+    }
+    else
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = set_key_value(cfgFileName, SECTION_NETWORK, KEY_DHCP, szDhcpValue, 0);
+
+    /* TODO: set  autoconf setting */
+
+cleanup:
+    return err;
+error:
+    goto cleanup;
+}
+
+int
+get_ip_dhcp_mode(
+    const char *pszInterfaceName,
+    uint32_t *pDhcpModeFlags
+)
+{
+    uint32_t err = 0, mode = 0;
+    char cfgFileName[MAX_LINE];
+    char *pszDhcpValue = NULL;
+
+    if (!pszInterfaceName || !pDhcpModeFlags)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    sprintf(cfgFileName, "%s10-%s.network", SYSTEMD_NET_PATH, pszInterfaceName);
+    err = get_key_value(cfgFileName, SECTION_NETWORK, KEY_DHCP, &pszDhcpValue);
+    if ((err == ENOENT) || !strcmp(pszDhcpValue, "no"))
+    {
+        mode = 0;
+        err = 0;
+    }
+    else if (!strcmp(pszDhcpValue, "ipv4"))
+    {
+        mode = fDHCP_IPV4;
+    }
+    else if (!strcmp(pszDhcpValue, "ipv6"))
+    {
+        mode = fDHCP_IPV6;
+    }
+    else if (!strcmp(pszDhcpValue, "yes"))
+    {
+        mode = (fDHCP_IPV4 | fDHCP_IPV6);
+    }
+    else
+    {
+        err = EINVAL;
+    }
+    bail_on_error(err);
+
+    /* TODO: query autoconf setting */
+
+    *pDhcpModeFlags = mode;
+cleanup:
+    if (pszDhcpValue != NULL)
+    {
+        netmgr_free(pszDhcpValue);
+    }
+    return err;
+error:
+    if (pDhcpModeFlags != NULL)
+    {
+        *pDhcpModeFlags = 0;
+    }
+    goto cleanup;
+}
+
 int
 set_static_ipv4_addr(
     const char *pszInterfaceName,
@@ -203,7 +324,34 @@ set_static_ipv4_addr(
     uint32_t flags
 )
 {
-    return 0;
+    uint32_t err = 0;
+    char cfgFileName[MAX_LINE], szIpAddr[MAX_LINE];
+
+    /* TODO: Handle eth0:0 virtual interfaces */
+    if (!pszInterfaceName || !pszIPv4Addr || !*pszIPv4Addr)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if (!is_ipv4_addr(pszIPv4Addr) || (prefix > 32))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    sprintf(cfgFileName, "%s10-%s.network", SYSTEMD_NET_PATH, pszInterfaceName);
+    sprintf(szIpAddr, "%s/%hhu", pszIPv4Addr, prefix);
+
+    err = delete_static_ipv4_addr(pszInterfaceName);
+    bail_on_error(err);
+
+    err = add_key_value(cfgFileName, SECTION_NETWORK, KEY_ADDRESS, szIpAddr, 0);
+
+cleanup:
+    return err;
+error:
+    goto cleanup;
 }
 
 int
@@ -211,7 +359,46 @@ delete_static_ipv4_addr(
     const char *pszInterfaceName
 )
 {
-    return 0;
+    uint32_t err = 0;
+    size_t i, count = 0;
+    char cfgFileName[MAX_LINE], **ppszAddrList = NULL;
+
+    /* TODO: Handle eth0:0 virtual interfaces */
+    if (!pszInterfaceName)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    sprintf(cfgFileName, "%s10-%s.network", SYSTEMD_NET_PATH, pszInterfaceName);
+
+    err = get_static_ip_addr(pszInterfaceName, STATIC_IPV4, &count,
+                             &ppszAddrList);
+    bail_on_error(err);
+    if (count > 1)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if (count)
+    {
+        err = delete_key_value(cfgFileName, SECTION_NETWORK, KEY_ADDRESS,
+                               ppszAddrList[0], 0);
+    }
+
+cleanup:
+    if (ppszAddrList != NULL)
+    {
+        for (i = 0; i < count; i++)
+        {
+            netmgr_free(ppszAddrList[i]);
+        }
+        netmgr_free(ppszAddrList);
+    }
+    return err;
+error:
+    goto cleanup;
 }
 
 int
@@ -222,7 +409,30 @@ add_static_ipv6_addr(
     uint32_t flags
 )
 {
-    return 0;
+    uint32_t err = 0;
+    char cfgFileName[MAX_LINE], szIpAddr[MAX_LINE];
+
+    if (!pszInterfaceName || !pszIPv6Addr || !*pszIPv6Addr)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if (!is_ipv6_addr(pszIPv6Addr) || (prefix > 128))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    sprintf(cfgFileName, "%s10-%s.network", SYSTEMD_NET_PATH, pszInterfaceName);
+    sprintf(szIpAddr, "%s/%hhu", pszIPv6Addr, prefix);
+
+    err = add_key_value(cfgFileName, SECTION_NETWORK, KEY_ADDRESS, szIpAddr, 0);
+
+cleanup:
+    return err;
+error:
+    goto cleanup;
 }
 
 int
@@ -233,27 +443,153 @@ delete_static_ipv6_addr(
     uint32_t flags
 )
 {
-    return 0;
+    uint32_t err = 0;
+    char cfgFileName[MAX_LINE], szIpAddr[MAX_LINE];
+
+    if (!pszInterfaceName || !pszIPv6Addr || !*pszIPv6Addr)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if (!is_ipv6_addr(pszIPv6Addr) || (prefix > 128))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    sprintf(cfgFileName, "%s10-%s.network", SYSTEMD_NET_PATH, pszInterfaceName);
+    sprintf(szIpAddr, "%s/%hhu", pszIPv6Addr, prefix);
+    err = delete_key_value(cfgFileName, SECTION_NETWORK, KEY_ADDRESS, szIpAddr, 0);
+
+cleanup:
+    return err;
+error:
+    goto cleanup;
 }
 
 int
-set_ip_dhcp_mode(
+get_static_ip_addr(
     const char *pszInterfaceName,
-    uint32_t dhcpModeFlags
-)
-{
-    return 0;
-}
-
-int
-get_ip_addr_info(
-    const char *pszInterfaceName,
-    uint32_t flags,
+    uint32_t addrTypes,
     size_t *pCount,
-    NET_IP_ADDR **ppAddrList
+    char ***pppszAddrList
 )
 {
-    return 0;
+    uint32_t err = 0, dwNumSections = 0, nCount = 0, i = 0, prefix;
+    char configFileName[MAX_LINE], ipAddr[INET6_ADDRSTRLEN];
+    char **ppszAddrList = NULL;
+    PCONFIG_INI pConfig = NULL;
+    PSECTION_INI *ppSections = NULL, pSection = NULL;
+    PKEYVALUE_INI pKeyValue = NULL, pNextKeyValue = NULL;
+
+    if (!pszInterfaceName || !*pszInterfaceName || !pCount || !pppszAddrList)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    sprintf(configFileName, "%s10-%s.network", SYSTEMD_NET_PATH,
+            pszInterfaceName);
+    err = ini_cfg_read(configFileName, &pConfig);
+    bail_on_error(err);
+
+    err = ini_cfg_find_sections(pConfig, SECTION_NETWORK, &ppSections,
+                                &dwNumSections);
+    bail_on_error(err);
+
+    if (dwNumSections > 1)
+    {
+        /* TODO: Log error */
+        err = EINVAL;
+        bail_on_error(err);
+    }
+    else if (dwNumSections == 0)
+    {
+        err = ENOENT;
+        bail_on_error(err);
+    }
+    pSection = ppSections[0];
+
+    /* Static IP addresses */
+    do
+    {
+        pNextKeyValue = ini_cfg_find_next_key(pSection, pKeyValue, KEY_ADDRESS);
+        if (pNextKeyValue == NULL)
+        {
+            break;
+        }
+        if (sscanf(pNextKeyValue->pszValue, "%[^/]/%u", ipAddr, &prefix) < 2)
+        {
+            err = EINVAL;
+            bail_on_error(err);
+        }
+        if (TEST_FLAG(addrTypes, STATIC_IPV4) && is_ipv4_addr(ipAddr))
+        {
+            nCount++;
+        }
+        else if (TEST_FLAG(addrTypes, STATIC_IPV6) && is_ipv6_addr(ipAddr))
+        {
+            nCount++;
+        }
+        pKeyValue = pNextKeyValue;
+    } while (pNextKeyValue != NULL);
+
+    if (nCount > 0)
+    {
+        err = netmgr_alloc((nCount * sizeof(char *)), (void *)&ppszAddrList);
+        bail_on_error(err);
+
+        pKeyValue = NULL;
+        do
+        {
+            pNextKeyValue = ini_cfg_find_next_key(pSection, pKeyValue,
+                                                  KEY_ADDRESS);
+            if (pNextKeyValue == NULL)
+            {
+                break;
+            }
+            sscanf(pNextKeyValue->pszValue, "%[^/]/%u", ipAddr, &prefix);
+            if ((TEST_FLAG(addrTypes, STATIC_IPV4) && is_ipv4_addr(ipAddr)) ||
+                (TEST_FLAG(addrTypes, STATIC_IPV6) && is_ipv6_addr(ipAddr)))
+            {
+                err = netmgr_alloc_string(pNextKeyValue->pszValue,
+                                          &(ppszAddrList[i++]));
+                bail_on_error(err);
+            }
+            pKeyValue = pNextKeyValue;
+        } while (pNextKeyValue != NULL);
+    }
+
+    /* TODO: Implement get for DHCPv4, DHCPv6 and AutoV6 */
+
+    *pCount = i;
+    *pppszAddrList = ppszAddrList;
+
+cleanup:
+    if (ppSections != NULL)
+    {
+        ini_cfg_free_sections(ppSections, dwNumSections);
+    }
+    if (pConfig != NULL)
+    {
+        ini_cfg_free_config(pConfig);
+    }
+    return err;
+error:
+    if (ppszAddrList != NULL)
+    {
+        netmgr_free(ppszAddrList);
+    }
+    if (pCount != NULL)
+    {
+        *pCount = 0;
+    }
+    if (pppszAddrList != NULL)
+    {
+        *pppszAddrList = NULL;
+    }
+    goto cleanup;
 }
 
 /*

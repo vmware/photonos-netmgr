@@ -15,6 +15,258 @@
 #include "includes.h"
 
 static uint32_t
+cmd_ip4_address(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0, mode = 0;
+    char *pszIfName = NULL, *pszMode = NULL;
+    char *pszAddr = NULL, *pszPrefix = NULL, *pszGateway = NULL;
+    char **ppszAddrList = NULL;
+    size_t i, count;
+
+    netmgrcli_find_cmdopt(pCmd, "interface", &pszIfName);
+
+    if (pCmd->op == OP_SET)
+    {
+        err = netmgrcli_find_cmdopt(pCmd, "mode", &pszMode);
+        bail_on_error(err);
+
+        err = get_ip_dhcp_mode(pszIfName, &mode);
+        bail_on_error(err);
+
+        if (!strcmp(pszMode, "static"))
+        {
+            err = netmgrcli_find_cmdopt(pCmd, "address", &pszAddr);
+            bail_on_error(err);
+
+            err = netmgrcli_find_cmdopt(pCmd, "prefix", &pszPrefix);
+            bail_on_error(err);
+
+            netmgrcli_find_cmdopt(pCmd, "gateway", &pszGateway);
+
+            CLEAR_FLAG(mode, fDHCP_IPV4);
+            err = set_ip_dhcp_mode(pszIfName, mode);
+            bail_on_error(err);
+
+            err = set_static_ipv4_addr(pszIfName, pszAddr, atoi(pszPrefix), 0);
+
+            if (pszGateway)
+            {
+                // TODO: set default route
+            }
+        }
+        else
+        {
+            err = delete_static_ipv4_addr(pszIfName);
+            if (err != ENOENT)
+            {
+                bail_on_error(err);
+            }
+
+            if (!strcmp(pszMode, "dhcp"))
+            {
+                SET_FLAG(mode, fDHCP_IPV4);
+            }
+            else
+            {
+                CLEAR_FLAG(mode, fDHCP_IPV4);
+            }
+
+            err = set_ip_dhcp_mode(pszIfName, mode);
+        }
+        bail_on_error(err);
+    }
+
+    if (pCmd->op == OP_GET)
+    {
+        err = get_ip_dhcp_mode(pszIfName, &mode);
+        bail_on_error(err);
+
+        err = get_static_ip_addr(pszIfName, STATIC_IPV4, &count, &ppszAddrList);
+        bail_on_error(err);
+
+        if (TEST_FLAG(mode, fDHCP_IPV4))
+        {
+            fprintf(stdout, "IPv4 Address Mode: dhcp\n");
+        }
+        else if (ppszAddrList != NULL)
+        {
+            fprintf(stdout, "IPv4 Address Mode: static\n");
+        }
+        else
+        {
+            fprintf(stdout, "IPv4 Address Mode: none\n");
+        }
+        fprintf(stdout, "IPv4 Address=%s\n", ppszAddrList[0]);
+
+        // TODO: get default route
+    }
+
+cleanup:
+    if (ppszAddrList != NULL)
+    {
+        for (i = 0; i < count; i++)
+        {
+            netmgr_free(ppszAddrList[i]);
+        }
+        netmgr_free(ppszAddrList);
+    }
+    netmgr_free(pszGateway);
+    return err;
+
+error:
+    goto cleanup;
+}
+
+static uint32_t
+cmd_ip6_address(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0, mode = 0;
+    char *pszIfName = NULL, *pszDhcp = NULL, *pszAutoconf = NULL;
+    char *pszAddrList = NULL, *pszGateway = NULL;
+    char *a1, *a2, szAddr[INET6_ADDRSTRLEN], **ppszAddrList = NULL;
+    uint8_t prefix;
+    size_t i, count;
+    CMD_OP addrOp = OP_MAX;
+
+    netmgrcli_find_cmdopt(pCmd, "interface", &pszIfName);
+
+    if (pCmd->op == OP_SET)
+    {
+        err = get_ip_dhcp_mode(pszIfName, &mode);
+        bail_on_error(err);
+
+        err = netmgrcli_find_cmdopt(pCmd, "dhcp", &pszDhcp);
+        if (err != ENOENT)
+        {
+            bail_on_error(err);
+        }
+        err = netmgrcli_find_cmdopt(pCmd, "autoconf", &pszAutoconf);
+        if (err != ENOENT)
+        {
+            bail_on_error(err);
+        }
+        err = netmgrcli_find_cmdopt(pCmd, "addrlist", &pszAddrList);
+        if (err != ENOENT)
+        {
+            bail_on_error(err);
+        }
+        err = netmgrcli_find_cmdopt(pCmd, "gateway", &pszGateway);
+        if (err != ENOENT)
+        {
+            bail_on_error(err);
+        }
+
+        if (pszDhcp != NULL)
+        {
+            if (!strcmp(pszDhcp, "1"))
+            {
+                SET_FLAG(mode, fDHCP_IPV6);
+            }
+            else
+            {
+                CLEAR_FLAG(mode, fDHCP_IPV6);
+            }
+        }
+        if (pszAutoconf != NULL)
+        {
+            if (!strcmp(pszAutoconf, "1"))
+            {
+                SET_FLAG(mode, fAUTO_IPV6);
+            }
+            else
+            {
+                CLEAR_FLAG(mode, fAUTO_IPV6);
+            }
+        }
+
+        err = set_ip_dhcp_mode(pszIfName, mode);
+        bail_on_error(err);
+
+        if (pszAddrList != NULL)
+        {
+            a2 = pszAddrList;
+            a1 = strsep(&a2, ",");
+            if (strlen(a1) > 0)
+            {
+                if (!strcmp(a1,"+"))
+                {
+                    addrOp = OP_ADD;
+                }
+                else if (!strcmp(a1,"-"))
+                {
+                    addrOp = OP_DEL;
+                }
+            }
+            do {
+                a1 = strsep(&a2, ",");
+                if (strlen(a1) == 0)
+                {
+                    continue;
+                }
+                sscanf(a1, "%[^/]/%hhu", szAddr, &prefix);
+                if (addrOp == OP_ADD)
+                {
+                    err = add_static_ipv6_addr(pszIfName, szAddr, prefix, 0);
+                }
+                else
+                {
+                    err = delete_static_ipv6_addr(pszIfName, szAddr, prefix, 0);
+                }
+                bail_on_error(err);
+            } while (a2 != NULL);
+
+            if (pszGateway)
+            {
+                // TODO: set default route
+            }
+        }
+        bail_on_error(err);
+    }
+
+    if (pCmd->op == OP_GET)
+    {
+        err = get_ip_dhcp_mode(pszIfName, &mode);
+        bail_on_error(err);
+
+        err = get_static_ip_addr(pszIfName, STATIC_IPV6, &count, &ppszAddrList);
+        bail_on_error(err);
+
+        if (TEST_FLAG(mode, fDHCP_IPV6))
+        {
+            fprintf(stdout, "IPv6 Address Mode: dhcp\n");
+        }
+        else if (ppszAddrList != NULL)
+        {
+            fprintf(stdout, "IPv6 Address Mode: static\n");
+        }
+        else
+        {
+            fprintf(stdout, "IPv6 Address Mode: none\n");
+        }
+        for (i = 0; i < count; i++)
+        {
+            fprintf(stdout, "IPv6 Address=%s\n", ppszAddrList[i]);
+        }
+        // TODO: get default route
+    }
+
+cleanup:
+    if (ppszAddrList != NULL)
+    {
+        for (i = 0; i < count; i++)
+        {
+            netmgr_free(ppszAddrList[i]);
+        }
+        netmgr_free(ppszAddrList);
+    }
+    netmgr_free(pszGateway);
+    return err;
+
+error:
+    goto cleanup;
+}
+
+static uint32_t
 cmd_dhcp_duid(PNETMGR_CMD pCmd)
 {
     uint32_t err = 0;
@@ -215,9 +467,11 @@ typedef struct _NETMGR_CLI_HANDLER
 
 NETMGR_CLI_HANDLER cmdHandler[] =
 {
-    { CMD_DHCP_DUID,           cmd_dhcp_duid },
-    { CMD_IF_IAID,             cmd_if_iaid },
-    { CMD_DNS_SERVERS,         cmd_dns_servers },
+    { CMD_IP4_ADDRESS,         cmd_ip4_address     },
+    { CMD_IP6_ADDRESS,         cmd_ip6_address     },
+    { CMD_DHCP_DUID,           cmd_dhcp_duid       },
+    { CMD_IF_IAID,             cmd_if_iaid         },
+    { CMD_DNS_SERVERS,         cmd_dns_servers     },
 };
 
 void

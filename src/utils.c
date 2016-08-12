@@ -29,7 +29,8 @@ set_key_value(
     PKEYVALUE_INI pKeyValue = NULL;
     FILE *fp;
 
-    if (!pszConfigFileName || !pszSection || !pszKey)
+    if (!pszConfigFileName || !pszSection || !pszKey ||
+        !*pszConfigFileName || !*pszSection || !*pszKey)
     {
         err = EINVAL;
         bail_on_error(err);
@@ -109,6 +110,144 @@ error:
 }
 
 int
+add_key_value(
+    const char *pszConfigFileName,
+    const char *pszSection,
+    const char *pszKey,
+    const char *pszValue,
+    uint32_t flags
+)
+{
+    uint32_t err = 0, dwNumSections = 0;
+    PCONFIG_INI pConfig = NULL;
+    PSECTION_INI *ppSections = NULL, pSection = NULL;
+    PKEYVALUE_INI pKeyValue = NULL;
+
+    if (!pszConfigFileName || !pszSection || !pszKey || !pszValue ||
+        !*pszConfigFileName || !*pszSection || !*pszKey || !*pszValue)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = ini_cfg_read(pszConfigFileName, &pConfig);
+    bail_on_error(err);
+
+    err = ini_cfg_find_sections(pConfig, pszSection, &ppSections, &dwNumSections);
+    bail_on_error(err);
+
+    if (dwNumSections > 1)
+    {
+        /* TODO: Better error reporting */
+        err = EINVAL;
+        bail_on_error(err);
+    }
+    else if (dwNumSections == 0)
+    {
+        err = ini_cfg_add_section(pConfig, pszSection, &pSection);
+        bail_on_error(err);
+    }
+    else
+    {
+        pSection = ppSections[0];
+    }
+
+    pKeyValue = ini_cfg_find_key_value(pSection, pszKey, pszValue);
+    if (pKeyValue != NULL)
+    {
+        err = EEXIST;
+    }
+    else
+    {
+        err = ini_cfg_add_key(pSection, pszKey, pszValue);
+    }
+    bail_on_error(err);
+
+    err = ini_cfg_save(pszConfigFileName, pConfig);
+    bail_on_error(err);
+
+error:
+    if (ppSections != NULL)
+    {
+        ini_cfg_free_sections(ppSections, dwNumSections);
+    }
+    if (pConfig != NULL)
+    {
+        ini_cfg_free_config(pConfig);
+    }
+    return err;
+}
+
+int
+delete_key_value(
+    const char *pszConfigFileName,
+    const char *pszSection,
+    const char *pszKey,
+    const char *pszValue,
+    uint32_t flags
+)
+{
+    uint32_t err = 0, dwNumSections = 0;
+    PCONFIG_INI pConfig = NULL;
+    PSECTION_INI *ppSections = NULL, pSection = NULL;
+    PKEYVALUE_INI pKeyValue = NULL;
+
+    if (!pszConfigFileName || !pszSection || !pszKey || !pszValue ||
+        !*pszConfigFileName || !*pszSection || !*pszKey || !*pszValue)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = ini_cfg_read(pszConfigFileName, &pConfig);
+    bail_on_error(err);
+
+    err = ini_cfg_find_sections(pConfig, pszSection, &ppSections, &dwNumSections);
+    bail_on_error(err);
+
+    if (dwNumSections > 1)
+    {
+        /* TODO: Better error reporting */
+        err = EINVAL;
+        bail_on_error(err);
+    }
+    else if (dwNumSections == 0)
+    {
+        err = ENOENT;
+        bail_on_error(err);
+    }
+    else
+    {
+        pSection = ppSections[0];
+    }
+
+    pKeyValue = ini_cfg_find_key_value(pSection, pszKey, pszValue);
+    if (pKeyValue == NULL)
+    {
+        err = ENOENT;
+    }
+    else
+    {
+        err = ini_cfg_delete_key_value(pSection, pKeyValue);
+    }
+    bail_on_error(err);
+
+    err = ini_cfg_save(pszConfigFileName, pConfig);
+    bail_on_error(err);
+
+error:
+    if (ppSections != NULL)
+    {
+        ini_cfg_free_sections(ppSections, dwNumSections);
+    }
+    if (pConfig != NULL)
+    {
+        ini_cfg_free_config(pConfig);
+    }
+    return err;
+}
+
+int
 get_key_value(
     const char *pszConfigFileName,
     const char *pszSection,
@@ -122,7 +261,8 @@ get_key_value(
     PKEYVALUE_INI pKeyValue = NULL;
     *ppszValue = NULL;
 
-    if (!pszConfigFileName || !pszSection || !pszKey)
+    if (!pszConfigFileName || !pszSection || !pszKey ||
+        !*pszConfigFileName || !*pszSection || !*pszKey)
     {
         err = EINVAL;
         bail_on_error(err);

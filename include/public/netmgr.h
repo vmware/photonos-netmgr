@@ -15,11 +15,16 @@
 #ifndef __NETMGR_H__
 #define __NETMGR_H__
 
+#define SET_FLAG(v, f) (v) = ((v) | (f))
+#define CLEAR_FLAG(v, f) (v) = ((v) & ~(f))
+#define TEST_FLAG(v, f) (((v) & (f)) != 0)
+
+
 typedef struct _NETMGR_INTERFACE
 {
     char* pszName;
     struct _NETMGR_INTERFACE* pNext;
-}NETMGR_INTERFACE, *PNETMGR_INTERFACE;
+} NETMGR_INTERFACE, *PNETMGR_INTERFACE;
 
 uint32_t
 enum_interfaces(
@@ -142,6 +147,12 @@ set_ip_dhcp_mode(
     uint32_t dhcpModeFlags
 );
 
+int
+get_ip_dhcp_mode(
+    const char *pszInterfaceName,
+    uint32_t *pDhcpModeFlags
+);
+
 typedef enum _NET_ADDR_TYPE
 {
     STATIC_IPV4  =  0x00000001,
@@ -160,11 +171,11 @@ typedef struct _NET_IP_ADDR
 } NET_IP_ADDR;
 
 int
-get_ip_addr_info(
+get_static_ip_addr(
     const char *pszInterfaceName,
-    uint32_t flags,
+    uint32_t addrTypes,
     size_t *pCount,
-    NET_IP_ADDR **ppAddrList
+    char ***ppszAddrList
 );
 
 
@@ -271,7 +282,6 @@ get_dns_domains(
     size_t *pCount,
     char **ppDnsDomains
 );
-
 
 /*
  * DHCP options, DUID, IAID configuration APIs

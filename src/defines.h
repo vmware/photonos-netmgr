@@ -27,11 +27,14 @@
 #define SECTION_NETWORK                "Network"
 #define SECTION_DHCP                   "DHCP"
 
+#define KEY_ADDRESS                    "Address"
+#define KEY_GATEWAY                    "Gateway"
+#define KEY_DHCP                       "DHCP"
+#define KEY_DNS                        "DNS"
+#define KEY_USE_DNS                    "UseDNS"
 #define KEY_IAID                       "IAID"
 #define KEY_DUID_TYPE                  "DUIDType"
 #define KEY_DUID_RAWDATA               "DUIDRawData"
-#define KEY_DNS                        "DNS"
-#define KEY_USE_DNS                    "UseDNS"
 
 
 #define bail_on_error(errcode) \
@@ -40,8 +43,5 @@
           goto error; \
        } \
     } while(0)
-
-#define SET_FLAG(v,f) ((v) | (f))
-#define TEST_FLAG(v,f) (((v) & (f)) != 0)
 
 #endif /* __DEFINES_H__ */
