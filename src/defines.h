@@ -23,6 +23,16 @@
 #define SYSTEMD_PATH                   "/etc/systemd/"
 #define SYSTEMD_NET_PATH               "/etc/systemd/network/"
 
+#define GET_NETWORKD_CONF_FILENAME(_pstr) \
+    sprintf((_pstr), "%snetworkd.conf", SYSTEMD_PATH)
+
+#define GET_RESOLVED_CONF_FILENAME(_pstr) \
+    sprintf((_pstr), "%sresolved.conf", SYSTEMD_PATH)
+
+#define GET_NETWORK_CONF_FILENAME(_pstr, _pifname) \
+    sprintf((_pstr), "%s10-%s.network", SYSTEMD_NET_PATH, (_pifname))
+
+
 #define SECTION_RESOLVE                "Resolve"
 #define SECTION_NETWORK                "Network"
 #define SECTION_DHCP                   "DHCP"

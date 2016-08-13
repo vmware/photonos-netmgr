@@ -14,6 +14,8 @@
 
 // memory.c
 
+#define IS_NULL_OR_EMPTY(_pstr)  (!(_pstr) || !(*(_pstr)))
+
 uint32_t
 netmgr_alloc(
     size_t size,
