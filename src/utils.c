@@ -29,8 +29,8 @@ set_key_value(
     PKEYVALUE_INI pKeyValue = NULL;
     FILE *fp;
 
-    if (!pszConfigFileName || !pszSection || !pszKey ||
-        !*pszConfigFileName || !*pszSection || !*pszKey)
+    if (IS_NULL_OR_EMPTY(pszConfigFileName) || IS_NULL_OR_EMPTY(pszSection) ||
+        IS_NULL_OR_EMPTY(pszKey))
     {
         err = EINVAL;
         bail_on_error(err);
@@ -123,8 +123,8 @@ add_key_value(
     PSECTION_INI *ppSections = NULL, pSection = NULL;
     PKEYVALUE_INI pKeyValue = NULL;
 
-    if (!pszConfigFileName || !pszSection || !pszKey || !pszValue ||
-        !*pszConfigFileName || !*pszSection || !*pszKey || !*pszValue)
+    if (IS_NULL_OR_EMPTY(pszConfigFileName) || IS_NULL_OR_EMPTY(pszSection) ||
+        IS_NULL_OR_EMPTY(pszKey) || IS_NULL_OR_EMPTY(pszValue))
     {
         err = EINVAL;
         bail_on_error(err);
@@ -192,8 +192,8 @@ delete_key_value(
     PSECTION_INI *ppSections = NULL, pSection = NULL;
     PKEYVALUE_INI pKeyValue = NULL;
 
-    if (!pszConfigFileName || !pszSection || !pszKey || !pszValue ||
-        !*pszConfigFileName || !*pszSection || !*pszKey || !*pszValue)
+    if (IS_NULL_OR_EMPTY(pszConfigFileName) || IS_NULL_OR_EMPTY(pszSection) ||
+        IS_NULL_OR_EMPTY(pszKey) || IS_NULL_OR_EMPTY(pszValue))
     {
         err = EINVAL;
         bail_on_error(err);
@@ -261,8 +261,8 @@ get_key_value(
     PKEYVALUE_INI pKeyValue = NULL;
     *ppszValue = NULL;
 
-    if (!pszConfigFileName || !pszSection || !pszKey ||
-        !*pszConfigFileName || !*pszSection || !*pszKey)
+    if (IS_NULL_OR_EMPTY(pszConfigFileName) || IS_NULL_OR_EMPTY(pszSection) ||
+        IS_NULL_OR_EMPTY(pszKey))
     {
         err = EINVAL;
         bail_on_error(err);

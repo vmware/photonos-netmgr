@@ -311,11 +311,5 @@ get_duid(
     char **ppszDuid
 );
 
-int
-set_dns_servers_v0(
-    const char *pszInterfaceName,
-    const char *pszDnsServers
-);
-
 #endif /* __NETMGR_H__ */
 

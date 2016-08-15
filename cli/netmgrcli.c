@@ -759,7 +759,7 @@ netmgrcli_find_cmdopt(
     char *pszOptValue = NULL;
     POPTIONKV pKeyVal;
 
-    if (!pCmd || !pszOptName || !*pszOptName)
+    if (!pCmd || IS_NULL_OR_EMPTY(pszOptName))
     {
         err = EINVAL;
         bail_on_error(err);
