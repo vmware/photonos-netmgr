@@ -274,13 +274,26 @@ set_dns_domains(
     uint32_t flags
 );
 
-#define fRESOLVED_CONF_DNS_DOMAINS     0x00000001
+int
+add_dns_domain(
+    const char *pszInterfaceName,
+    size_t count,
+    const char **ppDnsDomain
+);
+
 int
 get_dns_domains(
     const char *pszInterfaceName,
     uint32_t flags,
     size_t *pCount,
-    char **ppDnsDomains
+    char ***pppDnsDomains
+);
+
+int
+delete_dns_domain
+(
+    const char *pszInterfaceName,
+    const char *dns_domain
 );
 
 /*
