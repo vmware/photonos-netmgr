@@ -32,6 +32,8 @@
 #define KEY_DHCP                       "DHCP"
 #define KEY_DNS                        "DNS"
 #define KEY_USE_DNS                    "UseDNS"
+#define KEY_DOMAIN                     "Domains"
+#define KEY_USE_DOMAIN                 "UseDomains"
 #define KEY_IAID                       "IAID"
 #define KEY_DUID_TYPE                  "DUIDType"
 #define KEY_DUID_RAWDATA               "DUIDRawData"
