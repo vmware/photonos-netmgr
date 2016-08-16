@@ -1147,7 +1147,125 @@ set_dns_domains(
     uint32_t flags
 )
 {
-    return 0;
+    uint32_t err = 0;
+    char *cfgFileName = NULL;
+    char szSectionName[MAX_LINE];
+    char *szCurrentDnsDomains = NULL;
+    char *szDnsDomainsValue = NULL;
+
+
+    if (pszInterfaceName != NULL)
+    {
+        err = get_network_conf_filename(&cfgFileName, pszInterfaceName);
+        bail_on_error(err);
+        sprintf(szSectionName, SECTION_NETWORK);
+    }
+    else
+    {
+        err = get_resolved_conf_filename(&cfgFileName);
+        bail_on_error(err);
+        sprintf(szSectionName, SECTION_RESOLVE);
+    }
+
+    if (TEST_FLAG(flags, fAPPEND_DNS_DOMAINS_LIST))
+    {
+        err = get_key_value(cfgFileName, szSectionName, KEY_DOMAINS,
+                            &szCurrentDnsDomains);
+        if (err != ENOENT)
+        {
+            bail_on_error(err);
+        }
+    }
+
+    err = space_delimited_string_append(count, ppDnsDomains,
+                                        szCurrentDnsDomains,
+                                        &szDnsDomainsValue);
+    bail_on_error(err);
+    if (count == 0)
+    {
+        err = set_key_value(cfgFileName, szSectionName, KEY_DOMAINS, NULL, 0);
+    }
+    else
+    {
+        err = set_key_value(cfgFileName, szSectionName, KEY_DOMAINS,
+                            szDnsDomainsValue, 0);
+    }
+    bail_on_error(err);
+
+
+error:
+    if (szCurrentDnsDomains!= NULL)
+    {
+        netmgr_free(szCurrentDnsDomains);
+    }
+    if (szDnsDomainsValue != NULL)
+    {
+        netmgr_free(szDnsDomainsValue);
+    }
+    netmgr_free(cfgFileName);
+    return err;
+
+}
+
+int
+add_dns_domain(
+    const char *pszInterfaceName,
+    size_t count,
+    const char **ppDnsDomains
+)
+{
+    uint32_t err = 0;
+    char *cfgFileName = NULL;
+    char szSectionName[MAX_LINE];
+    char *szCurrentDnsDomains = NULL;
+    char *szDnsDomainsValue = NULL;
+
+    if ((count == 0) || (ppDnsDomains == NULL))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+    if (pszInterfaceName != NULL)
+    {
+        err = get_network_conf_filename(&cfgFileName, pszInterfaceName);
+        sprintf(szSectionName, SECTION_NETWORK);
+    }
+    else
+    {
+        err = get_resolved_conf_filename(&cfgFileName);
+        sprintf(szSectionName, SECTION_RESOLVE);
+    }
+    bail_on_error(err);
+
+    err = get_key_value(cfgFileName, szSectionName, KEY_DOMAINS,
+                        &szCurrentDnsDomains);
+    if (err != ENOENT)
+    {
+        bail_on_error(err);
+    }
+
+    err = space_delimited_string_append(count, ppDnsDomains,
+                                        szCurrentDnsDomains,
+                                        &szDnsDomainsValue);
+    bail_on_error(err);
+
+    err = set_key_value(cfgFileName, szSectionName, KEY_DOMAINS,
+                        szDnsDomainsValue, 0);
+    bail_on_error(err);
+
+cleanup:
+    if (szCurrentDnsDomains != NULL)
+    {
+        netmgr_free(szCurrentDnsDomains);
+    }
+    if (szDnsDomainsValue != NULL)
+    {
+        netmgr_free(szDnsDomainsValue);
+    }
+    netmgr_free(cfgFileName);
+    return err;
+error:
+    goto cleanup;
 }
 
 int
@@ -1155,12 +1273,196 @@ get_dns_domains(
     const char *pszInterfaceName,
     uint32_t flags,
     size_t *pCount,
-    char **ppDnsDomains
+    char ***pppDnsDomains
 )
 {
-    return 0;
+    uint32_t err = 0;
+    char *cfgFileName = NULL;
+    char szSectionName[MAX_LINE];
+    char *pszDnsDomainsValue = NULL;
+    char *pszDnsDomainValue2 = NULL;
+    char *s1, *s2, **szDnsDomainsList = NULL;
+    size_t i = 0, count = 0;
+
+    if ((pCount == NULL) || (pppDnsDomains == NULL))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if (pszInterfaceName != NULL)
+    {
+        err = get_network_conf_filename(&cfgFileName, pszInterfaceName);
+        sprintf(szSectionName, SECTION_NETWORK);
+    }
+    else
+    {
+        err = get_resolved_conf_filename(&cfgFileName);
+        sprintf(szSectionName, SECTION_RESOLVE);
+    }
+    bail_on_error(err);
+
+    /* Parse pszDnsServersValue */
+    err = get_key_value(cfgFileName, szSectionName, KEY_DOMAINS, &pszDnsDomainsValue);
+    if (err == ENOENT)
+    {
+        err = 0;
+        goto error;
+    }
+    bail_on_error(err);
+    err = netmgr_alloc_string(pszDnsDomainsValue, &pszDnsDomainValue2);
+    bail_on_error(err);
+
+    s2 = pszDnsDomainsValue;
+    do {
+        s1 = strsep(&s2, " ");
+        if (strlen(s1) > 0)
+        {
+            count++;
+        }
+    } while (s2 != NULL);
+
+    if (count > 0)
+    {
+        err = netmgr_alloc((count * sizeof(char *)), (void *)&szDnsDomainsList);
+        bail_on_error(err);
+
+        s2 = pszDnsDomainValue2;
+        do {
+            s1 = strsep(&s2, " ");
+            if (strlen(s1) > 0)
+            {
+                err = netmgr_alloc_string(s1, &(szDnsDomainsList[i++]));
+                bail_on_error(err);
+            }
+        } while (s2 != NULL);
+    }
+    *pCount = count;
+    *pppDnsDomains = szDnsDomainsList;
+
+clean:
+    if (pszDnsDomainValue2 != NULL)
+    {
+        netmgr_free(pszDnsDomainValue2);
+    }
+    if (pszDnsDomainsValue != NULL)
+    {
+        netmgr_free(pszDnsDomainsValue);
+    }
+    netmgr_free(cfgFileName);
+    return err;
+
+error:
+    /* Free allocated memory on error */
+    if(szDnsDomainsList != NULL)
+    {
+        netmgr_free_pointer2memory(szDnsDomainsList,count);
+    }
+    if (pCount != NULL)
+    {
+        *pCount = 0;
+    }
+    if (pppDnsDomains != NULL)
+    {
+        *pppDnsDomains = NULL;
+    }
+    goto clean;
+
 }
 
+int
+delete_dns_domain
+(
+    const char *pszInterfaceName,
+    const char *pszDnsDomain
+)
+{
+    uint32_t err = 0, length = 0;
+    char *cfgFileName = NULL;
+    char szSectionName[MAX_LINE];
+    char *szCurrentDnsDomains = NULL;
+    char *szNewDnsDomainsList = NULL;
+    char *szDomains = NULL;
+    char *s1 = NULL, *s2 = NULL;
+    if ( pszDnsDomain == NULL)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+    if (pszInterfaceName != NULL)
+    {
+        err = get_network_conf_filename(&cfgFileName, pszInterfaceName);
+        sprintf(szSectionName, SECTION_NETWORK);
+    }
+    else
+    {
+        err = get_resolved_conf_filename(&cfgFileName);
+        sprintf(szSectionName, SECTION_RESOLVE);
+    }
+    bail_on_error(err);
+
+    err = get_key_value(cfgFileName, szSectionName, KEY_DOMAINS,
+                        &szCurrentDnsDomains);
+    if (err == ENOENT)
+    {
+        err = 0;
+    }
+    bail_on_error(err);
+    szNewDnsDomainsList = szCurrentDnsDomains;
+
+    if (pszDnsDomain != NULL)
+    {
+        err = netmgr_alloc_string(pszDnsDomain,&szDomains);
+        bail_on_error(err);
+        if (strlen(szDomains) > 0)
+        {
+            s2 = szDomains;
+            do {
+                s1 = strsep(&s2, ",");
+                if (strlen(s1) > 0 && (szCurrentDnsDomains = strstr(szCurrentDnsDomains,s1)))
+                {
+                    length = strlen(s1);
+                    if(*(szCurrentDnsDomains + length) != '\0'){
+                        memmove(szCurrentDnsDomains, szCurrentDnsDomains + length + 1,strlen(szCurrentDnsDomains + length));
+                    }
+                    else
+                    {
+                        if(szNewDnsDomainsList != szCurrentDnsDomains)
+                        {
+                            memmove(szCurrentDnsDomains-1, szCurrentDnsDomains + length,1);
+                         }
+                    }
+                 }
+            } while (s2 != NULL);
+        }
+    }
+
+
+    if(szNewDnsDomainsList == szCurrentDnsDomains)
+    {
+        err = set_key_value(cfgFileName, szSectionName, KEY_DOMAINS,
+                        NULL, 0);
+    }else
+    {
+        err = set_key_value(cfgFileName, szSectionName, KEY_DOMAINS,
+                        szNewDnsDomainsList, 0);
+    }
+    bail_on_error(err);
+cleanup:
+    if (szNewDnsDomainsList != NULL)
+    {
+        netmgr_free(szNewDnsDomainsList);
+    }
+    if(szDomains != NULL)
+    {
+        netmgr_free(szDomains);
+    }
+    netmgr_free(cfgFileName);
+    return err;
+error:
+    goto cleanup;
+
+}
 
 /*
  * DHCP options, DUID, IAID configuration APIs

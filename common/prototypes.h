@@ -40,3 +40,10 @@ netmgr_free(
     void* pMemory
     );
 
+void
+netmgr_free_pointer2memory(
+    char ** ppMemory,
+    size_t count
+    );
+
+

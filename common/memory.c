@@ -151,3 +151,23 @@ netmgr_free(
     }
 }
 
+void
+netmgr_free_pointer2memory(
+    char ** ppMemory,
+    size_t count
+    )
+{
+    uint32_t i;
+    if (ppMemory != NULL)
+    {
+        for (i = 0; i < count; i++)
+        {
+            if (ppMemory[i] != NULL)
+            {
+                netmgr_free(ppMemory[i]);
+            }
+        }
+        netmgr_free(ppMemory);
+    }
+}
+
