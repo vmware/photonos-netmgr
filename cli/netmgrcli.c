@@ -518,6 +518,8 @@ static struct option dnsServerOptions[] =
 {
     {"set",          no_argument,          0,    's'},
     {"get",          no_argument,          0,    'g'},
+    {"add",          no_argument,          0,    'a'},
+    {"del",          no_argument,          0,    'd'},
     {"mode",         required_argument,    0,    'm'},
     {"servers",      required_argument,    0,     0 },
     {"interface",    required_argument,    0,    'i'},
@@ -531,7 +533,7 @@ cli_dns_servers(
     PNETMGR_CMD pCmd
     )
 {
-    uint32_t err = 0, invalidMode = 1;
+    uint32_t err = 0, invalidMode = 1, emptyServerList = 1;
     int nOptionIndex = 0, nOption = 0;
     CMD_OP op = OP_INVALID;
 
@@ -541,7 +543,7 @@ cli_dns_servers(
     {
         nOption = getopt_long(argc,
                               argv,
-                              "sgm:i:",
+                              "sgadm:i:",
                               dnsServerOptions,
                               &nOptionIndex);
         if (nOption == -1)
@@ -554,6 +556,12 @@ cli_dns_servers(
                 break;
             case 'g':
                 op = OP_GET;
+                break;
+            case 'a':
+                op = OP_ADD;
+                break;
+            case 'd':
+                op = OP_DEL;
                 break;
             case 'm':
                 if (!strcmp(optarg, "dhcp") || !strcmp(optarg, "static"))
@@ -578,6 +586,7 @@ cli_dns_servers(
                 if (strlen(optarg) > 0)
                 {
                     err = netmgrcli_alloc_keyvalue("servers", optarg, pCmd);
+                    emptyServerList = 0;
                 }
                 break;
             case '?':
@@ -587,7 +596,8 @@ cli_dns_servers(
         bail_on_error(err);
     }
 
-    if ((op == OP_INVALID) || ((op == OP_SET) && invalidMode))
+    if ((op == OP_INVALID) || ((op == OP_SET) && invalidMode) ||
+        (((op == OP_ADD) || (op == OP_DEL)) && emptyServerList))
     {
         err = EDOM;
         bail_on_error(err);
@@ -605,7 +615,8 @@ error:
     {
         fprintf(stderr,
                 "Usage:\ndns_servers --get\ndns_servers --set --mode "
-                 "dhcp|static --servers <server1,server2,...>\n");
+                 "dhcp|static --servers <server1,server2,...>\n"
+                 "dns_servers --add|--del --servers <server>\n");
     }
     goto cleanup;
 }

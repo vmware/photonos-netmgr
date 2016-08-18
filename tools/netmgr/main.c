@@ -339,120 +339,121 @@ cmd_dns_servers(PNETMGR_CMD pCmd)
 {
     uint32_t err = 0;
     size_t i = 0, count = 0;
-    int add_servers = 0;
     NET_DNS_MODE mode = DNS_MODE_INVALID;
-    char *pszMode, *s1, *s2, *pszServers = NULL, **szDnsServersList = NULL;
-    char szServers[2048], *pszIfname = NULL;
+    char *pszIfname = NULL, *pszMode = NULL, *pszDnsServers = NULL;
+    char *s1, *s2, *pszServers = NULL, **ppszDnsServersList = NULL;
 
     netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
 
-    if (pCmd->op == OP_SET)
+    switch (pCmd->op)
     {
-        err = netmgrcli_find_cmdopt(pCmd, "mode", &pszMode);
-        bail_on_error(err);
-
-        if (!strcmp(pszMode, "dhcp"))
-        {
-            mode = DHCP_DNS;
-        }
-        else if (!strcmp(pszMode, "static"))
-        {
-            mode = STATIC_DNS;
-        }
-
-        err = netmgrcli_find_cmdopt(pCmd, "servers", &pszServers);
-        if (err == ENOENT)
-        {
-            err = 0;
-        }
-        bail_on_error(err);
-
-        if (pszServers != NULL)
-        {
-            strcpy(szServers, pszServers);
-            if (strlen(szServers) > 0)
+        case OP_SET:
+            err = netmgrcli_find_cmdopt(pCmd, "mode", &pszMode);
+            bail_on_error(err);
+            if (!strcmp(pszMode, "dhcp"))
             {
-                s2 = szServers;
+                mode = DHCP_DNS;
+            }
+            else if (!strcmp(pszMode, "static"))
+            {
+                mode = STATIC_DNS;
+            }
+        case OP_ADD:
+        case OP_DEL:
+            err = netmgrcli_find_cmdopt(pCmd, "servers", &pszDnsServers);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            if (pszDnsServers != NULL)
+            {
+                err = netmgr_alloc_string(pszDnsServers, &pszServers);
+                bail_on_error(err);
+                if (strlen(pszServers) > 0)
+                {
+                    s2 = pszServers;
+                    do {
+                        s1 = strsep(&s2, ",");
+                        if (strlen(s1) > 0)
+                        {
+                            count++;
+                        }
+                    } while (s2 != NULL);
+                }
+            }
+            if (count > 0)
+            {
+                err = netmgr_alloc((count * sizeof(char*)),
+                                   (void *)&ppszDnsServersList);
+                bail_on_error(err);
+                strcpy(pszServers, pszDnsServers);
+                s2 = pszServers;
                 do {
                     s1 = strsep(&s2, ",");
                     if (strlen(s1) > 0)
                     {
-                        count++;
+                        err = netmgr_alloc_string(s1, &(ppszDnsServersList[i++]));
+                        bail_on_error(err);
                     }
                 } while (s2 != NULL);
             }
-        }
-        if (count > 0)
-        {
-            err = netmgr_alloc((count * sizeof(char*)),
-                               (void *)&szDnsServersList);
+
+            if (pCmd->op == OP_SET)
+            {
+                err = set_dns_servers(pszIfname, mode, count,
+                                      (const char **)ppszDnsServersList, 0);
+            }
+            else if (pCmd->op == OP_ADD)
+            {
+                err = add_dns_servers(pszIfname, count,
+                                      (const char **)ppszDnsServersList);
+            }
+            else if (pCmd->op == OP_DEL)
+            {
+                err = delete_dns_server(pszIfname, ppszDnsServersList[0]);
+            }
+            break;
+
+        case OP_GET:
+            err = get_dns_servers(pszIfname, 0, &mode, &count,
+                                  &ppszDnsServersList);
             bail_on_error(err);
-            strcpy(szServers, pszServers);
-            s2 = szServers;
-            do {
-                s1 = strsep(&s2, ",");
-                if (strlen(s1) > 0)
-                {
-                    if ((i == 0) && !strcmp(s1,"+"))
-                    {
-                        add_servers = 1;
-                        count -= 1;
-                        continue;
-                    }
-                    err = netmgr_alloc_string(s1, &(szDnsServersList[i++]));
-                    bail_on_error(err);
-                }
-            } while (s2 != NULL);
-        }
 
-        if (add_servers == 0)
-        {
-            err = set_dns_servers(pszIfname, mode, count,
-                                  (const char **)szDnsServersList, 0);
-        }
-        else
-        {
-            err = add_dns_servers(pszIfname, count,
-                                  (const char **)szDnsServersList);
-        }
-        bail_on_error(err);
+            if (mode == STATIC_DNS)
+            {
+                fprintf(stdout, "DNSMode=static\n");
+            }
+            else
+            {
+                fprintf(stdout, "DNSMode=dhcp\n");
+            }
+
+            fprintf(stdout, "DNSServers=");
+            for (i = 0; i < count; i++)
+            {
+                fprintf(stdout, "%s ", ppszDnsServersList[i]);
+            }
+            fprintf(stdout, "\n");
+            break;
+
+        default:
+            err = EINVAL;
     }
-
-    if (pCmd->op == OP_GET)
-    {
-        char **szDnsServers = NULL;
-        err = get_dns_servers(pszIfname, 0, &mode, &count, &szDnsServers);
-        bail_on_error(err);
-
-        if (mode == STATIC_DNS)
-        {
-            fprintf(stdout, "DNSMode=static\n");
-        }
-        else
-        {
-            fprintf(stdout, "DNSMode=dhcp\n");
-        }
-
-        fprintf(stdout, "DNSServers=");
-        for (i = 0; i < count; i++)
-        {
-            fprintf(stdout, "%s ", szDnsServers[i]);
-            netmgr_free(szDnsServers[i]);
-        }
-        netmgr_free(szDnsServers);
-        fprintf(stdout, "\n");
-    }
+    bail_on_error(err);
 
 cleanup:
     /* Free allocated memory */
-    if (szDnsServersList != NULL)
+    if (ppszDnsServersList != NULL)
     {
         for (i = 0; i < count; i++)
         {
-            netmgr_free(szDnsServersList[i]);
+            netmgr_free(ppszDnsServersList[i]);
         }
-        netmgr_free(szDnsServersList);
+        netmgr_free(ppszDnsServersList);
     }
+    netmgr_free(pszServers);
     return err;
 
 error:

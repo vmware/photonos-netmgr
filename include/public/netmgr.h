@@ -244,7 +244,7 @@ set_dns_servers(
     const char *pszInterfaceName,
     NET_DNS_MODE mode,
     size_t count,
-    const char **ppDnsServers,
+    const char **ppszDnsServers,
     uint32_t flags
 );
 
@@ -252,8 +252,15 @@ int
 add_dns_servers(
     const char *pszInterfaceName,
     size_t count,
-    const char **ppDnsServers
+    const char **ppszDnsServers
 );
+
+int
+delete_dns_server(
+    const char *pszInterfaceName,
+    const char *pszDnsServer
+);
+
 
 #define fRESOLVED_CONF_DNS_SERVERS
 int
@@ -262,7 +269,7 @@ get_dns_servers(
     uint32_t flags,
     NET_DNS_MODE *pMode,
     size_t *pCount,
-    char ***ppDnsServers
+    char ***pppszDnsServers
 );
 
 #define fAPPEND_DNS_DOMAINS_LIST       0x00000001
