@@ -272,22 +272,33 @@ get_dns_servers(
     char ***pppszDnsServers
 );
 
-#define fAPPEND_DNS_DOMAINS_LIST       0x00000001
 int
 set_dns_domains(
     const char *pszInterfaceName,
     size_t count,
-    const char **ppDnsDomains,
+    const char **ppszDnsDomains,
     uint32_t flags
 );
 
-#define fRESOLVED_CONF_DNS_DOMAINS     0x00000001
+int
+add_dns_domain(
+    const char *pszInterfaceName,
+    size_t count,
+    const char **ppszDnsDomains
+);
+
+int
+delete_dns_domain(
+    const char *pszInterfaceName,
+    const char *pszDnsDomain
+);
+
 int
 get_dns_domains(
     const char *pszInterfaceName,
     uint32_t flags,
     size_t *pCount,
-    char **ppDnsDomains
+    char ***pppszDnsDomains
 );
 
 /*

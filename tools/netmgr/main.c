@@ -460,6 +460,102 @@ error:
     goto cleanup;
 }
 
+static uint32_t
+cmd_dns_domains(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    size_t i = 0, count = 0;
+    char *s1, *s2, *pszDnsDomains= NULL, **ppszDnsDomainsList = NULL;
+    char *pszDomains = NULL, *pszIfname = NULL;
+
+    netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
+
+    switch(pCmd->op)
+    {
+        case OP_SET:
+        case OP_ADD:
+        case OP_DEL:
+            err = netmgrcli_find_cmdopt(pCmd, "domains", &pszDnsDomains);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            if (pszDnsDomains != NULL)
+            {
+                err = netmgr_alloc_string(pszDnsDomains, &pszDomains);
+                bail_on_error(err);
+                if (strlen(pszDomains) > 0)
+                {
+                    s2 = pszDomains;
+                    do {
+                        s1 = strsep(&s2, ",");
+                        if (strlen(s1) > 0)
+                        {
+                            count++;
+                        }
+                    } while (s2 != NULL);
+                }
+            }
+            if (count > 0)
+            {
+                err = netmgr_alloc((count * sizeof(char*)),
+                                   (void *)&ppszDnsDomainsList);
+                bail_on_error(err);
+                strcpy(pszDomains, pszDnsDomains);
+                s2 = pszDomains;
+                do {
+                    s1 = strsep(&s2, ",");
+                    if (strlen(s1) > 0)
+                    {
+                        err = netmgr_alloc_string(s1, &(ppszDnsDomainsList[i++]));
+                        bail_on_error(err);
+                    }
+                } while (s2 != NULL);
+            }
+            if (pCmd->op == OP_SET)
+            {
+                err = set_dns_domains(pszIfname, count,
+                                      (const char **)ppszDnsDomainsList, 0);
+            }
+            else if(pCmd->op == OP_ADD)
+            {
+                err = add_dns_domain(pszIfname, count,
+                                     (const char **)ppszDnsDomainsList);
+            }
+            else if(pCmd->op == OP_DEL)
+            {
+                err = delete_dns_domain(pszIfname, ppszDnsDomainsList[0]);
+                bail_on_error(err);
+            }
+            bail_on_error(err);
+            break;
+        case OP_GET:
+            err = get_dns_domains(pszIfname, 0, &count, &ppszDnsDomainsList);
+            bail_on_error(err);
+
+            fprintf(stdout, "Domains=");
+            for (i = 0; i < count; i++)
+            {
+                fprintf(stdout, "%s ", ppszDnsDomainsList[i]);
+            }
+            fprintf(stdout, "\n");
+            break;
+        default:
+            err = EINVAL;
+    }
+    bail_on_error(err);
+cleanup:
+    /* Free allocated memory */
+    netmgr_list_free(count, (void **)ppszDnsDomainsList);
+    netmgr_free(pszDomains);
+    return err;
+
+error:
+    goto cleanup;
+}
+
 typedef struct _NETMGR_CLI_HANDLER
 {
     CMD_ID id;
@@ -473,6 +569,7 @@ NETMGR_CLI_HANDLER cmdHandler[] =
     { CMD_DHCP_DUID,           cmd_dhcp_duid       },
     { CMD_IF_IAID,             cmd_if_iaid         },
     { CMD_DNS_SERVERS,         cmd_dns_servers     },
+    { CMD_DNS_DOMAINS,         cmd_dns_domains     },
 };
 
 void
