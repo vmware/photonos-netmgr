@@ -1291,13 +1291,6 @@ add_dns_domain(
     }
     bail_on_error(err);
 
-    err = get_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
-                        &pszCurrentDnsDomains);
-    if (err != ENOENT)
-    {
-        bail_on_error(err);
-    }
-
     err = space_delimited_string_append(count, ppszDnsDomains,
                                         pszCurrentDnsDomains,
                                         &pszDnsDomainsValue);
