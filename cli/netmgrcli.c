@@ -621,6 +621,108 @@ error:
     goto cleanup;
 }
 
+static struct option dnsDomainsOptions[] =
+{
+    {"set",          no_argument,          0,    's'},
+    {"get",          no_argument,          0,    'g'},
+    {"domains",      required_argument,    0,     0 },
+    {"interface",    required_argument,    0,    'i'},
+    {"del",          no_argument,          0,    'd'},
+    {"add",          no_argument,          0,    'a'},
+    {0, 0, 0, 0}
+};
+
+
+uint32_t
+cli_dns_domains(
+    int argc,
+    char **argv,
+    PNETMGR_CMD pCmd
+    )
+{
+    uint32_t err = 0, domains_option_present = 0;
+    int nOptionIndex = 0, nOption = 0;
+    CMD_OP op = OP_INVALID;
+
+    opterr = 0;
+    optind = 1;
+    while (1)
+    {
+        nOption = getopt_long(argc,
+                              argv,
+                              "sgdai:",
+                              dnsDomainsOptions,
+                              &nOptionIndex);
+        if (nOption == -1)
+            break;
+
+        switch(nOption)
+        {
+            case 's':
+                op = OP_SET;
+                break;
+            case 'g':
+                op = OP_GET;
+                break;
+            case 'i':
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("interface", optarg, pCmd);
+                }
+                else
+                {
+                    fprintf(stderr, "Invalid interface name.\n");
+                    err = EDOM;
+                }
+                break;
+            case 'd':
+                op = OP_DEL;
+                break;
+            case 'a':
+                op = OP_ADD;
+                break;
+            case 0:
+                /* --domains option */
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("domains", optarg, pCmd);
+                    domains_option_present = 1;
+                }
+                break;
+            case '?':
+                /* Option not handled here. Ignore. */
+                break;
+        }
+        bail_on_error(err);
+    }
+
+    if ((op == OP_INVALID) ||
+        (((op == OP_DEL) ||(op == OP_ADD)) &&
+        (domains_option_present == 0)))
+    {
+        err = EDOM;
+        bail_on_error(err);
+    }
+
+    pCmd->id = CMD_DNS_DOMAINS;
+    pCmd->op = op;
+
+cleanup:
+    return err;
+
+error:
+    pCmd->op = OP_INVALID;
+    /* TODO: Free allocated memory */
+    if(err == EDOM)
+    {
+        fprintf(stderr,
+                "Usage:\ndns_domains --get\ndns_domains --set "
+                 "--domains <domain1,domain2,...>\n"
+                 "dns_domains --add --domains <domain1,domain2,..>\n"
+                 "dns_domains --del --domains <domain1>\n");
+    }
+    goto cleanup;
+}
 
 /* Map command name to command parser function */
 typedef struct _NETMGRCLI_CMD_MAP
@@ -659,6 +761,11 @@ NETMGRCLI_CMD_MAP cmdMap[] =
      cli_if_iaid,
      "--set --iaid <IAID value>> --interface <interface name>",
      "get or set interface IAID"
+    },
+    {"dns_domains",
+     cli_dns_domains,
+     "--set --del --add --domains <Domains list>",
+     "get or set DNS domains list"
     },
 };
 
