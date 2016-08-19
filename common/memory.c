@@ -151,3 +151,24 @@ netmgr_free(
     }
 }
 
+void
+netmgr_list_free(
+    size_t count,
+    void **ppMemory
+    )
+{
+    size_t i;
+
+    if (ppMemory != NULL)
+    {
+        for (i = 0; i < count; i++)
+        {
+            if (ppMemory[i] != NULL)
+            {
+                netmgr_free(ppMemory[i]);
+            }
+        }
+        netmgr_free(ppMemory);
+    }
+}
+

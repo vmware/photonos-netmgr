@@ -40,3 +40,8 @@ netmgr_free(
     void* pMemory
     );
 
+void
+netmgr_list_free(
+    size_t count,
+    void **ppMemory
+    );
