@@ -210,6 +210,8 @@ error:
 
 static struct option ip6AddrOptions[] =
 {
+    {"add",          no_argument,          0,    'p'},
+    {"del",          no_argument,          0,    'm'},
     {"set",          no_argument,          0,    's'},
     {"get",          no_argument,          0,    'g'},
     {"interface",    required_argument,    0,    'i'},
@@ -227,7 +229,7 @@ cli_ip6_address(
     PNETMGR_CMD pCmd
     )
 {
-    uint32_t err = 0, validIfName = 0;
+    uint32_t err = 0, validIfName = 0, validAddr = 0;
     int nOptionIndex = 0, nOption = 0;
     CMD_OP op = OP_INVALID;
 
@@ -237,7 +239,7 @@ cli_ip6_address(
     {
         nOption = getopt_long(argc,
                               argv,
-                              "sgi:d:a:12",
+                              "pmsgi:d:a:12",
                               ip6AddrOptions,
                               &nOptionIndex);
         if (nOption == -1)
@@ -245,6 +247,12 @@ cli_ip6_address(
 
         switch(nOption)
         {
+            case 'p':
+                op = OP_ADD;
+                break;
+            case 'm':
+                op = OP_DEL;
+                break;
             case 's':
                 op = OP_SET;
                 break;
@@ -288,6 +296,7 @@ cli_ip6_address(
                 if (strlen(optarg) > 0)
                 {
                     err = netmgrcli_alloc_keyvalue("addrlist", optarg, pCmd);
+                    validAddr = 1;
                 }
                 break;
             case '2':
@@ -304,7 +313,8 @@ cli_ip6_address(
         bail_on_error(err);
     }
 
-    if ((op == OP_INVALID) || !validIfName)
+    if ((op == OP_INVALID) || !validIfName ||
+        (((op == OP_ADD) || (op == OP_DEL)) && !validAddr))
     {
         err = EDOM;
         bail_on_error(err);
@@ -322,8 +332,10 @@ error:
     {
         fprintf(stderr,
                 "Usage:\nip6_address --get --interface <ifame>\n"
+                "ip6_address --add|--del --interface <ifame> "
+                "--addrlist <IPv6Addr1/prefix,IPv6Addr2/prefix,...>\n"
                 "ip6_address --set --interface <ifname> --dhcp <1|0> "
-                "--autoconf <1|0> --addrlist <IPv6 address/prefix list>\n");
+                "--autoconf <1|0>\n");
     }
     goto cleanup;
 }
