@@ -309,3 +309,34 @@ error:
     return err;
 }
 
+int
+netmgr_run_command(
+const char *pszCommand
+)
+{
+    uint32_t err = 0;
+    FILE *pipe_fp = NULL;
+
+    if(pszCommand == NULL)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+    pipe_fp = popen(pszCommand, "r");
+    if(pipe_fp == NULL)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+clean:
+    if(pipe_fp != NULL)
+    {
+        pclose(pipe_fp);
+        err = errno;
+    }
+    return err;
+error:
+    goto clean;
+}
+
