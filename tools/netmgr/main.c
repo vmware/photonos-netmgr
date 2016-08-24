@@ -329,10 +329,11 @@ error:
 static uint32_t
 cmd_dns_servers(PNETMGR_CMD pCmd)
 {
-    uint32_t err = 0;
+    uint32_t err = 0, flags = 0;
     size_t i = 0, count = 0;
     NET_DNS_MODE mode = DNS_MODE_INVALID;
-    char *pszIfname = NULL, *pszMode = NULL, *pszDnsServers = NULL;
+    char *pszIfname = NULL, *pszMode = NULL;
+    char *pszDnsServers = NULL, *pszNoRestart = NULL;
     char *s1, *s2, *pszServers = NULL, **ppszDnsServersList = NULL;
 
     netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
@@ -391,20 +392,29 @@ cmd_dns_servers(PNETMGR_CMD pCmd)
                     }
                 } while (s2 != NULL);
             }
-
+            err = netmgrcli_find_cmdopt(pCmd, "norestart", &pszNoRestart);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+            if ((pszNoRestart != NULL) && !strcmp(pszNoRestart,"true"))
+            {
+                flags = fNO_RESTART;
+            }
             if (pCmd->op == OP_SET)
             {
                 err = set_dns_servers(pszIfname, mode, count,
-                                      (const char **)ppszDnsServersList, 0);
+                                      (const char **)ppszDnsServersList, flags);
             }
             else if (pCmd->op == OP_ADD)
             {
                 err = add_dns_servers(pszIfname, count,
-                                      (const char **)ppszDnsServersList);
+                                      (const char **)ppszDnsServersList, flags);
             }
             else if (pCmd->op == OP_DEL)
             {
-                err = delete_dns_server(pszIfname, ppszDnsServersList[0]);
+                err = delete_dns_server(pszIfname, ppszDnsServersList[0], flags);
             }
             break;
 
@@ -455,10 +465,10 @@ error:
 static uint32_t
 cmd_dns_domains(PNETMGR_CMD pCmd)
 {
-    uint32_t err = 0;
+    uint32_t err = 0, flags = 0;
     size_t i = 0, count = 0;
     char *s1, *s2, *pszDnsDomains= NULL, **ppszDnsDomainsList = NULL;
-    char *pszDomains = NULL, *pszIfname = NULL;
+    char *pszDomains = NULL, *pszIfname = NULL, *pszNoRestart = NULL;
 
     netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
 
@@ -506,20 +516,29 @@ cmd_dns_domains(PNETMGR_CMD pCmd)
                     }
                 } while (s2 != NULL);
             }
-
+            err = netmgrcli_find_cmdopt(pCmd, "norestart", &pszNoRestart);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+            if ((pszNoRestart != NULL) && !strcmp(pszNoRestart,"true"))
+            {
+                flags = fNO_RESTART;
+            }
             if (pCmd->op == OP_SET)
             {
                 err = set_dns_domains(pszIfname, count,
-                                      (const char **)ppszDnsDomainsList, 0);
+                                      (const char **)ppszDnsDomainsList, flags);
             }
-            else if(pCmd->op == OP_ADD)
+            else if (pCmd->op == OP_ADD)
             {
                 err = add_dns_domain(pszIfname, count,
-                                     (const char **)ppszDnsDomainsList);
+                                     (const char **)ppszDnsDomainsList, flags);
             }
-            else if(pCmd->op == OP_DEL)
+            else if (pCmd->op == OP_DEL)
             {
-                err = delete_dns_domain(pszIfname, ppszDnsDomainsList[0]);
+                err = delete_dns_domain(pszIfname, ppszDnsDomainsList[0], flags);
                 bail_on_error(err);
             }
             bail_on_error(err);
