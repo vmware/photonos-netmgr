@@ -848,7 +848,8 @@ int
 add_dns_servers(
     const char *pszInterfaceName,
     size_t count,
-    const char **ppszDnsServers
+    const char **ppszDnsServers,
+    uint32_t flags
 )
 {
     uint32_t err = 0;
@@ -903,7 +904,13 @@ add_dns_servers(
     err = set_key_value(pszCfgFileName, szSectionName, KEY_DNS,
                         pszNewDnsServersValue, 0);
     bail_on_error(err);
-
+    if(!(TEST_FLAG(flags,fNO_RESTART)))
+    {
+        err = restart_dns_service();
+        bail_on_error(err);
+        err = restart_network_service();
+        bail_on_error(err);
+    }
 cleanup:
     netmgr_free(pszCurrentDnsServers);
     netmgr_free(pszNewDnsServersValue);
@@ -916,7 +923,8 @@ error:
 int
 delete_dns_server(
     const char *pszInterfaceName,
-    const char *pszDnsServer
+    const char *pszDnsServer,
+    uint32_t flags
 )
 {
     uint32_t err = 0;
@@ -982,7 +990,13 @@ delete_dns_server(
     err = set_key_value(pszCfgFileName, szSectionName, KEY_DNS,
                         pszNewDnsServersValue, 0);
     bail_on_error(err);
-
+    if(!(TEST_FLAG(flags,fNO_RESTART)))
+    {
+        err = restart_dns_service();
+        bail_on_error(err);
+        err = restart_network_service();
+        bail_on_error(err);
+    }
 cleanup:
     netmgr_free(pszCurrentDnsServers);
     netmgr_free(pszCfgFileName);
@@ -1083,7 +1097,13 @@ set_dns_servers(
             }
         }
     }
-
+    if(!(TEST_FLAG(flags,fNO_RESTART)))
+    {
+        err = restart_dns_service();
+        bail_on_error(err);
+        err = restart_network_service();
+        bail_on_error(err);
+    }
 error:
     if (dirFile != NULL)
     {
@@ -1245,7 +1265,13 @@ set_dns_domains(
                             pszDnsDomainsValue, 0);
     }
     bail_on_error(err);
-
+    if(!(TEST_FLAG(flags,fNO_RESTART)))
+    {
+        err = restart_dns_service();
+        bail_on_error(err);
+        err = restart_network_service();
+        bail_on_error(err);
+    }
 error:
     netmgr_free(pszCurrentDnsDomains);
     netmgr_free(pszDnsDomainsValue);
@@ -1257,7 +1283,8 @@ int
 add_dns_domain(
     const char *pszInterfaceName,
     size_t count,
-    const char **ppszDnsDomains
+    const char **ppszDnsDomains,
+    uint32_t flags
 )
 {
     uint32_t err = 0;
@@ -1299,6 +1326,14 @@ add_dns_domain(
     err = set_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
                         pszDnsDomainsValue, 0);
     bail_on_error(err);
+    if(!(TEST_FLAG(flags,fNO_RESTART)))
+    {
+        err = restart_dns_service();
+        bail_on_error(err);
+        err = restart_network_service();
+        bail_on_error(err);
+    }
+
 
 cleanup:
     netmgr_free(pszCurrentDnsDomains);
@@ -1312,7 +1347,8 @@ error:
 int
 delete_dns_domain(
     const char *pszInterfaceName,
-    const char *pszDnsDomain
+    const char *pszDnsDomain,
+    uint32_t flags
 )
 {
     uint32_t err = 0;
@@ -1369,6 +1405,14 @@ delete_dns_domain(
     err = set_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
                         pszNewDnsDomainsList, 0);
     bail_on_error(err);
+    if(!(TEST_FLAG(flags,fNO_RESTART)))
+    {
+        err = restart_dns_service();
+        bail_on_error(err);
+        err = restart_network_service();
+        bail_on_error(err);
+    }
+
 
 cleanup:
     netmgr_free(pszNewDnsDomainsList);
@@ -1696,6 +1740,113 @@ error:
     {
         *ppszDuid = NULL;
     }
+    goto clean;
+}
+
+int
+restart_dns_service(
+    uint32_t flags
+)
+{
+    uint32_t err = 0;
+    char *command = NULL;
+
+    err = netmgr_alloc_string("systemctl restart systemd-resolved", &command);
+    bail_on_error(err);
+    err = network_popen(command, "r");
+    bail_on_error(err);    
+clean:
+    netmgr_free(command);
+    return err;
+error:
+    goto clean;
+}
+
+int
+restart_network_service(
+    uint32_t flags
+)
+{
+    uint32_t err = 0;
+    char *command = NULL;
+
+    err = netmgr_alloc_string("systemctl restart systemd-networkd", &command);
+    bail_on_error(err);
+    err = network_popen(command, "r");
+    bail_on_error(err);    
+clean:
+    netmgr_free(command);
+    return err;
+error:
+    goto clean;
+}
+
+int
+stop_network_service(
+    uint32_t flags
+)
+{
+    uint32_t err = 0;
+    char *command = NULL;
+
+    err = netmgr_alloc_string("systemctl stop systemd-networkd", &command);
+    bail_on_error(err);
+    err = network_popen(command, "r");
+    bail_on_error(err);    
+clean:
+    netmgr_free(command);
+    return err;
+error:
+    goto clean;
+}
+
+int
+stop_dns_service(
+    uint32_t flags
+)
+{
+    uint32_t err = 0;
+    char *command = NULL;
+
+    err = netmgr_alloc_string("systemctl stop systemd-resolved", &command);
+    bail_on_error(err);
+    err = network_popen(command, "r");
+    bail_on_error(err);    
+clean:
+    netmgr_free(command);
+    return err;
+error:
+    goto clean;
+}
+
+int
+network_popen(
+const char * pszCommand,
+const char * pszPermission
+)
+{
+    uint32_t err = 0;
+    FILE *pipe_fp = NULL;
+    char readbuffer[MAX_LINE];
+    
+    if(pszCommand == NULL)
+    {
+        err = 1;
+        bail_on_error(err);
+    }
+   if((pipe_fp = popen(pszCommand, pszPermission)) == NULL)
+    {
+        err = 1;
+        bail_on_error(err);
+    }
+    while(fgets(readbuffer, MAX_LINE, pipe_fp))
+    {
+        fprintf(stdout, "%s", readbuffer);
+	}   
+clean:
+    pclose(pipe_fp);
+    return err;
+error:
     goto clean;
 }
 
