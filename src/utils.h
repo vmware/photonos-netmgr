@@ -52,4 +52,9 @@ get_key_value(
     char **ppszValue
 );
 
+int
+netmgr_run_command(
+const char * pszCommand
+);
+
 #endif /* __UTILS_H__ */

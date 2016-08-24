@@ -252,17 +252,22 @@ int
 add_dns_servers(
     const char *pszInterfaceName,
     size_t count,
-    const char **ppszDnsServers
+    const char **ppszDnsServers,
+    uint32_t flags
 );
 
 int
 delete_dns_server(
     const char *pszInterfaceName,
-    const char *pszDnsServer
+    const char *pszDnsServer,
+    uint32_t flags
 );
 
 
 #define fRESOLVED_CONF_DNS_SERVERS
+
+#define fNO_RESTART                    0x00000001
+
 int
 get_dns_servers(
     const char *pszInterfaceName,
@@ -284,13 +289,15 @@ int
 add_dns_domain(
     const char *pszInterfaceName,
     size_t count,
-    const char **ppszDnsDomains
+    const char **ppszDnsDomains,
+    uint32_t flags
 );
 
 int
 delete_dns_domain(
     const char *pszInterfaceName,
-    const char *pszDnsDomain
+    const char *pszDnsDomain,
+    uint32_t flags
 );
 
 int
@@ -328,6 +335,18 @@ get_duid(
     const char *pszInterfaceName,
     char **ppszDuid
 );
+
+int
+restart_dns_service();
+
+int
+stop_dns_service();
+
+int
+restart_network_service();
+
+int
+stop_network_service();
 
 #endif /* __NETMGR_H__ */
 
