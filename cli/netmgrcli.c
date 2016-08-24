@@ -535,6 +535,7 @@ static struct option dnsServerOptions[] =
     {"mode",         required_argument,    0,    'm'},
     {"servers",      required_argument,    0,     0 },
     {"interface",    required_argument,    0,    'i'},
+    {"norestart",    no_argument,          0,    'n'},
     {0, 0, 0, 0}
 };
 
@@ -555,7 +556,7 @@ cli_dns_servers(
     {
         nOption = getopt_long(argc,
                               argv,
-                              "sgadm:i:",
+                              "sngadm:i:",
                               dnsServerOptions,
                               &nOptionIndex);
         if (nOption == -1)
@@ -592,6 +593,9 @@ cli_dns_servers(
                     fprintf(stderr, "Invalid interface name.\n");
                     err = EDOM;
                 }
+                break;
+            case 'n':
+                err = netmgrcli_alloc_keyvalue("norestart", "true", pCmd);
                 break;
             case 0:
                 /* --servers option */
@@ -641,6 +645,7 @@ static struct option dnsDomainsOptions[] =
     {"interface",    required_argument,    0,    'i'},
     {"del",          no_argument,          0,    'd'},
     {"add",          no_argument,          0,    'a'},
+    {"norestart",    no_argument,          0,    'n'},
     {0, 0, 0, 0}
 };
 
@@ -662,7 +667,7 @@ cli_dns_domains(
     {
         nOption = getopt_long(argc,
                               argv,
-                              "sgdai:",
+                              "sngdai:",
                               dnsDomainsOptions,
                               &nOptionIndex);
         if (nOption == -1)
@@ -693,6 +698,9 @@ cli_dns_domains(
             case 'a':
                 op = OP_ADD;
                 break;
+            case 'n':
+                err = netmgrcli_alloc_keyvalue("norestart", "true", pCmd);
+                break;
             case 0:
                 /* --domains option */
                 if (strlen(optarg) > 0)
@@ -709,7 +717,7 @@ cli_dns_domains(
     }
 
     if ((op == OP_INVALID) ||
-        (((op == OP_DEL) ||(op == OP_ADD)) &&
+        (((op == OP_DEL) || (op == OP_ADD) || (op == OP_SET)) &&
         (domains_option_present == 0)))
     {
         err = EDOM;
