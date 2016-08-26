@@ -409,8 +409,7 @@ cmd_dns_servers(PNETMGR_CMD pCmd)
             }
             else if (pCmd->op == OP_ADD)
             {
-                err = add_dns_servers(pszIfname, count,
-                                      (const char **)ppszDnsServersList, flags);
+                err = add_dns_server(pszIfname, ppszDnsServersList[0], flags);
             }
             else if (pCmd->op == OP_DEL)
             {
@@ -533,8 +532,7 @@ cmd_dns_domains(PNETMGR_CMD pCmd)
             }
             else if (pCmd->op == OP_ADD)
             {
-                err = add_dns_domain(pszIfname, count,
-                                     (const char **)ppszDnsDomainsList, flags);
+                err = add_dns_domain(pszIfname, ppszDnsDomainsList[0], flags);
             }
             else if (pCmd->op == OP_DEL)
             {

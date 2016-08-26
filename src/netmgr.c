@@ -767,12 +767,14 @@ space_delimited_string_append(
         }
         for (i = 0; i < count; i++)
         {
-            /* TODO: Eliminate duplicates */
             if (strlen(pszNewString) > 0)
             {
                 strcat(pszNewString, " ");
             }
-            strcat(pszNewString, ppszStrings[i]);
+            if (strstr(pszNewString, ppszStrings[i]) == NULL)
+            {
+                strcat(pszNewString, ppszStrings[i]);
+            }
         }
     }
 
@@ -845,10 +847,9 @@ error:
 }
 
 int
-add_dns_servers(
+add_dns_server(
     const char *pszInterfaceName,
-    size_t count,
-    const char **ppszDnsServers,
+    const char *pszDnsServer,
     uint32_t flags
 )
 {
@@ -859,7 +860,7 @@ add_dns_servers(
     char *pszCurrentDnsServers = NULL;
     char *pszNewDnsServersValue = NULL;
 
-    if ((count == 0) || (ppszDnsServers == NULL))
+    if (pszDnsServer == NULL)
     {
         err = EINVAL;
         bail_on_error(err);
@@ -896,7 +897,7 @@ add_dns_servers(
         bail_on_error(err);
     }
 
-    err = space_delimited_string_append(count, ppszDnsServers,
+    err = space_delimited_string_append(1, &pszDnsServer,
                                         pszCurrentDnsServers,
                                         &pszNewDnsServersValue);
     bail_on_error(err);
@@ -1023,7 +1024,6 @@ set_dns_servers(
     char netCfgFileName[MAX_LINE];
     char szSectionName[MAX_LINE];
     char szUseDnsValue[MAX_LINE];
-    char *pszCurrentDnsServers = NULL;
     char *pszDnsServersValue = NULL;
     DIR *dirFile = NULL;
     struct dirent *hFile;
@@ -1040,18 +1040,7 @@ set_dns_servers(
     }
     bail_on_error(err);
 
-    if (TEST_FLAG(flags, fAPPEND_DNS_SERVERS_LIST))
-    {
-        err = get_key_value(pszCfgFileName, szSectionName, KEY_DNS,
-                            &pszCurrentDnsServers);
-        if (err != ENOENT)
-        {
-            bail_on_error(err);
-        }
-    }
-
-    err = space_delimited_string_append(count, ppszDnsServers,
-                                        pszCurrentDnsServers,
+    err = space_delimited_string_append(count, ppszDnsServers, NULL,
                                         &pszDnsServersValue);
     bail_on_error(err);
 
@@ -1115,7 +1104,6 @@ error:
     {
         closedir(dirFile);
     }
-    netmgr_free(pszCurrentDnsServers);
     netmgr_free(pszDnsServersValue);
     netmgr_free(pszCfgFileName);
     return err;
@@ -1231,67 +1219,9 @@ error:
 }
 
 int
-set_dns_domains(
-    const char *pszInterfaceName,
-    size_t count,
-    const char **ppszDnsDomains,
-    uint32_t flags
-)
-{
-    uint32_t err = 0;
-    char *pszCfgFileName = NULL;
-    char szSectionName[MAX_LINE];
-    char *pszCurrentDnsDomains = NULL;
-    char *pszDnsDomainsValue = NULL;
-
-
-    if (pszInterfaceName != NULL)
-    {
-        err = get_network_conf_filename(&pszCfgFileName, pszInterfaceName);
-        sprintf(szSectionName, SECTION_NETWORK);
-    }
-    else
-    {
-        err = get_resolved_conf_filename(&pszCfgFileName);
-        sprintf(szSectionName, SECTION_RESOLVE);
-    }
-    bail_on_error(err);
-
-    err = space_delimited_string_append(count, ppszDnsDomains,
-                                        pszCurrentDnsDomains,
-                                        &pszDnsDomainsValue);
-    bail_on_error(err);
-    if (count == 0)
-    {
-        err = set_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS, NULL, 0);
-    }
-    else
-    {
-        err = set_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
-                            pszDnsDomainsValue, 0);
-    }
-    bail_on_error(err);
-
-    if (!TEST_FLAG(flags, fNO_RESTART))
-    {
-        err = restart_network_service();
-        bail_on_error(err);
-        err = restart_dns_service();
-        bail_on_error(err);
-    }
-
-error:
-    netmgr_free(pszCurrentDnsDomains);
-    netmgr_free(pszDnsDomainsValue);
-    netmgr_free(pszCfgFileName);
-    return err;
-}
-
-int
 add_dns_domain(
     const char *pszInterfaceName,
-    size_t count,
-    const char **ppszDnsDomains,
+    const char *pszDnsDomain,
     uint32_t flags
 )
 {
@@ -1301,7 +1231,7 @@ add_dns_domain(
     char *pszCurrentDnsDomains = NULL;
     char *pszDnsDomainsValue = NULL;
 
-    if ((count == 0) || (ppszDnsDomains == NULL))
+    if (pszDnsDomain == NULL)
     {
         err = EINVAL;
         bail_on_error(err);
@@ -1326,7 +1256,7 @@ add_dns_domain(
         bail_on_error(err);
     }
 
-    err = space_delimited_string_append(count, ppszDnsDomains,
+    err = space_delimited_string_append(1, &pszDnsDomain,
                                         pszCurrentDnsDomains,
                                         &pszDnsDomainsValue);
     bail_on_error(err);
@@ -1431,6 +1361,60 @@ error:
 }
 
 int
+set_dns_domains(
+    const char *pszInterfaceName,
+    size_t count,
+    const char **ppszDnsDomains,
+    uint32_t flags
+)
+{
+    uint32_t err = 0;
+    char *pszCfgFileName = NULL;
+    char szSectionName[MAX_LINE];
+    char *pszDnsDomainsValue = NULL;
+
+    if (pszInterfaceName != NULL)
+    {
+        err = get_network_conf_filename(&pszCfgFileName, pszInterfaceName);
+        sprintf(szSectionName, SECTION_NETWORK);
+    }
+    else
+    {
+        err = get_resolved_conf_filename(&pszCfgFileName);
+        sprintf(szSectionName, SECTION_RESOLVE);
+    }
+    bail_on_error(err);
+
+    err = space_delimited_string_append(count, ppszDnsDomains, NULL,
+                                        &pszDnsDomainsValue);
+    bail_on_error(err);
+
+    if (count == 0)
+    {
+        err = set_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS, NULL, 0);
+    }
+    else
+    {
+        err = set_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
+                            pszDnsDomainsValue, 0);
+    }
+    bail_on_error(err);
+
+    if (!TEST_FLAG(flags, fNO_RESTART))
+    {
+        err = restart_network_service();
+        bail_on_error(err);
+        err = restart_dns_service();
+        bail_on_error(err);
+    }
+
+error:
+    netmgr_free(pszDnsDomainsValue);
+    netmgr_free(pszCfgFileName);
+    return err;
+}
+
+int
 get_dns_domains(
     const char *pszInterfaceName,
     uint32_t flags,
@@ -1500,6 +1484,7 @@ get_dns_domains(
             }
         } while (s2 != NULL);
     }
+
     *pCount = count;
     *pppszDnsDomains = ppszDnsDomainsList;
 

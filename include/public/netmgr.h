@@ -20,6 +20,95 @@
 #define TEST_FLAG(v, f) (((v) & (f)) != 0)
 
 
+#define fNO_RESTART        0x00000001
+
+
+/*
+ * Interface configuration structs
+ */
+typedef enum _NET_LINK_MODE
+{
+    LINK_AUTO = 0,
+    LINK_MANUAL,
+} NET_LINK_MODE;
+
+typedef enum _NET_LINK_STATE
+{
+    LINK_DOWN = 0,
+    LINK_UP,
+    LINK_UNKNOWN,
+} NET_LINK_STATE;
+
+typedef struct _NET_LINK_INFO
+{
+    char *pszInterfaceName;
+    char *pszMacAddress;
+    uint32_t mtu;
+    NET_LINK_MODE mode;
+    NET_LINK_STATE state;
+} NET_LINK_INFO;
+
+
+/*
+ * IP Address configuration structs
+ */
+#define fDHCP_IPV4         0x00000001
+#define fDHCP_IPV6         0x00000010
+#define fAUTO_IPV6         0x00000020
+
+typedef enum _NET_ADDR_TYPE
+{
+    STATIC_IPV4  =  0x00000001,
+    STATIC_IPV6  =  0x00000002,
+    DHCP_IPV4    =  0x00000010,
+    DHCP_IPV6    =  0x00000020,
+    AUTO_IPV6    =  0x00000040,
+} NET_ADDR_TYPE;
+//#define ALL_IP_ADDR = or of all the above enum values
+
+typedef struct _NET_IP_ADDR
+{
+    NET_ADDR_TYPE type;
+    char *pszIPAddr;
+    uint8_t prefix;
+} NET_IP_ADDR;
+
+
+/*
+ * Route configuration structs
+ */
+typedef enum _NET_ROUTE_TYPE
+{
+    GLOBAL_ROUTE,
+    LINK_ROUTE,
+    HOST_ROUTE,
+} NET_ROUTE_TYPE;
+
+typedef struct _NET_IP_ROUTE
+{
+    char *pszInterfaceName;
+    char *pszDestAddr;
+    uint8_t prefix;
+    char *pszGateway;
+    NET_ROUTE_TYPE type;
+} NET_IP_ROUTE;
+
+#define fCLEAR_ROUTES_LIST     0x00000001
+#define fSCOPE_HOST            0x00000010
+
+
+/*
+ * DNS configuration structs
+ */
+typedef enum _NET_DNS_MODE
+{
+    DNS_MODE_INVALID = 0,
+    STATIC_DNS,
+    DHCP_DNS,
+    DNS_MODE_MAX,
+} NET_DNS_MODE;
+
+
 typedef struct _NETMGR_INTERFACE
 {
     char* pszName;
@@ -51,29 +140,6 @@ ifdown(
 /*
  * Interface configuration APIs
  */
-
-typedef enum _NET_LINK_MODE
-{
-    LINK_AUTO = 0,
-    LINK_MANUAL,
-} NET_LINK_MODE;
-
-typedef enum _NET_LINK_STATE
-{
-    LINK_DOWN = 0,
-    LINK_UP,
-    LINK_UNKNOWN,
-} NET_LINK_STATE;
-
-typedef struct _NET_LINK_INFO
-{
-    char *pszInterfaceName;
-    char *pszMacAddress;
-    uint32_t mtu;
-    NET_LINK_MODE mode;
-    NET_LINK_STATE state;
-} NET_LINK_INFO;
-
 // Override the 'factory/nvram' mac address. mtu=0 -> use default 1500
 int
 set_link_info(
@@ -105,7 +171,6 @@ get_link_info(
 /*
  * IP Address configuration APIs
  */
-
 //TODO: Support address for virtual interface e.g. "eth1:0"
 int
 set_static_ipv4_addr(
@@ -120,7 +185,6 @@ delete_static_ipv4_addr(
     const char *pszInterfaceName
 );
 
-#define fCLEAR_IPV6_ADDR_LIST     0x00000001
 int
 add_static_ipv6_addr(
     const char *pszInterfaceName,
@@ -137,9 +201,6 @@ delete_static_ipv6_addr(
     uint32_t flags
 );
 
-#define fDHCP_IPV4         0x00000001
-#define fDHCP_IPV6         0x00000010
-#define fAUTO_IPV6         0x00000020
 //[3 - dhcp=yes], [4 - dhcp=no, autoconf=1], [1 - dhcp=ipv4, autoconf=0], [2 - dhcp=ipv6, autoconf=0]
 int
 set_ip_dhcp_mode(
@@ -153,23 +214,6 @@ get_ip_dhcp_mode(
     uint32_t *pDhcpModeFlags
 );
 
-typedef enum _NET_ADDR_TYPE
-{
-    STATIC_IPV4  =  0x00000001,
-    STATIC_IPV6  =  0x00000002,
-    DHCP_IPV4    =  0x00000010,
-    DHCP_IPV6    =  0x00000020,
-    AUTO_IPV6    =  0x00000040,
-} NET_ADDR_TYPE;
-
-//#define ALL_IP_ADDR = or of all the above enum values
-typedef struct _NET_IP_ADDR
-{
-    NET_ADDR_TYPE type;
-    char *pszIPAddr;
-    uint8_t prefix;
-} NET_IP_ADDR;
-
 int
 get_static_ip_addr(
     const char *pszInterfaceName,
@@ -182,25 +226,6 @@ get_static_ip_addr(
 /*
  * Route configuration APIs
  */
-
-typedef enum _NET_ROUTE_TYPE
-{
-    GLOBAL_ROUTE,
-    LINK_ROUTE,
-    HOST_ROUTE,
-} NET_ROUTE_TYPE;
-
-typedef struct _NET_IP_ROUTE
-{
-    char *pszInterfaceName;
-    char *pszDestAddr;
-    uint8_t prefix;
-    char *pszGateway;
-    NET_ROUTE_TYPE type;
-} NET_IP_ROUTE;
-
-#define fCLEAR_ROUTES_LIST     0x00000001
-#define fSCOPE_HOST            0x00000010
 int
 set_ip_route(
     const char *pszInterfaceName,
@@ -229,16 +254,6 @@ get_ip_route_info(
 /*
  * DNS configuration APIs
  */
-
-typedef enum _NET_DNS_MODE
-{
-    DNS_MODE_INVALID = 0,
-    STATIC_DNS,
-    DHCP_DNS,
-    DNS_MODE_MAX,
-} NET_DNS_MODE;
-
-#define fAPPEND_DNS_SERVERS_LIST       0x00000001
 int
 set_dns_servers(
     const char *pszInterfaceName,
@@ -249,10 +264,9 @@ set_dns_servers(
 );
 
 int
-add_dns_servers(
+add_dns_server(
     const char *pszInterfaceName,
-    size_t count,
-    const char **ppszDnsServers,
+    const char *pszDnsServer,
     uint32_t flags
 );
 
@@ -262,11 +276,6 @@ delete_dns_server(
     const char *pszDnsServer,
     uint32_t flags
 );
-
-
-#define fRESOLVED_CONF_DNS_SERVERS
-
-#define fNO_RESTART                    0x00000001
 
 int
 get_dns_servers(
@@ -288,8 +297,7 @@ set_dns_domains(
 int
 add_dns_domain(
     const char *pszInterfaceName,
-    size_t count,
-    const char **ppszDnsDomains,
+    const char *pszDnsDomain,
     uint32_t flags
 );
 
@@ -308,10 +316,10 @@ get_dns_domains(
     char ***pppszDnsDomains
 );
 
+
 /*
  * DHCP options, DUID, IAID configuration APIs
  */
-
 int
 set_iaid(
     const char *pszInterfaceName,
@@ -336,6 +344,10 @@ get_duid(
     char **ppszDuid
 );
 
+
+/*
+ * DHCP options, DUID, IAID configuration APIs
+ */
 int
 stop_network_service();
 
