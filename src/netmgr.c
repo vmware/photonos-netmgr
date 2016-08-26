@@ -795,6 +795,75 @@ error:
     goto cleanup;
 }
 
+static uint32_t
+space_delimited_string_to_list(
+    const char *pszString,
+    size_t *pCount,
+    char ***pppszStringList
+)
+{
+    uint32_t err = 0;
+    size_t i = 0, count = 0;
+    char *pszString1 = NULL, *pszString2 = NULL;
+    char *s1, *s2, **ppszStringList = NULL;
+
+    if (!pCount || !pppszStringList)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = netmgr_alloc_string(pszString, &pszString1);
+    bail_on_error(err);
+    err = netmgr_alloc_string(pszString, &pszString2);
+    bail_on_error(err);
+
+    s2 = pszString1;
+    do {
+        s1 = strsep(&s2, " ");
+        if (strlen(s1) > 0)
+        {
+            count++;
+        }
+    } while (s2 != NULL);
+
+    if (count > 0)
+    {
+        err = netmgr_alloc((count * sizeof(char *)), (void *)&ppszStringList);
+        bail_on_error(err);
+
+        s2 = pszString2;
+        do {
+            s1 = strsep(&s2, " ");
+            if (strlen(s1) > 0)
+            {
+                err = netmgr_alloc_string(s1, &(ppszStringList[i++]));
+                bail_on_error(err);
+            }
+        } while (s2 != NULL);
+    }
+
+    *pCount = count;
+    *pppszStringList = ppszStringList;
+
+cleanup:
+    netmgr_free(pszString1);
+    netmgr_free(pszString2);
+    return err;
+
+error:
+    netmgr_list_free(count, (void **)ppszStringList);
+    if (pCount != NULL)
+    {
+        *pCount = 0;
+    }
+    if (pppszStringList != NULL)
+    {
+        *pppszStringList = NULL;
+    }
+    goto cleanup;
+}
+
 static int
 get_dns_mode(
     const char *pszInterfaceName,
@@ -1109,6 +1178,65 @@ error:
     return err;
 }
 
+static uint32_t
+read_etc_resolv_conf(char **ppszFileBuf)
+{
+    uint32_t err = 0;
+    long len;
+    FILE *fp = NULL;
+    char *pszFileBuf = NULL;
+
+    if (!ppszFileBuf)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    fp = fopen("/etc/resolv.conf", "r");
+    if (fp == NULL)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+    if (fseek(fp, 0, SEEK_END) != 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+    len = ftell(fp);
+    if (len == -1)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+    fseek(fp, 0, SEEK_SET);
+
+    err = netmgr_alloc((len + 1), (void *)&pszFileBuf);
+    bail_on_error(err);
+
+    fread(pszFileBuf, len, 1, fp);
+
+    *ppszFileBuf = pszFileBuf;
+
+cleanup:
+    if (fp != NULL)
+    {
+        fclose(fp);
+    }
+    return err;
+
+error:
+    if (ppszFileBuf != NULL)
+    {
+        *ppszFileBuf = NULL;
+    }
+    if (pszFileBuf != NULL)
+    {
+        netmgr_free(pszFileBuf);
+    }
+    goto cleanup;
+}
+
 int
 get_dns_servers(
     const char *pszInterfaceName,
@@ -1119,12 +1247,10 @@ get_dns_servers(
 )
 {
     uint32_t err = 0;
-    char *pszCfgFileName = NULL;
-    char szSectionName[MAX_LINE];
-    char *pszUseDnsValue = NULL;
-    char *pszDnsServersValue = NULL;
-    char *pszDnsServersValue2 = NULL;
-    char *s1, *s2, **szDnsServersList = NULL;
+    char *pszCfgFileName = NULL, *pszFileBuf = NULL;
+    char szSectionName[MAX_LINE], szServer[INET6_ADDRSTRLEN];
+    char *pszUseDnsValue = NULL, *pszDnsServersValue = NULL;
+    char *s1, **ppszDnsServersList = NULL;
     size_t i = 0, count = 0;
 
     if ((pMode == NULL) || (pCount == NULL) || (pppszDnsServers == NULL))
@@ -1137,76 +1263,74 @@ get_dns_servers(
     err = get_dns_mode("eth0", pMode);
     bail_on_error(err);
 
-    if (pszInterfaceName != NULL)
+    if (pszInterfaceName == NULL)
     {
-        err = get_network_conf_filename(&pszCfgFileName, pszInterfaceName);
-        sprintf(szSectionName, SECTION_NETWORK);
+        err = read_etc_resolv_conf(&pszFileBuf);
+        bail_on_error(err);
+
+        s1 = pszFileBuf;
+        while ((s1 = strstr(s1, "nameserver")) != NULL)
+        {
+            count++;
+            s1++;
+        }
+
+        if (count > 0)
+        {
+            err = netmgr_alloc((count * sizeof(char *)),
+                               (void *)&ppszDnsServersList);
+            bail_on_error(err);
+
+            s1 = pszFileBuf;
+            while ((s1 = strstr(s1, "nameserver")) != NULL)
+            {
+                sscanf(s1, "nameserver %s", szServer);
+                err = netmgr_alloc_string(szServer, &(ppszDnsServersList[i++]));
+                bail_on_error(err);
+                s1++;
+            } while (s1 != NULL);
+        }
     }
     else
     {
-        err = get_resolved_conf_filename(&pszCfgFileName);
-        sprintf(szSectionName, SECTION_RESOLVE);
-    }
-    bail_on_error(err);
-
-    /* Parse pszDnsServersValue */
-    err = get_key_value(pszCfgFileName, szSectionName, KEY_DNS, &pszDnsServersValue);
-    if (err == ENOENT)
-    {
-        err = 0;
-        goto error;
-    }
-    bail_on_error(err);
-    err = netmgr_alloc_string(pszDnsServersValue, &pszDnsServersValue2);
-    bail_on_error(err);
-
-    s2 = pszDnsServersValue;
-    do {
-        s1 = strsep(&s2, " ");
-        if (strlen(s1) > 0)
+        if (!strcmp(pszInterfaceName, "none"))
         {
-            count++;
+            err = get_resolved_conf_filename(&pszCfgFileName);
+            sprintf(szSectionName, SECTION_RESOLVE);
         }
-    } while (s2 != NULL);
-
-    if (count > 0)
-    {
-        err = netmgr_alloc((count * sizeof(char *)), (void *)&szDnsServersList);
+        else
+        {
+            err = get_network_conf_filename(&pszCfgFileName, pszInterfaceName);
+            sprintf(szSectionName, SECTION_NETWORK);
+        }
         bail_on_error(err);
 
-        s2 = pszDnsServersValue2;
-        do {
-            s1 = strsep(&s2, " ");
-            if (strlen(s1) > 0)
-            {
-                err = netmgr_alloc_string(s1, &(szDnsServersList[i++]));
-                bail_on_error(err);
-            }
-        } while (s2 != NULL);
+        err = get_key_value(pszCfgFileName, szSectionName, KEY_DNS,
+                            &pszDnsServersValue);
+        if (err == ENOENT)
+        {
+            err = 0;
+            goto error;
+        }
+        bail_on_error(err);
+
+        err = space_delimited_string_to_list(pszDnsServersValue, &count,
+                                             &ppszDnsServersList);
+        bail_on_error(err);
     }
+
     *pCount = count;
-    *pppszDnsServers = szDnsServersList;
+    *pppszDnsServers = ppszDnsServersList;
 
 clean:
-    netmgr_free(pszDnsServersValue2);
+    netmgr_free(pszFileBuf);
     netmgr_free(pszDnsServersValue);
     netmgr_free(pszUseDnsValue);
     netmgr_free(pszCfgFileName);
     return err;
 
 error:
-    /* Free allocated memory on error */
-    if (szDnsServersList != NULL)
-    {
-        for (i = 0; i < count; i++)
-        {
-            if (szDnsServersList[i] != NULL)
-            {
-                netmgr_free(szDnsServersList[i]);
-            }
-        }
-        netmgr_free(szDnsServersList);
-    }
+    netmgr_list_free(count, (void **)ppszDnsServersList);
     if (pCount != NULL)
     {
         *pCount = 0;
@@ -1423,12 +1547,10 @@ get_dns_domains(
 )
 {
     uint32_t err = 0;
-    char *pszCfgFileName = NULL;
+    size_t count = 0;
     char szSectionName[MAX_LINE];
-    char *pszDnsDomainsValue = NULL;
-    char *pszDnsDomainValue2 = NULL;
-    char *s1, *s2, **ppszDnsDomainsList = NULL;
-    size_t i = 0, count = 0;
+    char *pszCfgFileName = NULL, *pszFileBuf = NULL;
+    char *pszDnsDomainsValue = NULL, **ppszDnsDomainsList = NULL;
 
     if ((pCount == NULL) || (pppszDnsDomains == NULL))
     {
@@ -1436,61 +1558,64 @@ get_dns_domains(
         bail_on_error(err);
     }
 
-    if (pszInterfaceName != NULL)
+    if (pszInterfaceName == NULL)
     {
-        err = get_network_conf_filename(&pszCfgFileName, pszInterfaceName);
-        sprintf(szSectionName, SECTION_NETWORK);
+        err = read_etc_resolv_conf(&pszFileBuf);
+        bail_on_error(err);
+
+        pszDnsDomainsValue = strstr(pszFileBuf, "search");
+        if (pszDnsDomainsValue == NULL)
+        {
+            err = ENOENT;
+            bail_on_error(err);
+        }
+        pszDnsDomainsValue = strstr(pszDnsDomainsValue, " ");
+        if (pszDnsDomainsValue == NULL)
+        {
+            pszDnsDomainsValue = NULL;
+            err = ENOENT;
+            bail_on_error(err);
+        }
+        pszDnsDomainsValue++;
+
+        err = space_delimited_string_to_list(pszDnsDomainsValue, &count,
+                                             &ppszDnsDomainsList);
+        pszDnsDomainsValue = NULL;
+        bail_on_error(err);
     }
     else
     {
-        err = get_resolved_conf_filename(&pszCfgFileName);
-        sprintf(szSectionName, SECTION_RESOLVE);
-    }
-    bail_on_error(err);
-
-    err = get_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
-                        &pszDnsDomainsValue);
-    if (err == ENOENT)
-    {
-        err = 0;
-        goto error;
-    }
-    bail_on_error(err);
-
-    err = netmgr_alloc_string(pszDnsDomainsValue, &pszDnsDomainValue2);
-    bail_on_error(err);
-
-    s2 = pszDnsDomainsValue;
-    do {
-        s1 = strsep(&s2, " ");
-        if (strlen(s1) > 0)
+        if (!strcmp(pszInterfaceName, "none"))
         {
-            count++;
+            err = get_resolved_conf_filename(&pszCfgFileName);
+            sprintf(szSectionName, SECTION_RESOLVE);
         }
-    } while (s2 != NULL);
-
-    if (count > 0)
-    {
-        err = netmgr_alloc((count * sizeof(char *)), (void *)&ppszDnsDomainsList);
+        else
+        {
+            err = get_network_conf_filename(&pszCfgFileName, pszInterfaceName);
+            sprintf(szSectionName, SECTION_NETWORK);
+        }
         bail_on_error(err);
 
-        s2 = pszDnsDomainValue2;
-        do {
-            s1 = strsep(&s2, " ");
-            if (strlen(s1) > 0)
-            {
-                err = netmgr_alloc_string(s1, &(ppszDnsDomainsList[i++]));
-                bail_on_error(err);
-            }
-        } while (s2 != NULL);
+        err = get_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
+                            &pszDnsDomainsValue);
+        if (err == ENOENT)
+        {
+            err = 0;
+            goto error;
+        }
+        bail_on_error(err);
+
+        err = space_delimited_string_to_list(pszDnsDomainsValue, &count,
+                                             &ppszDnsDomainsList);
+        bail_on_error(err);
     }
 
     *pCount = count;
     *pppszDnsDomains = ppszDnsDomainsList;
 
 clean:
-    /* Free allocated memory on error */
-    netmgr_free(pszDnsDomainValue2);
+    netmgr_free(pszFileBuf);
     netmgr_free(pszDnsDomainsValue);
     netmgr_free(pszCfgFileName);
     return err;

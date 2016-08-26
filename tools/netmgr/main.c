@@ -285,7 +285,6 @@ cmd_dhcp_duid(PNETMGR_CMD pCmd)
     }
 
 cleanup:
-    /* Free allocated memory */
     netmgr_free(pszDuid);
     return err;
 
@@ -445,15 +444,7 @@ cmd_dns_servers(PNETMGR_CMD pCmd)
     bail_on_error(err);
 
 cleanup:
-    /* Free allocated memory */
-    if (ppszDnsServersList != NULL)
-    {
-        for (i = 0; i < count; i++)
-        {
-            netmgr_free(ppszDnsServersList[i]);
-        }
-        netmgr_free(ppszDnsServersList);
-    }
+    netmgr_list_free(count, (void **)ppszDnsServersList);
     netmgr_free(pszServers);
     return err;
 
@@ -560,7 +551,6 @@ cmd_dns_domains(PNETMGR_CMD pCmd)
     bail_on_error(err);
 
 cleanup:
-    /* Free allocated memory */
     netmgr_list_free(count, (void **)ppszDnsDomainsList);
     netmgr_free(pszDomains);
     return err;
