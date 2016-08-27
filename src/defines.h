@@ -39,6 +39,10 @@
 #define KEY_DUID_RAWDATA               "DUIDRawData"
 
 
+#define STR_NAMESERVER                 "nameserver"
+#define STR_SEARCH                     "search"
+
+
 #define bail_on_error(errcode) \
     do { \
        if (errcode) { \

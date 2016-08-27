@@ -346,7 +346,7 @@ get_duid(
 
 
 /*
- * DHCP options, DUID, IAID configuration APIs
+ * Service management APIs
  */
 int
 stop_network_service();
