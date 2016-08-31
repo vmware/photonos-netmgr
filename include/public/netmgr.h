@@ -77,20 +77,23 @@ typedef struct _NET_IP_ADDR
 /*
  * Route configuration structs
  */
-typedef enum _NET_ROUTE_TYPE
+typedef enum _NET_ROUTE_SCOPE
 {
-    GLOBAL_ROUTE,
+    GLOBAL_ROUTE = 0,
     LINK_ROUTE,
     HOST_ROUTE,
-} NET_ROUTE_TYPE;
+    NET_ROUTE_SCOPE_MAX
+} NET_ROUTE_SCOPE;
 
 typedef struct _NET_IP_ROUTE
 {
     char *pszInterfaceName;
-    char *pszDestAddr;
-    uint8_t prefix;
+    char *pszDestNetwork;
+    char *pszSourceNetwork;
     char *pszGateway;
-    NET_ROUTE_TYPE type;
+    NET_ROUTE_SCOPE scope;
+    uint32_t metric;
+    uint32_t table;
 } NET_IP_ROUTE;
 
 #define fCLEAR_ROUTES_LIST     0x00000001
@@ -227,27 +230,22 @@ get_static_ip_addr(
  * Route configuration APIs
  */
 int
-set_ip_route(
-    const char *pszInterfaceName,
-    const char *pszDestAddr,
-    uint8_t prefix,
-    const char *pszGateway,
-    uint32_t metric,
+add_static_ip_route(
+    NET_IP_ROUTE *pRoute,
     uint32_t flags
 );
 
 int
-delete_ip_route(
-    const char *pszInterfaceName,
-    const char *pszDestAddr,
-    uint8_t prefix,
+delete_static_ip_route(
+    NET_IP_ROUTE *pRoute,
     uint32_t flags
 );
 
 int
-get_ip_route_info(
+get_static_ip_routes(
+    const char *pszInterfaceName,
     size_t *pCount,
-    NET_IP_ROUTE **ppRouteList
+    NET_IP_ROUTE ***pppRouteList
 );
 
 

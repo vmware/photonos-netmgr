@@ -85,6 +85,7 @@ error:
     goto cleanup;
 }
 
+
 static struct option ip4AddrOptions[] =
 {
     {"set",          no_argument,          0,    's'},
@@ -97,7 +98,7 @@ static struct option ip4AddrOptions[] =
     {0, 0, 0, 0}
 };
 
-uint32_t
+static uint32_t
 cli_ip4_address(
     int argc,
     char **argv,
@@ -208,6 +209,7 @@ error:
     goto cleanup;
 }
 
+
 static struct option ip6AddrOptions[] =
 {
     {"add",          no_argument,          0,    'p'},
@@ -222,7 +224,7 @@ static struct option ip6AddrOptions[] =
     {0, 0, 0, 0}
 };
 
-uint32_t
+static uint32_t
 cli_ip6_address(
     int argc,
     char **argv,
@@ -340,6 +342,167 @@ error:
     goto cleanup;
 }
 
+
+static struct option ipRouteOptions[] =
+{
+    {"get",          no_argument,          0,    '1'},
+    {"add",          no_argument,          0,    '3'},
+    {"del",          no_argument,          0,    '4'},
+    {"interface",    required_argument,    0,    'i'},
+    {"destination",  required_argument,    0,    'd'},
+    {"gateway",      required_argument,    0,    'g'},
+    {"scope",        required_argument,    0,    's'},
+    {"metric",       required_argument,    0,    'm'},
+    {0, 0, 0, 0}
+};
+
+static uint32_t
+cli_ip_route(
+    int argc,
+    char **argv,
+    PNETMGR_CMD pCmd
+    )
+{
+    uint32_t err = 0, validIfName = 0, validDest = 0, validGW = 0;
+    uint8_t prefix = 255;
+    char addr[INET6_ADDRSTRLEN+5];
+    int nOptionIndex = 0, nOption = 0;
+    CMD_OP op = OP_INVALID;
+
+    opterr = 0;
+    optind = 1;
+    while (1)
+    {
+        nOption = getopt_long(argc,
+                              argv,
+                              "134i:d:g:s:m:",
+                              ipRouteOptions,
+                              &nOptionIndex);
+        if (nOption == -1)
+            break;
+
+        switch(nOption)
+        {
+            case '1':
+                op = OP_GET;
+                break;
+            case '3':
+                op = OP_ADD;
+                break;
+            case '4':
+                op = OP_DEL;
+                break;
+            case 'i':
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("interface", optarg, pCmd);
+                    validIfName = 1;
+                }
+                else
+                {
+                    fprintf(stderr, "Invalid interface name.\n");
+                    err = EDOM;
+                }
+                break;
+            case 'd':
+                /* Validate destnnation network IP and prefix */
+                if ((strlen(optarg) == 0) ||
+                    (sscanf(optarg, "%[^/]/%hhu", addr, &prefix) < 1))
+                {
+                    fprintf(stderr, "Invalid destination network.\n");
+                    err = EDOM;
+                    break;
+                }
+                if (is_ipv4_addr(addr))
+                {
+                    prefix = (prefix == 255) ? 32 : prefix;
+                    if (prefix > 32)
+                    {
+                        fprintf(stderr, "Invalid IPv4 prefix.\n");
+                        err = EDOM;
+                        break;
+                    }
+                    validDest = 4;
+                }
+                else if (is_ipv6_addr(addr))
+                {
+                    prefix = (prefix == 255) ? 128 : prefix;
+                    if (prefix > 128)
+                    {
+                        fprintf(stderr, "Invalid IPv6 prefix.\n");
+                        err = EDOM;
+                        break;
+                    }
+                    validDest = 6;
+                }
+                else
+                {
+                    fprintf(stderr, "Invalid destination network address.\n");
+                    err = EDOM;
+                    break;
+                }
+                sprintf(addr, "%s/%hhu", addr, prefix);
+                err = netmgrcli_alloc_keyvalue("destination", addr, pCmd);
+                break;
+            case 'g':
+                if ((strlen(optarg) > 0) &&
+                    (is_ipv4_addr(optarg) || is_ipv6_addr(optarg)))
+                {
+                    err = netmgrcli_alloc_keyvalue("gateway", optarg, pCmd);
+                    validGW = is_ipv4_addr(optarg) ? 4 : 6;
+                }
+                else
+                {
+                    fprintf(stderr, "Invalid IP gateway.\n");
+                    err = EDOM;
+                }
+                break;
+            case 's':
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("scope", optarg, pCmd);
+                }
+                break;
+            case 'm':
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("metric", optarg, pCmd);
+                }
+                break;
+            case '?':
+                /* Option not handled here. Ignore. */
+                break;
+        }
+        bail_on_error(err);
+    }
+
+    if ((op == OP_INVALID) || ((op != OP_GET) && (!validIfName || !validDest ||
+        (validGW && (validDest != validGW)))))
+    {
+        err = EDOM;
+        bail_on_error(err);
+    }
+
+    pCmd->id = CMD_IP_ROUTE;
+    pCmd->op = op;
+
+cleanup:
+    return err;
+
+error:
+    pCmd->op = OP_INVALID;
+    if (err == EDOM)
+    {
+        fprintf(stderr,
+                "Usage:\nip_route --get --interface <ifame>\n"
+                "ip_route --add --interface <ifname> --gateway <GatewayIP>"
+                " --destination <DestinationNetwork/prefix> --metric <N>\n"
+                "ip_route --del --interface <ifname> --destination <DestIP/N>\n");
+    }
+    goto cleanup;
+}
+
+
 static struct option dhcpDuidOptions[] =
 {
     {"set",          no_argument,          0,    's'},
@@ -349,7 +512,7 @@ static struct option dhcpDuidOptions[] =
     {0, 0, 0, 0}
 };
 
-uint32_t
+static uint32_t
 cli_dhcp_duid(
     int argc,
     char **argv,
@@ -432,6 +595,7 @@ error:
     goto cleanup;
 }
 
+
 static struct option ifIaidOptions[] =
 {
     {"set",          no_argument,          0,    's'},
@@ -441,7 +605,7 @@ static struct option ifIaidOptions[] =
     {0, 0, 0, 0}
 };
 
-uint32_t
+static uint32_t
 cli_if_iaid(
     int argc,
     char **argv,
@@ -526,6 +690,7 @@ error:
     goto cleanup;
 }
 
+
 static struct option dnsServerOptions[] =
 {
     {"set",          no_argument,          0,    's'},
@@ -539,7 +704,7 @@ static struct option dnsServerOptions[] =
     {0, 0, 0, 0}
 };
 
-uint32_t
+static uint32_t
 cli_dns_servers(
     int argc,
     char **argv,
@@ -637,6 +802,7 @@ error:
     goto cleanup;
 }
 
+
 static struct option dnsDomainsOptions[] =
 {
     {"set",          no_argument,          0,    's'},
@@ -649,8 +815,7 @@ static struct option dnsDomainsOptions[] =
     {0, 0, 0, 0}
 };
 
-
-uint32_t
+static uint32_t
 cli_dns_domains(
     int argc,
     char **argv,
@@ -744,6 +909,7 @@ error:
     goto cleanup;
 }
 
+
 /* Map command name to command parser function */
 typedef struct _NETMGRCLI_CMD_MAP
 {
@@ -753,6 +919,7 @@ typedef struct _NETMGRCLI_CMD_MAP
     char *pszHelpMessage;
 } NETMGRCLI_CMD_MAP, *PNETMGRCLI_CMD_MAP;
 
+/* TODO: Cleanup the help text and help formatting */
 NETMGRCLI_CMD_MAP cmdMap[] =
 {
     {"ip4_address",
@@ -763,9 +930,15 @@ NETMGRCLI_CMD_MAP cmdMap[] =
     },
     {"ip6_address",
      cli_ip6_address,
-     "--set --interface <interface name> --dhcp <1|0> --autoconf <1|0> "
+     "--add|--del|--set --interface <interface name> --dhcp <1|0> --autoconf <1|0> "
      "--addrlist <IPv6 Address/Prefix list> --gateway <Default IPv6 gateway>",
      "add or delete IPv6 addresses and default gateway for interface"
+    },
+    {"ip_route",
+     cli_ip_route,
+     "--add|--del --interface <interface name> --destination <Dest Network/Prefix> "
+     "--gateway <Gateway IP Addr> -- metric <Route Metric> --scope <scope>",
+     "add or delete IP routes for the interface"
     },
     {"dns_servers",
      cli_dns_servers,

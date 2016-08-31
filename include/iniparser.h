@@ -61,6 +61,12 @@ ini_cfg_delete_sections(
     const char*   pszName
     );
 
+uint32_t
+ini_cfg_delete_section(
+    PCONFIG_INI   pConfig,
+    PSECTION_INI  pSection
+    );
+
 PKEYVALUE_INI
 ini_cfg_find_key(
     PSECTION_INI  pSection,

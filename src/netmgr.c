@@ -262,20 +262,6 @@ get_link_info(
  * IP Address configuration APIs
  */
 
-static uint32_t
-is_ipv4_addr(const char *pszIpAddr)
-{
-    struct sockaddr_in sa;
-    return (inet_pton(AF_INET, pszIpAddr, &(sa.sin_addr)) != 0);
-}
-
-static uint32_t
-is_ipv6_addr(const char *pszIpAddr)
-{
-    struct sockaddr_in6 sa;
-    return (inet_pton(AF_INET6, pszIpAddr, &(sa.sin6_addr)) != 0);
-}
-
 int
 set_ip_dhcp_mode(
     const char *pszInterfaceName,
@@ -682,41 +668,386 @@ error:
     goto cleanup;
 }
 
+
 /*
  * Route configuration APIs
  */
 
-int
-set_ip_route(
-    const char *pszInterfaceName,
-    const char *pszDestAddr,
-    uint8_t prefix,
-    const char *pszGateway,
-    uint32_t metric,
-    uint32_t flags
+static int
+add_route_section(
+    NET_IP_ROUTE *pRoute
 )
 {
-    return 0;
+    uint32_t err = 0, dwNumSections = 0, i;
+    char *pszCfgFileName = NULL, buf[MAX_LINE];
+    PCONFIG_INI pConfig = NULL;
+    PSECTION_INI *ppSections = NULL, pSection = NULL;
+    PKEYVALUE_INI pDestKeyVal = NULL;
+
+    if (!pRoute || IS_NULL_OR_EMPTY(pRoute->pszInterfaceName) ||
+        IS_NULL_OR_EMPTY(pRoute->pszDestNetwork) ||
+        IS_NULL_OR_EMPTY(pRoute->pszGateway))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = get_network_conf_filename(&pszCfgFileName, pRoute->pszInterfaceName);
+    bail_on_error(err);
+
+    err = ini_cfg_read(pszCfgFileName, &pConfig);
+    bail_on_error(err);
+
+    err = ini_cfg_find_sections(pConfig, SECTION_ROUTE, &ppSections,
+                                &dwNumSections);
+    bail_on_error(err);
+
+    for (i = 0; i < dwNumSections; i++)
+    {
+        pDestKeyVal = ini_cfg_find_key_value(ppSections[i], KEY_DEST,
+                                             pRoute->pszDestNetwork);
+        if (pDestKeyVal != NULL)
+        {
+            err = EEXIST;
+            bail_on_error(err);
+        }
+    }
+
+    err = ini_cfg_add_section(pConfig, SECTION_ROUTE, &pSection);
+    bail_on_error(err);
+
+    err = ini_cfg_add_key(pSection, KEY_GATEWAY, pRoute->pszGateway);
+    bail_on_error(err);
+    err = ini_cfg_add_key(pSection, KEY_DEST, pRoute->pszDestNetwork);
+    bail_on_error(err);
+    if (pRoute->pszSourceNetwork)
+    {
+        err = ini_cfg_add_key(pSection, KEY_SRC, pRoute->pszSourceNetwork);
+        bail_on_error(err);
+    }
+    if (pRoute->metric)
+    {
+        sprintf(buf, "%u", pRoute->metric);
+        err = ini_cfg_add_key(pSection, KEY_METRIC, buf);
+        bail_on_error(err);
+    }
+    if (pRoute->scope && (pRoute->scope < NET_ROUTE_SCOPE_MAX))
+    {
+        switch (pRoute->scope)
+        {
+            case GLOBAL_ROUTE:
+                strcpy(buf, "global");
+                break;
+            case LINK_ROUTE:
+                strcpy(buf, "link");
+                break;
+            case HOST_ROUTE:
+                strcpy(buf, "host");
+                break;
+            default:
+                err = EINVAL;
+                bail_on_error(err);
+        }
+        sprintf(buf, "%u", pRoute->metric);
+        err = ini_cfg_add_key(pSection, KEY_SCOPE, buf);
+        bail_on_error(err);
+    }
+
+    err = ini_cfg_save(pszCfgFileName, pConfig);
+    bail_on_error(err);
+
+cleanup:
+    if (ppSections != NULL)
+    {
+        ini_cfg_free_sections(ppSections, dwNumSections);
+    }
+    if (pConfig != NULL)
+    {
+        ini_cfg_free_config(pConfig);
+    }
+    netmgr_free(pszCfgFileName);
+    return err;
+
+error:
+    goto cleanup;
 }
 
-int
-delete_ip_route(
-    const char *pszInterfaceName,
-    const char *pszDestAddr,
-    uint8_t prefix,
-    uint32_t flags
+static int
+delete_route_section(
+    NET_IP_ROUTE *pRoute
 )
 {
-    return 0;
+    uint32_t err = 0, dwNumSections = 0, i;
+    char *pszCfgFileName = NULL;
+    PCONFIG_INI pConfig = NULL;
+    PSECTION_INI *ppSections = NULL;
+    PKEYVALUE_INI pDestKeyVal = NULL;
+
+    if (!pRoute || IS_NULL_OR_EMPTY(pRoute->pszInterfaceName) ||
+        IS_NULL_OR_EMPTY(pRoute->pszDestNetwork))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = get_network_conf_filename(&pszCfgFileName, pRoute->pszInterfaceName);
+    bail_on_error(err);
+
+    err = ini_cfg_read(pszCfgFileName, &pConfig);
+    bail_on_error(err);
+
+    err = ini_cfg_find_sections(pConfig, SECTION_ROUTE, &ppSections,
+                                &dwNumSections);
+    bail_on_error(err);
+
+    for (i = 0; i < dwNumSections; i++)
+    {
+        pDestKeyVal = ini_cfg_find_key_value(ppSections[i], KEY_DEST,
+                                             pRoute->pszDestNetwork);
+        if (pDestKeyVal != NULL)
+        {
+            break;
+        }
+    }
+
+    if (pDestKeyVal == NULL)
+    {
+        err = ENOENT;
+        bail_on_error(err);
+    }
+
+    err = ini_cfg_delete_section(pConfig, ppSections[i]);
+    bail_on_error(err);
+
+    err = ini_cfg_save(pszCfgFileName, pConfig);
+    bail_on_error(err);
+
+cleanup:
+    if (ppSections != NULL)
+    {
+        ini_cfg_free_sections(ppSections, dwNumSections);
+    }
+    if (pConfig != NULL)
+    {
+        ini_cfg_free_config(pConfig);
+    }
+    netmgr_free(pszCfgFileName);
+    return err;
+
+error:
+    goto cleanup;
 }
 
-int
-get_ip_route_info(
+static int
+get_routes(
+    const char *pszInterfaceName,
     size_t *pCount,
-    NET_IP_ROUTE **ppRouteList
+    NET_IP_ROUTE ***pppRoutes
 )
 {
-    return 0;
+    uint32_t err = 0, dwNumSections = 0, i;
+    char *pszCfgFileName = NULL;
+    PCONFIG_INI pConfig = NULL;
+    PSECTION_INI *ppSections = NULL;
+    PKEYVALUE_INI pKeyVal = NULL;
+    NET_IP_ROUTE **ppRoutes = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) || !pCount || !pppRoutes)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = get_network_conf_filename(&pszCfgFileName, pszInterfaceName);
+    bail_on_error(err);
+
+    err = ini_cfg_read(pszCfgFileName, &pConfig);
+    bail_on_error(err);
+
+    err = ini_cfg_find_sections(pConfig, SECTION_ROUTE, &ppSections,
+                                &dwNumSections);
+    bail_on_error(err);
+
+    err = netmgr_alloc(dwNumSections * sizeof(NET_IP_ROUTE *), (void **)&ppRoutes);
+    bail_on_error(err);
+
+    for (i = 0; i < dwNumSections; i++)
+    {
+        err = netmgr_alloc(sizeof(NET_IP_ROUTE), (void **)&ppRoutes[i]);
+        bail_on_error(err);
+
+        pKeyVal = ini_cfg_find_key(ppSections[i], KEY_DEST);
+        err = netmgr_alloc_string(pKeyVal->pszValue, &ppRoutes[i]->pszDestNetwork);
+        bail_on_error(err);
+
+        pKeyVal = ini_cfg_find_key(ppSections[i], KEY_GATEWAY);
+        err = netmgr_alloc_string(pKeyVal->pszValue, &ppRoutes[i]->pszGateway);
+        bail_on_error(err);
+
+        pKeyVal = ini_cfg_find_key(ppSections[i], KEY_METRIC);
+        if (pKeyVal != NULL)
+        {
+            ppRoutes[i]->metric = (uint32_t)atoi(pKeyVal->pszValue);
+        }
+    }
+
+    *pCount = dwNumSections;
+    *pppRoutes = ppRoutes;
+
+cleanup:
+    if (ppSections != NULL)
+    {
+        ini_cfg_free_sections(ppSections, dwNumSections);
+    }
+    if (pConfig != NULL)
+    {
+        ini_cfg_free_config(pConfig);
+    }
+    netmgr_free(pszCfgFileName);
+    return err;
+
+error:
+    if (pCount != NULL)
+    {
+        *pCount = 0;
+    }
+    if (pppRoutes != NULL)
+    {
+        *pppRoutes = NULL;
+    }
+    /* TODO: Check MEM LEAK */
+    netmgr_list_free(dwNumSections, (void **)ppRoutes);
+    goto cleanup;
+}
+
+int
+add_static_ip_route(
+    NET_IP_ROUTE *pRoute,
+    uint32_t flags
+)
+{
+    uint32_t err = 0;
+    uint8_t prefix = 255;
+    char szDestAddr[INET6_ADDRSTRLEN+5];
+    NET_IP_ROUTE route;
+
+    if (IS_NULL_OR_EMPTY(pRoute->pszInterfaceName) ||
+        IS_NULL_OR_EMPTY(pRoute->pszDestNetwork) ||
+        IS_NULL_OR_EMPTY(pRoute->pszGateway) ||
+        (sscanf(pRoute->pszDestNetwork, "%[^/]/%hhu", szDestAddr, &prefix) < 1))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if (is_ipv4_addr(szDestAddr))
+    {
+        prefix = (prefix == 255) ? 32 : prefix;
+        if ((prefix > 32) || !is_ipv4_addr(pRoute->pszGateway))
+        {
+            err = EINVAL;
+            bail_on_error(err);
+        }
+    }
+    else if (is_ipv6_addr(szDestAddr))
+    {
+        prefix = (prefix == 255) ? 128 : prefix;
+        if ((prefix > 128) || !is_ipv6_addr(pRoute->pszGateway))
+        {
+            err = EINVAL;
+            bail_on_error(err);
+        }
+    }
+    else
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    memcpy(&route, pRoute, sizeof(route));
+    sprintf(szDestAddr, "%s/%hhu", szDestAddr, prefix);
+    route.pszDestNetwork = szDestAddr;
+
+    err = add_route_section(&route);
+    bail_on_error(err);
+
+cleanup:
+    return err;
+error:
+    goto cleanup;
+}
+
+int
+delete_static_ip_route(
+    NET_IP_ROUTE *pRoute,
+    uint32_t flags
+)
+{
+    uint32_t err = 0;
+    uint8_t prefix = 255;
+    char szDestAddr[INET6_ADDRSTRLEN+5];
+    NET_IP_ROUTE route;
+
+    if (IS_NULL_OR_EMPTY(pRoute->pszInterfaceName) ||
+        IS_NULL_OR_EMPTY(pRoute->pszDestNetwork) ||
+        (sscanf(pRoute->pszDestNetwork, "%[^/]/%hhu", szDestAddr, &prefix) < 1))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if (is_ipv4_addr(szDestAddr))
+    {
+        prefix = (prefix == 255) ? 32 : prefix;
+    }
+    else if (is_ipv6_addr(szDestAddr))
+    {
+        prefix = (prefix == 255) ? 128 : prefix;
+    }
+    else
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    memcpy(&route, pRoute, sizeof(route));
+    sprintf(szDestAddr, "%s/%hhu", szDestAddr, prefix);
+    route.pszDestNetwork = szDestAddr;
+
+    err = delete_route_section(&route);
+    bail_on_error(err);
+
+cleanup:
+    return err;
+error:
+    goto cleanup;
+}
+
+int
+get_static_ip_routes(
+    const char *pszInterfaceName,
+    size_t *pCount,
+    NET_IP_ROUTE ***pppRoutesList
+)
+{
+    uint32_t err = 0;
+
+    if (!pszInterfaceName)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    /* TODO: If pszInterfaceName == NULL, get static route for all if */
+
+    err = get_routes(pszInterfaceName, pCount, pppRoutesList);
+    bail_on_error(err);
+
+
+cleanup:
+    return err;
+error:
+    goto cleanup;
 }
 
 

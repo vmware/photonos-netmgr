@@ -19,7 +19,9 @@
 #include <string.h>
 #include <errno.h>
 #include <getopt.h>
+#include <arpa/inet.h>
 
 #include "../common/prototypes.h"
+#include "../common/common_utils.h"
 #include "defines.h"
 #include "netmgrcli.h"

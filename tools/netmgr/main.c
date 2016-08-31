@@ -21,7 +21,7 @@ cmd_ip4_address(PNETMGR_CMD pCmd)
     char *pszIfName = NULL, *pszMode = NULL;
     char *pszAddr = NULL, *pszPrefix = NULL, *pszGateway = NULL;
     char **ppszAddrList = NULL;
-    size_t i, count;
+    size_t count;
 
     netmgrcli_find_cmdopt(pCmd, "interface", &pszIfName);
 
@@ -102,14 +102,7 @@ cmd_ip4_address(PNETMGR_CMD pCmd)
     }
 
 cleanup:
-    if (ppszAddrList != NULL)
-    {
-        for (i = 0; i < count; i++)
-        {
-            netmgr_free(ppszAddrList[i]);
-        }
-        netmgr_free(ppszAddrList);
-    }
+    netmgr_list_free(count, (void **)ppszAddrList);
     netmgr_free(pszGateway);
     return err;
 
@@ -243,15 +236,85 @@ cmd_ip6_address(PNETMGR_CMD pCmd)
     }
 
 cleanup:
-    if (ppszAddrList != NULL)
-    {
-        for (i = 0; i < count; i++)
-        {
-            netmgr_free(ppszAddrList[i]);
-        }
-        netmgr_free(ppszAddrList);
-    }
+    netmgr_list_free(count, (void **)ppszAddrList);
     netmgr_free(pszGateway);
+    return err;
+
+error:
+    goto cleanup;
+}
+
+static uint32_t
+cmd_ip_route(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    size_t i, count = 0;
+    char *pszMetric = NULL, *pszScope = NULL;
+    NET_IP_ROUTE ipRoute = {0}, **ppRoutesList = NULL;
+
+    netmgrcli_find_cmdopt(pCmd, "interface", &ipRoute.pszInterfaceName);
+
+    switch (pCmd->op)
+    {
+        case OP_ADD:
+            netmgrcli_find_cmdopt(pCmd, "gateway", &ipRoute.pszGateway);
+
+            err = netmgrcli_find_cmdopt(pCmd, "metric", &pszMetric);
+            if (err == ENOENT)
+            {
+                err = 0;
+                ipRoute.metric = 1024;
+            }
+            else
+            {
+                sscanf(pszMetric, "%u", &ipRoute.metric);
+            }
+            bail_on_error(err);
+
+            err = netmgrcli_find_cmdopt(pCmd, "scope", &pszScope);
+            if (err == ENOENT)
+            {
+                err = 0;
+                // TODO: scope = default
+            }
+            bail_on_error(err);
+
+        case OP_DEL:
+            netmgrcli_find_cmdopt(pCmd, "destination", &ipRoute.pszDestNetwork);
+
+            if (pCmd->op == OP_ADD)
+            {
+                err = add_static_ip_route(&ipRoute, 0);
+            }
+            else
+            {
+                err = delete_static_ip_route(&ipRoute, 0);
+            }
+            bail_on_error(err);
+            break;
+
+        case OP_GET:
+            err = get_static_ip_routes(ipRoute.pszInterfaceName, &count, &ppRoutesList);
+            fprintf(stdout, "Static IP Routes:\n");
+            for (i = 0; i < count; i++)
+            {
+                fprintf(stdout, "Route #%zu\n", i+1);
+                fprintf(stdout, "  Dest=%s\n", ppRoutesList[i]->pszDestNetwork);
+                fprintf(stdout, "  Gateway=%s\n", ppRoutesList[i]->pszGateway);
+                fprintf(stdout, "  Scope=%u\n", ppRoutesList[i]->scope);
+                fprintf(stdout, "  Metric=%u\n", ppRoutesList[i]->metric);
+            }
+            fprintf(stdout, "\n");
+            break;
+
+        default:
+            err = EINVAL;
+    }
+    bail_on_error(err);
+
+cleanup:
+    /* TODO: MEM LEAK CHECK */
+    netmgr_list_free(count, (void **)ppRoutesList);
     return err;
 
 error:
@@ -569,6 +632,7 @@ NETMGR_CLI_HANDLER cmdHandler[] =
 {
     { CMD_IP4_ADDRESS,         cmd_ip4_address     },
     { CMD_IP6_ADDRESS,         cmd_ip6_address     },
+    { CMD_IP_ROUTE,            cmd_ip_route        },
     { CMD_DHCP_DUID,           cmd_dhcp_duid       },
     { CMD_IF_IAID,             cmd_if_iaid         },
     { CMD_DNS_SERVERS,         cmd_dns_servers     },

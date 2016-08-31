@@ -27,6 +27,7 @@
 #include <iniparser.h>
 
 #include "../common/prototypes.h"
+#include "../common/common_utils.h"
 #include "defines.h"
 #include "structs.h"
 #include "prototypes.h"

@@ -403,6 +403,45 @@ error:
     return err;
 }
 
+uint32_t
+ini_cfg_delete_section(
+    PCONFIG_INI   pConfig,
+    PSECTION_INI  pSection
+    )
+{
+    uint32_t err = 0;
+    PSECTION_INI *pCursor = NULL;
+    PSECTION_INI pCandidate = NULL;
+
+    if (!pConfig || !pSection)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    for (pCursor = &pConfig->pSection; *pCursor; pCursor = &(*pCursor)->pNext)
+    {
+        if (*pCursor == pSection)
+        {
+            pCandidate = *pCursor;
+            *pCursor = pCandidate->pNext;
+            break;
+        }
+    }
+
+    if (!pCandidate)
+    {
+        err = ENOENT;
+        bail_on_error(err);
+    }
+
+    pCandidate->pNext = NULL;
+    ini_cfg_free_section(pCandidate);
+
+error:
+    return err;
+}
+
 PKEYVALUE_INI
 ini_cfg_find_key(
     PSECTION_INI  pSection,
