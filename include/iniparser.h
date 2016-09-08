@@ -22,11 +22,12 @@ extern "C" {
 typedef struct _KEYVALUE_INI * PKEYVALUE_INI;
 typedef struct _SECTION_INI * PSECTION_INI;
 typedef struct _CONFIG_INI * PCONFIG_INI;
+typedef struct _INTERFACE_INI * PINTERFACE_INI;
 
 uint32_t
 ini_cfg_read(
     const char*  pszPath,
-    PCONFIG_INI* ppConfig 
+    PCONFIG_INI* ppConfig
     );
 
 uint32_t

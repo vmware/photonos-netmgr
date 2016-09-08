@@ -13,6 +13,7 @@
  */
 
 #include "includes.h"
+#include <netmgr.h>
 
 uint32_t
 is_ipv4_addr(const char *pszIpAddr)
@@ -27,4 +28,30 @@ is_ipv6_addr(const char *pszIpAddr)
     struct sockaddr_in6 sa;
     return (inet_pton(AF_INET6, pszIpAddr, &(sa.sin6_addr)) != 0);
 }
+
+char *
+state_to_string(
+    NET_LINK_STATE state)
+{
+    switch(state)
+    {
+        case LINK_UP:   return "up";
+        case LINK_DOWN: return "down";
+        default:        return "unknown";
+    }
+}
+
+char *
+mode_to_string(
+    NET_LINK_MODE mode)
+{
+    switch(mode)
+    {
+       case LINK_AUTO:   return "auto";
+       case LINK_MANUAL: return "manual";
+       default:          return "unknown";
+    }
+
+}
+
 

@@ -15,10 +15,19 @@
 #ifndef __COMMON_UTILS_H__
 #define __COMMON_UTILS_H__
 
+#include <netmgr.h>
+
 uint32_t
 is_ipv4_addr(const char *pszIpAddr);
 
 uint32_t
 is_ipv6_addr(const char *pszIpAddr);
+
+char *
+state_to_string(NET_LINK_STATE state);
+
+char *
+mode_to_string(NET_LINK_MODE mode);
+
 
 #endif /* __COMMON_UTILS_H__ */

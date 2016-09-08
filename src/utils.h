@@ -57,4 +57,15 @@ netmgr_run_command(
     const char *pszCommand
 );
 
+int
+add_interface_ini(
+    const char *pszInterfaceName,
+    PINTERFACE_INI pInterfaceDummyIni
+);
+
+void
+delete_interface_ini(
+    PINTERFACE_INI pInterfaceDummyIni
+);
+
 #endif /* __UTILS_H__ */

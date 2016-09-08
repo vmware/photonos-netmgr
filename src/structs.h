@@ -15,7 +15,7 @@
 typedef struct _KEYVALUE_INI
 {
     char * pszKey;
-    char * pszValue; 
+    char * pszValue;
 
     struct _KEYVALUE_INI * pNext;
 
@@ -38,3 +38,11 @@ typedef struct _CONFIG_INI
     PSECTION_INI pSection;
 
 } CONFIG_INI;
+
+typedef struct _INTERFACE_INI
+{
+    char * pszName;
+
+    struct _INTERFACE_INI * pNext;
+
+} INTERFACE_INI;

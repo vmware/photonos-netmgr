@@ -310,6 +310,61 @@ error:
 }
 
 int
+add_interface_ini(
+    const char *pszInterfaceName,
+    PINTERFACE_INI pInterfaceDummyIni
+)
+{
+    uint32_t err = 0;
+    PINTERFACE_INI pInterfaceIni = NULL;
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) || !pInterfaceDummyIni)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = netmgr_alloc(sizeof(INTERFACE_INI), (void *)&pInterfaceIni);
+    bail_on_error(err);
+
+    err = netmgr_alloc_string(pszInterfaceName, &pInterfaceIni->pszName);
+    bail_on_error(err);
+
+    pInterfaceIni->pNext = pInterfaceDummyIni->pNext;
+    pInterfaceDummyIni->pNext = pInterfaceIni;
+
+cleanup:
+    return err;
+error:
+    netmgr_free(pInterfaceIni->pszName);
+    netmgr_free(pInterfaceIni);
+    goto cleanup;
+}
+
+void
+delete_interface_ini(
+    PINTERFACE_INI pInterfaceDummyIni
+)
+{
+    PINTERFACE_INI pCur = NULL, pNext = NULL;
+
+    if (pInterfaceDummyIni)
+    {
+        pCur = pInterfaceDummyIni->pNext;
+        while (pCur)
+        {
+            pNext = pCur->pNext;
+            if (pCur->pszName)
+            {
+                netmgr_free(pCur->pszName);
+            }
+            netmgr_free(pCur);
+            pCur = pNext;
+        }
+
+    }
+}
+
+int
 netmgr_run_command(
     const char *pszCommand
 )
@@ -333,7 +388,7 @@ netmgr_run_command(
 clean:
     if (pipe_fp != NULL)
     {
-        if (pclose(pipe_fp) == -1)
+        if ((err = pclose(pipe_fp)) == -1)
         {
             err = errno;
         }
