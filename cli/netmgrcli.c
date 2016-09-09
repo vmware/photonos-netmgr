@@ -909,6 +909,141 @@ error:
     goto cleanup;
 }
 
+static struct option linkInfoOptions[] =
+{
+    {"set",          no_argument,          0,    's'},
+    {"get",          no_argument,          0,    'g'},
+    {"interface",    required_argument,    0,    'i'},
+    {"mode",         required_argument,    0,    'm'},
+    {"state",        required_argument,    0,    't'},
+    {"macaddr",      required_argument,    0,    'a'},
+    {"mtu",          required_argument,    0,    'u'},
+    {0, 0, 0, 0}
+};
+
+static uint32_t
+cli_link_info(
+    int argc,
+    char **argv,
+    PNETMGR_CMD pCmd
+    )
+{
+    uint32_t err = 0, link_options_present = 0, validIfname = 0;
+    int nOptionIndex = 0, nOption = 0;
+    CMD_OP op = OP_INVALID;
+
+    opterr = 0;
+    optind = 1;
+    while (1)
+    {
+        nOption = getopt_long(argc,
+                              argv,
+                              "sgi:m:t:a:u:",
+                              linkInfoOptions,
+                              &nOptionIndex);
+        if (nOption == -1)
+            break;
+
+        switch (nOption)
+        {
+            case 's':
+                op = OP_SET;
+                break;
+            case 'g':
+                op = OP_GET;
+                break;
+            case 'i':
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("interface", optarg, pCmd);
+                    validIfname = 1;
+                }
+                else
+                {
+                    fprintf(stderr, "Invalid interface name.\n");
+                    err = EDOM;
+                }
+                break;
+            case 'm':
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("mode", optarg, pCmd);
+                    link_options_present = 1;
+                }
+                else
+                {
+                    fprintf(stderr, "Invalid mode.\n");
+                    err = EDOM;
+                }
+                break;
+            case 't':
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("state", optarg, pCmd);
+                    link_options_present = 1;
+                }
+                else
+                {
+                    fprintf(stderr, "Invalid state.\n");
+                    err = EDOM;
+                }
+                break;
+            case 'a':
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("mac_adrress", optarg, pCmd);
+                    link_options_present = 1;
+                }
+                else
+                {
+                    fprintf(stderr, "Invalid macaddr.\n");
+                    err = EDOM;
+                }
+                break;
+            case 'u':
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("mtu", optarg, pCmd);
+                    link_options_present = 1;
+                }
+                else
+                {
+                    fprintf(stderr, "Invalid mtu.\n");
+                    err = EDOM;
+                }
+                break;
+            case '?':
+                /* Option not handled here. Ignore. */
+                break;
+        }
+        bail_on_error(err);
+    }
+
+    if ((op == OP_INVALID) ||
+        ((op == OP_SET) && (!link_options_present || !validIfname)))
+    {
+        err = EDOM;
+        bail_on_error(err);
+    }
+
+    pCmd->id = CMD_LINK_INFO;
+    pCmd->op = op;
+
+cleanup:
+    return err;
+
+error:
+    pCmd->op = OP_INVALID;
+    /* TODO: Free allocated memory */
+    if(err == EDOM)
+    {
+        fprintf(stderr,
+                "Usage:\nlink_info --get\nlink_info --set "
+                 "--mode <manual|auto> --state <up|down> --macaddr <mac_address> "
+                 "--mtu <MTU> --interface <IfName>\n");
+    }
+    goto cleanup;
+}
 
 /* Map command name to command parser function */
 typedef struct _NETMGRCLI_CMD_MAP
@@ -922,6 +1057,12 @@ typedef struct _NETMGRCLI_CMD_MAP
 /* TODO: Cleanup the help text and help formatting */
 NETMGRCLI_CMD_MAP cmdMap[] =
 {
+    {"link_info",
+     cli_link_info,
+     "--set --interface <interface name> --mode <manual|auto> --state <up|down> "
+     "--get --macaddr <mac_address> --mtu <mtu>",
+     "get or set link mac addr, mtu, state, mode per interface"
+    },
     {"ip4_address",
      cli_ip4_address,
      "--set --interface <interface name> --mode <dhcp|static> --addr <IPv4 Address>"

@@ -21,6 +21,7 @@ extern "C" {
 typedef enum _CMD_ID
 {
     CMD_INVALID = 0,
+    CMD_LINK_INFO,
     CMD_IP4_ADDRESS,
     CMD_IP6_ADDRESS,
     CMD_IP_ROUTE,
