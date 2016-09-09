@@ -622,6 +622,120 @@ error:
     goto cleanup;
 }
 
+static uint32_t
+cmd_link_info(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0, mtu = 0;
+    char *pszIfname = NULL, *pszMode = NULL, *pszState = NULL;
+    char *pszMac_Addr = NULL, *pszMtu = NULL, *pszEnd = NULL;
+    NET_LINK_MODE link_mode = LINK_MODE_UNKNOWN;
+    NET_LINK_STATE link_state = LINK_STATE_UNKNOWN;
+
+    switch(pCmd->op)
+    {
+        case OP_SET:
+            err = netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
+            bail_on_error(err);
+            err = netmgrcli_find_cmdopt(pCmd, "mode", &pszMode);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            if (pszMode!= NULL)
+            {
+                if (!strcmp(pszMode, "manual"))
+                {
+                    link_mode = LINK_MANUAL;
+                }
+                else if (!strcmp(pszMode, "auto"))
+                {
+                    link_mode = LINK_AUTO;
+                }
+                if (link_mode == LINK_MODE_UNKNOWN)
+                {
+                    err = EDOM;
+                }
+                bail_on_error(err);
+
+                err = set_link_mode(pszIfname, link_mode);
+                bail_on_error(err);
+            }
+
+            err = netmgrcli_find_cmdopt(pCmd, "state", &pszState);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            if (pszState != NULL)
+            {
+                if (!strcmp(pszState, "up"))
+                {
+                    link_state = LINK_UP;
+                }
+                else if (!strcmp(pszState, "down"))
+                {
+                    link_state = LINK_DOWN;
+                }
+                if (link_state == LINK_STATE_UNKNOWN)
+                {
+                    err = EDOM;
+                }
+                bail_on_error(err);
+
+                err = set_link_state(pszIfname, link_state);
+                bail_on_error(err);
+            }
+
+            err = netmgrcli_find_cmdopt(pCmd, "mac_adrress", &pszMac_Addr);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            if (pszMac_Addr != NULL)
+            {
+                err = set_link_mac_addr(pszIfname, pszMac_Addr);
+                bail_on_error(err);
+            }
+
+            err = netmgrcli_find_cmdopt(pCmd, "mtu", &pszMtu);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            if (pszMtu != NULL)
+            {
+                mtu = (uint32_t)strtoul(pszMtu, &pszEnd, 10);
+                err = set_link_mtu(pszIfname, mtu);
+                bail_on_error(err);
+            }
+            break;
+        case OP_GET:
+            err = netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
+            break;
+        default:
+            err =  EINVAL;
+    }
+    bail_on_error(err);
+
+cleanup:
+    netmgr_free(pszIfname);
+    netmgr_free(pszMac_Addr);
+    netmgr_free(pszMode);
+    netmgr_free(pszMtu);
+    netmgr_free(pszState);
+    return err;
+error:
+    goto cleanup;
+}
+
 typedef struct _NETMGR_CLI_HANDLER
 {
     CMD_ID id;
@@ -637,6 +751,7 @@ NETMGR_CLI_HANDLER cmdHandler[] =
     { CMD_IF_IAID,             cmd_if_iaid         },
     { CMD_DNS_SERVERS,         cmd_dns_servers     },
     { CMD_DNS_DOMAINS,         cmd_dns_domains     },
+    { CMD_LINK_INFO,           cmd_link_info       },
 };
 
 void
