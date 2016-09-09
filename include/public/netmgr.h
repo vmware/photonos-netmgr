@@ -30,17 +30,19 @@ typedef enum _NET_LINK_MODE
 {
     LINK_AUTO = 0,
     LINK_MANUAL,
+    LINK_MODE_UNKNOWN
 } NET_LINK_MODE;
 
 typedef enum _NET_LINK_STATE
 {
     LINK_DOWN = 0,
     LINK_UP,
-    LINK_UNKNOWN,
+    LINK_STATE_UNKNOWN,
 } NET_LINK_STATE;
 
 typedef struct _NET_LINK_INFO
 {
+    struct _NET_LINK_INFO *pNext;
     char *pszInterfaceName;
     char *pszMacAddress;
     uint32_t mtu;
@@ -145,9 +147,14 @@ ifdown(
  */
 // Override the 'factory/nvram' mac address. mtu=0 -> use default 1500
 int
-set_link_info(
+set_link_mac_addr(
     const char *pszInterfaceName,
-    const char *pszMacAddress,
+    const char *pszMacAddress
+);
+
+int
+set_link_mtu(
+    const char *pszInterfaceName,
     uint32_t mtu
 );
 
