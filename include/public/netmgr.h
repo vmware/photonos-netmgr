@@ -134,13 +134,20 @@ free_interface(
 uint32_t
 ifup(
     const char *pszInterfaceName
-    );
+);
 
 uint32_t
 ifdown(
     const char * pszInterfaceName
-    );
+);
 
+uint32_t
+get_interface_ipaddr(
+    const char *pszInterfaceName,
+    NET_ADDR_TYPE addrType,
+    size_t *pCount,
+    char ***pppszIpAddress
+);
 
 /*
  * Interface configuration APIs
