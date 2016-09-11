@@ -48,7 +48,7 @@
 
 #define STR_NAMESERVER                 "nameserver"
 #define STR_SEARCH                     "search"
-
+#define ARPING_COMMAND                 "/sbin/arping"
 
 #define bail_on_error(errcode) \
     do { \
