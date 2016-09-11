@@ -132,14 +132,39 @@ free_interface(
     );
 
 uint32_t
+get_interface_ip(
+    const char *pszInterfaceName,
+    NET_ADDR_TYPE addrType,
+    char **pszAddress,
+    int *isIpAddressSet
+);
+
+uint32_t
+flush_interface_ip(
+    const char *pszInterfaceName
+);
+
+uint32_t
+set_interface_state(
+    const char *pszInterfaceName,
+    NET_LINK_STATE state
+);
+
+uint32_t
+is_interface_up(
+    const char *pszInterfaceName,
+    int *isIfUp
+);
+
+uint32_t
 ifup(
     const char *pszInterfaceName
-    );
+);
 
 uint32_t
 ifdown(
     const char * pszInterfaceName
-    );
+);
 
 
 /*
