@@ -93,7 +93,6 @@ static struct option ip4AddrOptions[] =
     {"interface",    required_argument,    0,    'i'},
     {"mode",         required_argument,    0,    'm'},
     {"addr",         required_argument,    0,    'a'},
-    {"prefix",       required_argument,    0,    'p'},
     {"gateway",      required_argument,    0,     0 },
     {0, 0, 0, 0}
 };
@@ -115,7 +114,7 @@ cli_ip4_address(
     {
         nOption = getopt_long(argc,
                               argv,
-                              "sgi:m:a:p:",
+                              "sgi:m:a:",
                               ip4AddrOptions,
                               &nOptionIndex);
         if (nOption == -1)
@@ -160,17 +159,6 @@ cli_ip4_address(
                     err = EDOM;
                 }
                 break;
-            case 'p':
-                if (strlen(optarg) > 0)
-                {
-                    err = netmgrcli_alloc_keyvalue("prefix", optarg, pCmd);
-                }
-                else
-                {
-                    fprintf(stderr, "Invalid IPv4 address prefix.\n");
-                    err = EDOM;
-                }
-                break;
             case 0:
                 /* --gateway option */
                 if (strlen(optarg) > 0)
@@ -204,7 +192,7 @@ error:
         fprintf(stderr,
                 "Usage:\nip4_address --get --interface <ifame>\n"
                 "ip4_address --set --interface <ifname> --mode dhcp|static|none"
-                " --addr <IPv4 address> --prefix <IPv4 prefix>\n");
+                " --addr <IPv4Address/prefix>\n");
     }
     goto cleanup;
 }
@@ -1065,8 +1053,8 @@ NETMGRCLI_CMD_MAP cmdMap[] =
     },
     {"ip4_address",
      cli_ip4_address,
-     "--set --interface <interface name> --mode <dhcp|static> --addr <IPv4 Address>"
-     " --prefix <prefix> --gateway <default gateway>",
+     "--set --interface <interface name> --mode <dhcp|static|none> "
+     "--addr <IPv4Address/prefix> --gateway <default gateway>",
      "get or set IPv4 address and default gateway for interface"
     },
     {"ip6_address",
