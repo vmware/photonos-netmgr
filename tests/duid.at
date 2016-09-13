@@ -1,0 +1,16 @@
+#
+# Copyright (C) 2015 VMware, Inc. All Rights Reserved.
+#
+
+AT_BANNER([netmgr tests start])
+
+AT_SETUP([duid])
+AT_KEYWORDS([duid])
+m4_define([DUID_PATTERN], [00:01:11:22:33:44:55:66:77:88])
+AT_CHECK([$abs_top_builddir/tools/netmgr/netmgr dhcp_duid --get],
+[0],
+[DUID=DUID_PATTERN
+])
+
+AT_CLEANUP
+
