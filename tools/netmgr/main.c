@@ -195,6 +195,8 @@ cmd_ip6_address(PNETMGR_CMD pCmd)
 
         case OP_GET:
 
+            // TODO: Implement a function to get IPv6 addr from interface ioctls,
+            // and query static IP addr if that fails.
             err = get_static_ip_addr(pszIfName, STATIC_IPV6, &count, &ppszAddrList);
             bail_on_error(err);
 

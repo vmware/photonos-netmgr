@@ -467,7 +467,7 @@ get_link_info(
  * IP Address configuration APIs
  */
 
-static int
+static uint32_t
 set_ip_dhcp_mode(
     const char *pszInterfaceName,
     uint32_t dhcpModeFlags
@@ -519,7 +519,7 @@ error:
     goto cleanup;
 }
 
-static int
+static uint32_t
 get_ip_dhcp_mode(
     const char *pszInterfaceName,
     uint32_t *pDhcpModeFlags
@@ -580,20 +580,20 @@ error:
     goto cleanup;
 }
 
-static int
+static uint32_t
 set_ip_default_gateway(
     const char *pszInterfaceName,
     const char *pszIpGwAddr,
     uint32_t flags
 );
 
-static int
+static uint32_t
 delete_ip_default_gateway(
     const char *pszInterfaceName,
     uint32_t addrTypes
 );
 
-static int
+static uint32_t
 get_ip_default_gateway(
     const char *pszInterfaceName,
     uint32_t addrTypes,
@@ -601,7 +601,7 @@ get_ip_default_gateway(
     char ***pppszGwAddrList
 );
 
-static int
+static uint32_t
 set_static_ipv4_addr(
     const char *pszInterfaceName,
     const char *pszIPv4Addr,
@@ -609,12 +609,12 @@ set_static_ipv4_addr(
     uint32_t flags
 );
 
-static int
+static uint32_t
 delete_static_ipv4_addr(
     const char *pszInterfaceName
 );
 
-static int
+static uint32_t
 set_ip_default_gateway(
     const char *pszInterfaceName,
     const char *pszIpGwAddr,
@@ -662,7 +662,7 @@ error:
     goto cleanup;
 }
 
-static int
+static uint32_t
 delete_ip_default_gateway(
     const char *pszInterfaceName,
     uint32_t addrTypes
@@ -701,7 +701,7 @@ error:
     goto cleanup;
 }
 
-static int
+static uint32_t
 get_ip_default_gateway(
     const char *pszInterfaceName,
     uint32_t addrTypes,
@@ -952,7 +952,7 @@ error:
     goto cleanup;
 }
 
-static int
+static uint32_t
 set_static_ipv4_addr(
     const char *pszInterfaceName,
     const char *pszIPv4Addr,
@@ -994,7 +994,7 @@ error:
     goto cleanup;
 }
 
-static int
+static uint32_t
 delete_static_ipv4_addr(
     const char *pszInterfaceName
 )
@@ -1144,9 +1144,14 @@ get_ipv4_addr_gateway(
     if (TEST_FLAG(ip4Mode, fDHCP_IPV4))
     {
         ip4Mode = IPV4_ADDR_MODE_DHCP;
+
+        //TODO: Get DHCP IP addresss from interface via ioctl.
     }
     else
     {
+        //TODO: Get IP addresss from interface via ioctl. If that fails
+        // get it as below from file.
+
         err = get_static_ip_addr(pszInterfaceName, STATIC_IPV4, &ipCount,
                                  &ppszIpAddrList);
         bail_on_error(err);
@@ -1413,7 +1418,7 @@ error:
  * Route configuration APIs
  */
 
-static int
+static uint32_t
 add_route_section(
     NET_IP_ROUTE *pRoute
 )
@@ -1512,7 +1517,7 @@ error:
     goto cleanup;
 }
 
-static int
+static uint32_t
 delete_route_section(
     NET_IP_ROUTE *pRoute
 )
@@ -1578,7 +1583,7 @@ error:
     goto cleanup;
 }
 
-static int
+static uint32_t
 get_routes(
     const char *pszInterfaceName,
     size_t *pCount,
@@ -1795,7 +1800,7 @@ error:
  * DNS configuration APIs
  */
 
-static int
+static uint32_t
 space_delimited_string_append(
     size_t count,
     const char **ppszStrings,
@@ -1935,7 +1940,7 @@ error:
     goto cleanup;
 }
 
-static int
+static uint32_t
 get_dns_mode(
     const char *pszInterfaceName,
     NET_DNS_MODE *pMode
@@ -2000,13 +2005,12 @@ add_dns_server(
     char *pszCurrentDnsServers = NULL;
     char *pszNewDnsServersValue = NULL;
 
-    if (pszDnsServer == NULL)
+    if (IS_NULL_OR_EMPTY(pszDnsServer) || !(is_ipv4_addr(pszDnsServer) ||
+        is_ipv6_addr(pszDnsServer)))
     {
         err = EINVAL;
         bail_on_error(err);
     }
-
-    /* TODO: Check DNS server IP addresses are valid. */
 
     /* Determine DNS mode from UseDNS value in 10-eth0.network */
     err = get_dns_mode("eth0", &mode);
@@ -2077,8 +2081,8 @@ delete_dns_server(
     char *pszCurrentDnsServers = NULL, *pszMatch, *pszNext;
     char *pszNewDnsServersValue = NULL;
 
-    if (!pszDnsServer || (!is_ipv4_addr(pszDnsServer) &&
-        !is_ipv6_addr(pszDnsServer)))
+    if (IS_NULL_OR_EMPTY(pszDnsServer) || !(is_ipv4_addr(pszDnsServer) ||
+        is_ipv6_addr(pszDnsServer)))
     {
         err = EINVAL;
         bail_on_error(err);
@@ -2726,7 +2730,7 @@ set_iaid(
     char *pszCfgFileName = NULL;
     char szValue[MAX_LINE] = "";
 
-    if (!pszInterfaceName)
+    if (IS_NULL_OR_EMPTY(pszInterfaceName))
     {
         err = EINVAL;
         bail_on_error(err);
@@ -2761,7 +2765,7 @@ get_iaid(
     char *pszCfgFileName = NULL;
     char *pszIaid = NULL;
 
-    if (!pszInterfaceName || !pIaid)
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) || !pIaid)
     {
         err = EINVAL;
         bail_on_error(err);

@@ -885,7 +885,6 @@ cleanup:
 
 error:
     pCmd->op = OP_INVALID;
-    /* TODO: Free allocated memory */
     if(err == EDOM)
     {
         fprintf(stderr,
@@ -1022,7 +1021,6 @@ cleanup:
 
 error:
     pCmd->op = OP_INVALID;
-    /* TODO: Free allocated memory */
     if(err == EDOM)
     {
         fprintf(stderr,
