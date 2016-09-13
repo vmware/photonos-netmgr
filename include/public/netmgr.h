@@ -54,6 +54,14 @@ typedef struct _NET_LINK_INFO
 /*
  * IP Address configuration structs
  */
+typedef enum _NET_IPV4ADDR_MODE
+{
+    IPV4ADDR_MODE_NONE = 0,
+    IPV4ADDR_MODE_STATIC,
+    IPV4ADDR_MODE_DHCP,
+    IPV4ADDR_MODE_MAX
+} NET_IPV4ADDR_MODE;
+
 #define fDHCP_IPV4         0x00000001
 #define fDHCP_IPV6         0x00000010
 #define fAUTO_IPV6         0x00000020
@@ -181,55 +189,74 @@ get_link_info(
 /*
  * IP Address configuration APIs
  */
+int
+get_static_ip_addr(
+    const char *pszInterfaceName,
+    uint32_t addrTypes,
+    size_t *pCount,
+    char ***pppszIpAddrList
+);
+
 //TODO: Support address for virtual interface e.g. "eth1:0"
 int
-set_static_ipv4_addr(
+set_ipv4addr_gateway(
     const char *pszInterfaceName,
-    const char *pszIPv4Addr,
-    uint8_t prefix,
+    NET_IPV4ADDR_MODE mode,
+    const char *pszIPv4AddrPrefix,
+    const char *pszIPv4Gateway,
     uint32_t flags
 );
 
 int
-delete_static_ipv4_addr(
-    const char *pszInterfaceName
+get_ipv4addr_gateway(
+    const char *pszInterfaceName,
+    NET_IPV4ADDR_MODE *pMode,
+    char **ppszIPv4AddrPrefix,
+    char **ppszIPv4Gateway
 );
 
 int
 add_static_ipv6_addr(
     const char *pszInterfaceName,
-    const char *pszIPv6Addr,
-    uint8_t prefix,
+    const char *pszIPv6AddrPrefix,
     uint32_t flags
 );
 
 int
 delete_static_ipv6_addr(
     const char *pszInterfaceName,
-    const char *pszIPv6Addr,
-    uint8_t prefix,
+    const char *pszIPv6AddrPrefix,
     uint32_t flags
 );
 
-//[3 - dhcp=yes], [4 - dhcp=no, autoconf=1], [1 - dhcp=ipv4, autoconf=0], [2 - dhcp=ipv6, autoconf=0]
 int
-set_ip_dhcp_mode(
+set_ipv6addr_mode(
     const char *pszInterfaceName,
-    uint32_t dhcpModeFlags
+    uint32_t enableDhcp,
+    uint32_t enableAutoconf
 );
 
 int
-get_ip_dhcp_mode(
-    const char *pszInterfaceName,
-    uint32_t *pDhcpModeFlags
+is_dhcp_ipv6_enabled(
+    const char *pszInterfaceName
 );
 
 int
-get_static_ip_addr(
+is_autoconf_ipv6_enabled(
+    const char *pszInterfaceName
+);
+
+int
+set_ipv6_gateway(
     const char *pszInterfaceName,
-    uint32_t addrTypes,
-    size_t *pCount,
-    char ***ppszAddrList
+    const char *pszIPv6Gateway,
+    uint32_t flags
+);
+
+int
+get_ipv6_gateway(
+    const char *pszInterfaceName,
+    char **ppszIPv6Gateway
 );
 
 
