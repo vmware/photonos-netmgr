@@ -17,92 +17,84 @@
 static uint32_t
 cmd_ip4_address(PNETMGR_CMD pCmd)
 {
-    uint32_t err = 0, mode = 0;
+    uint32_t err = 0;
+    NET_IPV4_ADDR_MODE ip4Mode;
     char *pszIfName = NULL, *pszMode = NULL;
-    char *pszAddr = NULL, *pszPrefix = NULL, *pszGateway = NULL;
-    char **ppszAddrList = NULL;
-    size_t count;
+    char *pszIpAddr = NULL, *pszGateway = NULL;
 
     netmgrcli_find_cmdopt(pCmd, "interface", &pszIfName);
 
-    if (pCmd->op == OP_SET)
+    switch (pCmd->op)
     {
-        err = netmgrcli_find_cmdopt(pCmd, "mode", &pszMode);
-        bail_on_error(err);
-
-        err = get_ip_dhcp_mode(pszIfName, &mode);
-        bail_on_error(err);
-
-        if (!strcmp(pszMode, "static"))
-        {
-            err = netmgrcli_find_cmdopt(pCmd, "address", &pszAddr);
+        case OP_SET:
+            err = netmgrcli_find_cmdopt(pCmd, "mode", &pszMode);
             bail_on_error(err);
-
-            err = netmgrcli_find_cmdopt(pCmd, "prefix", &pszPrefix);
-            bail_on_error(err);
-
-            netmgrcli_find_cmdopt(pCmd, "gateway", &pszGateway);
-
-            CLEAR_FLAG(mode, fDHCP_IPV4);
-            err = set_ip_dhcp_mode(pszIfName, mode);
-            bail_on_error(err);
-
-            err = set_static_ipv4_addr(pszIfName, pszAddr, atoi(pszPrefix), 0);
-
-            if (pszGateway)
-            {
-                // TODO: set default route
-            }
-        }
-        else
-        {
-            err = delete_static_ipv4_addr(pszIfName);
-            if (err != ENOENT)
-            {
-                bail_on_error(err);
-            }
 
             if (!strcmp(pszMode, "dhcp"))
             {
-                SET_FLAG(mode, fDHCP_IPV4);
+                ip4Mode = IPV4_ADDR_MODE_DHCP;
+            }
+            else if (!strcmp(pszMode, "static"))
+            {
+                ip4Mode = IPV4_ADDR_MODE_STATIC;
+            }
+            else if (!strcmp(pszMode, "none"))
+            {
+                ip4Mode = IPV4_ADDR_MODE_NONE;
             }
             else
             {
-                CLEAR_FLAG(mode, fDHCP_IPV4);
+                err = EINVAL;
+                bail_on_error(err);
             }
 
-            err = set_ip_dhcp_mode(pszIfName, mode);
-        }
-        bail_on_error(err);
-    }
+            netmgrcli_find_cmdopt(pCmd, "address", &pszIpAddr);
 
-    if (pCmd->op == OP_GET)
-    {
-        err = get_ip_dhcp_mode(pszIfName, &mode);
-        bail_on_error(err);
+            netmgrcli_find_cmdopt(pCmd, "gateway", &pszGateway);
 
-        err = get_static_ip_addr(pszIfName, STATIC_IPV4, &count, &ppszAddrList);
-        bail_on_error(err);
+            err = set_ipv4_addr_gateway(pszIfName, ip4Mode, pszIpAddr,
+                                        pszGateway, 0);
+            pszIpAddr = NULL;
+            pszGateway = NULL;
+            bail_on_error(err);
+            break;
 
-        if (TEST_FLAG(mode, fDHCP_IPV4))
-        {
-            fprintf(stdout, "IPv4 Address Mode: dhcp\n");
-        }
-        else if (ppszAddrList != NULL)
-        {
-            fprintf(stdout, "IPv4 Address Mode: static\n");
-        }
-        else
-        {
-            fprintf(stdout, "IPv4 Address Mode: none\n");
-        }
-        fprintf(stdout, "IPv4 Address=%s\n", ppszAddrList[0]);
+        case OP_GET:
+            err = get_ipv4_addr_gateway(pszIfName, &ip4Mode, &pszIpAddr,
+                                        &pszGateway);
+            bail_on_error(err);
 
-        // TODO: get default route
+            if (ip4Mode == IPV4_ADDR_MODE_NONE)
+            {
+                fprintf(stdout, "IPv4 Address Mode: none\n");
+            }
+            else if (ip4Mode == IPV4_ADDR_MODE_DHCP)
+            {
+                fprintf(stdout, "IPv4 Address Mode: dhcp\n");
+            }
+            else
+            {
+                fprintf(stdout, "IPv4 Address Mode: static\n");
+            }
+            if (pszIpAddr != NULL)
+            {
+                fprintf(stdout, "IPv4 Address=%s\n", pszIpAddr);
+            }
+            if (pszGateway != NULL)
+            {
+                fprintf(stdout, "IPv4 Gateway=%s\n", pszGateway);
+            }
+            // TODO: Display DHCP IPv4 address as well as static IPv4 address
+            // TODO: Display address configured on interface (higher preference)
+            // TODO: Display default gateway from interface (higher preference over file info)
+            break;
+
+        default:
+            break;
     }
 
 cleanup:
-    netmgr_list_free(count, (void **)ppszAddrList);
+    netmgr_free(pszIpAddr);
     netmgr_free(pszGateway);
     return err;
 
@@ -113,24 +105,27 @@ error:
 static uint32_t
 cmd_ip6_address(PNETMGR_CMD pCmd)
 {
-    uint32_t err = 0, mode = 0;
+    uint32_t err = 0, dhcpEnabled, autoconfEnabled;;
     char *pszIfName = NULL, *pszDhcp = NULL, *pszAutoconf = NULL;
     char *pszAddrList = NULL, *pszGateway = NULL;
-    char *a1, *a2, szAddr[INET6_ADDRSTRLEN], **ppszAddrList = NULL;
-    uint8_t prefix;
+    char *a1, *a2, **ppszAddrList = NULL;
     size_t i, count;
 
     netmgrcli_find_cmdopt(pCmd, "interface", &pszIfName);
+
+    err = get_ipv6_addr_mode(pszIfName, &dhcpEnabled, &autoconfEnabled);
+    bail_on_error(err);
 
     switch (pCmd->op)
     {
         case OP_ADD:
         case OP_DEL:
             err = netmgrcli_find_cmdopt(pCmd, "addrlist", &pszAddrList);
-            if (err != ENOENT)
+            if (err == ENOENT)
             {
-                bail_on_error(err);
+                err = 0;
             }
+            bail_on_error(err);
             if (pszAddrList != NULL)
             {
                 a2 = pszAddrList;
@@ -140,95 +135,92 @@ cmd_ip6_address(PNETMGR_CMD pCmd)
                     {
                         continue;
                     }
-                    sscanf(a1, "%[^/]/%hhu", szAddr, &prefix);
                     if (pCmd->op == OP_ADD)
                     {
-                        err = add_static_ipv6_addr(pszIfName, szAddr, prefix, 0);
+                        err = add_static_ipv6_addr(pszIfName, a1, 0);
                     }
                     else
                     {
-                        err = delete_static_ipv6_addr(pszIfName, szAddr, prefix, 0);
+                        err = delete_static_ipv6_addr(pszIfName, a1, 0);
                     }
                     bail_on_error(err);
                 } while (a2 != NULL);
             }
 
         case OP_SET:
-            err = get_ip_dhcp_mode(pszIfName, &mode);
-            bail_on_error(err);
-
             err = netmgrcli_find_cmdopt(pCmd, "dhcp", &pszDhcp);
-            if (err != ENOENT)
+            if (err == ENOENT)
             {
-                bail_on_error(err);
+                err = 0;
             }
+            bail_on_error(err);
             err = netmgrcli_find_cmdopt(pCmd, "autoconf", &pszAutoconf);
-            if (err != ENOENT)
+            if (err == ENOENT)
             {
-                bail_on_error(err);
+                err = 0;
             }
+            bail_on_error(err);
             err = netmgrcli_find_cmdopt(pCmd, "gateway", &pszGateway);
-            if (err != ENOENT)
+            if (err == ENOENT)
             {
-                bail_on_error(err);
+                err = 0;
             }
-
-            if (pszDhcp != NULL)
-            {
-                if (!strcmp(pszDhcp, "1"))
-                {
-                    SET_FLAG(mode, fDHCP_IPV6);
-                }
-                else
-                {
-                    CLEAR_FLAG(mode, fDHCP_IPV6);
-                }
-            }
-            if (pszAutoconf != NULL)
-            {
-                if (!strcmp(pszAutoconf, "1"))
-                {
-                    SET_FLAG(mode, fAUTO_IPV6);
-                }
-                else
-                {
-                    CLEAR_FLAG(mode, fAUTO_IPV6);
-                }
-            }
-
-            err = set_ip_dhcp_mode(pszIfName, mode);
             bail_on_error(err);
 
             if (pszGateway)
             {
-                // TODO: set default route
+                err = set_ipv6_gateway(pszIfName, pszGateway, 0);
+                pszGateway = NULL;
+                bail_on_error(err);
             }
+
+            if (!pszDhcp && !pszAutoconf)
+            {
+                break;
+            }
+
+            if (pszDhcp != NULL)
+            {
+                dhcpEnabled  = (!strcmp(pszDhcp, "1")) ? 1 : 0;
+            }
+            if (pszAutoconf != NULL)
+            {
+                autoconfEnabled  = (!strcmp(pszAutoconf, "1")) ? 1 : 0;
+            }
+
+            // TODO: Implement configuration of autoconf IPv6 enable / disable
+            err = set_ipv6_addr_mode(pszIfName, dhcpEnabled, autoconfEnabled);
+            bail_on_error(err);
             break;
 
         case OP_GET:
-            err = get_ip_dhcp_mode(pszIfName, &mode);
-            bail_on_error(err);
 
             err = get_static_ip_addr(pszIfName, STATIC_IPV6, &count, &ppszAddrList);
             bail_on_error(err);
 
-            if (TEST_FLAG(mode, fDHCP_IPV6))
+            err = get_ipv6_gateway(pszIfName, &pszGateway);
+            bail_on_error(err);
+
+            if (dhcpEnabled)
             {
-                fprintf(stdout, "IPv6 Address Mode: dhcp\n");
+                fprintf(stdout, "DHCP IPv6 enabled\n");
             }
-            else if (ppszAddrList != NULL)
+            if (autoconfEnabled)
             {
-                fprintf(stdout, "IPv6 Address Mode: static\n");
-            }
-            else
-            {
-                fprintf(stdout, "IPv6 Address Mode: none\n");
+            // TODO: Implement configuration of autoconf IPv6 enable / disable
+                fprintf(stdout, "Autoconf IPv6 enabled\n");
             }
             for (i = 0; i < count; i++)
             {
                 fprintf(stdout, "IPv6 Address=%s\n", ppszAddrList[i]);
             }
-            // TODO: get default route
+            if (pszGateway != NULL)
+            {
+                fprintf(stdout, "IPv6 Gateway=%s\n", pszGateway);
+            }
+            // TODO: Display DHCP IPv4 address as well as static IPv4 address
+            // TODO: Display address configured on interface (higher preference)
+            // TODO: Display default gateway from interface (higher preference over file info)
             break;
 
         default:
@@ -393,7 +385,7 @@ cmd_dns_servers(PNETMGR_CMD pCmd)
 {
     uint32_t err = 0, flags = 0;
     size_t i = 0, count = 0;
-    NET_DNS_MODE mode = DNS_MODE_INVALID;
+    NET_DNS_MODE dnsMode = DNS_MODE_INVALID;
     char *pszIfname = NULL, *pszMode = NULL;
     char *pszDnsServers = NULL, *pszNoRestart = NULL;
     char *s1, *s2, *pszServers = NULL, **ppszDnsServersList = NULL;
@@ -407,11 +399,11 @@ cmd_dns_servers(PNETMGR_CMD pCmd)
             bail_on_error(err);
             if (!strcmp(pszMode, "dhcp"))
             {
-                mode = DHCP_DNS;
+                dnsMode = DHCP_DNS;
             }
             else if (!strcmp(pszMode, "static"))
             {
-                mode = STATIC_DNS;
+                dnsMode = STATIC_DNS;
             }
         case OP_ADD:
         case OP_DEL:
@@ -466,7 +458,7 @@ cmd_dns_servers(PNETMGR_CMD pCmd)
             }
             if (pCmd->op == OP_SET)
             {
-                err = set_dns_servers(pszIfname, mode, count,
+                err = set_dns_servers(pszIfname, dnsMode, count,
                                       (const char **)ppszDnsServersList, flags);
             }
             else if (pCmd->op == OP_ADD)
@@ -480,11 +472,11 @@ cmd_dns_servers(PNETMGR_CMD pCmd)
             break;
 
         case OP_GET:
-            err = get_dns_servers(pszIfname, 0, &mode, &count,
+            err = get_dns_servers(pszIfname, 0, &dnsMode, &count,
                                   &ppszDnsServersList);
             bail_on_error(err);
 
-            if (mode == STATIC_DNS)
+            if (dnsMode == STATIC_DNS)
             {
                 fprintf(stdout, "DNSMode=static\n");
             }

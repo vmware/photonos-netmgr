@@ -12,8 +12,6 @@
  * under the License.
  */
 
-#define IsNullOrEmptyString(str) (!(str) || !(*str))
-
 #ifndef __DEFINES_H__
 #define __DEFINES_H__
 
