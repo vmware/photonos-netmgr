@@ -251,20 +251,530 @@ free_interface(
     }
 }
 
-uint32_t
-ifup(
-    const char *pszInterfaceName
-    )
+static uint32_t
+set_interface_state(
+    const char *pszInterfaceName,
+    NET_LINK_STATE linkState
+)
 {
     uint32_t err = 0;
+    int sockFd = -1;
+    struct ifreq ifr;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+        (strlen(pszInterfaceName) > IFNAMSIZ) ||
+        (linkState >= LINK_STATE_UNKNOWN))
     {
         err = EINVAL;
         bail_on_error(err);
     }
 
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
+
+    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockFd < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    err = ioctl(sockFd, SIOCGIFFLAGS, &ifr);
+    if (err != 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    switch (linkState)
+    {
+        case LINK_UP:
+            if (TEST_FLAG(ifr.ifr_flags, IFF_UP))
+            {
+                goto cleanup;
+            }
+            SET_FLAG(ifr.ifr_flags, IFF_UP | IFF_BROADCAST |
+                     IFF_RUNNING | IFF_MULTICAST);
+            break;
+        case LINK_DOWN:
+            if (!TEST_FLAG(ifr.ifr_flags, IFF_UP))
+            {
+                goto cleanup;
+            }
+            CLEAR_FLAG(ifr.ifr_flags, IFF_UP);
+            break;
+        default:
+            err = EINVAL;
+    }
+    bail_on_error(err);
+
+    err = ioctl(sockFd, SIOCSIFFLAGS, &ifr);
+    if (err != 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
 cleanup:
+    if (sockFd > -1)
+    {
+        close(sockFd);
+    }
+    return err;
+error:
+    goto cleanup;
+}
+
+uint32_t
+flush_interface_ipaddr(
+    const char *pszInterfaceName
+)
+{
+    uint32_t err = 0;
+    int sockFd = -1;
+    struct ifreq ifr;
+    struct sockaddr_in sin;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+        (strlen(pszInterfaceName) > IFNAMSIZ))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
+
+    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockFd < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+    // TODO: Flush IPV6 Address
+
+    memset(&sin, 0, sizeof(struct sockaddr_in));
+    inet_aton("0.0.0.0.", &sin.sin_addr);
+    sin.sin_family = AF_INET;
+    memcpy(&ifr.ifr_addr, &sin, sizeof(struct sockaddr_in));
+
+    err = ioctl(sockFd, SIOCSIFADDR, &ifr);
+    if (err != 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+cleanup:
+    if (sockFd > -1)
+    {
+        close(sockFd);
+    }
+    return err;
+error:
+    goto cleanup;
+}
+
+static uint32_t
+get_interface_state(
+    const char *pszInterfaceName,
+    NET_LINK_STATE *pLinkState
+)
+{
+    uint32_t err = 0;
+    int sockFd = -1;
+    struct ifreq ifr;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+        (strlen(pszInterfaceName) > IFNAMSIZ) || !pLinkState)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
+
+    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockFd < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    err = ioctl(sockFd, SIOCGIFFLAGS, &ifr);
+    if (err != 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    *pLinkState = TEST_FLAG(ifr.ifr_flags, IFF_UP) ? LINK_UP : LINK_DOWN;
+
+cleanup:
+    if (sockFd > -1)
+    {
+        close(sockFd);
+    }
+    return err;
+
+error:
+    if (pLinkState)
+    {
+        *pLinkState = LINK_STATE_UNKNOWN;
+    }
+    goto cleanup;
+}
+
+static uint32_t
+get_interface_mode(
+    const char *pszInterfaceName,
+    NET_LINK_MODE *pLinkMode
+)
+{
+    uint32_t err = 0;
+    char *pszCfgFileName = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+        (strlen(pszInterfaceName) > IFNAMSIZ) || !pLinkMode)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    bail_on_error(err);
+
+    if (strstr(pszCfgFileName, ".manual"))
+    {
+        *pLinkMode = LINK_MANUAL;
+    }
+    else if (strstr(pszCfgFileName, ".network"))
+    {
+        *pLinkMode = LINK_AUTO;
+    }
+    else
+    {
+        *pLinkMode = LINK_MODE_UNKNOWN;
+    }
+
+cleanup:
+    netmgr_free(pszCfgFileName);
+    return err;
+
+error:
+    if (pLinkMode)
+    {
+        *pLinkMode = LINK_MODE_UNKNOWN;
+    }
+    goto cleanup;
+}
+
+uint32_t
+get_interface_ipaddr(
+    const char *pszInterfaceName,
+    NET_ADDR_TYPE addrType,
+    size_t *pCount,
+    char ***pppszIpAddress
+)
+{
+    uint32_t err = 0, ip4Type = 0, ip6Type = 0;
+    uint8_t prefix = 0;
+    size_t count = 0;
+    int af = 0, i = 0;
+    struct ifaddrs *ifaddr = NULL, *ifa = NULL;
+    struct sockaddr_in *sockIpv4 = NULL;
+    struct sockaddr_in6 *sockIpv6 = NULL;
+    char **ppszIpAddrList = NULL;
+    // Adding 4 extra bytes to append prefix.1 byte for / and 3 bytes for Prefix
+    char szIpAddr[INET6_ADDRSTRLEN + 4];
+    const char *pszIpAddr = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+        (strlen(pszInterfaceName) > IFNAMSIZ) || !pCount || !pppszIpAddress)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = getifaddrs(&ifaddr);
+    if (err != 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    if (TEST_FLAG(addrType, STATIC_IPV4) || TEST_FLAG(addrType, DHCP_IPV4))
+    {
+        ip4Type = 1;
+    }
+    if (TEST_FLAG(addrType, STATIC_IPV6) || TEST_FLAG(addrType, DHCP_IPV6) ||
+        TEST_FLAG(addrType, AUTO_IPV6))
+    {
+        ip6Type = 1;
+    }
+
+    if (!ip4Type && !ip6Type)
+    {
+        err = ENOENT;
+        bail_on_error(err);
+    }
+
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
+    {
+        if (ifa->ifa_addr == NULL)
+        {
+           continue;
+        }
+
+        if (!strcmp(ifa->ifa_name, pszInterfaceName))
+        {
+            af = ifa->ifa_addr->sa_family;
+
+            if (((af == AF_INET) && ip4Type) ||
+                ((af == AF_INET6) && ip6Type))
+            {
+                count++;
+            }
+        }
+    }
+
+    if (count == 0)
+    {
+        err = ENOENT;
+        bail_on_error(err);
+    }
+
+    err = netmgr_alloc((count * sizeof(char *)), (void *)&ppszIpAddrList);
+    bail_on_error(err);
+
+    for (ifa = ifaddr; count && (ifa != NULL); ifa = ifa->ifa_next)
+    {
+        if (ifa->ifa_addr == NULL)
+        {
+           continue;
+        }
+
+        if (!strcmp(ifa->ifa_name, pszInterfaceName))
+        {
+            af = ifa->ifa_addr->sa_family;
+
+            if (((af == AF_INET) && ip4Type) ||
+                ((af == AF_INET6) && ip6Type))
+            {
+                switch (af)
+                {
+                    case AF_INET:
+                        sockIpv4 = (struct sockaddr_in *)ifa->ifa_addr;
+                        pszIpAddr = inet_ntop(af, (void *)&sockIpv4->sin_addr,
+                                              szIpAddr, INET6_ADDRSTRLEN);
+                        break;
+                    case AF_INET6:
+                        sockIpv6 = (struct sockaddr_in6 *)ifa->ifa_addr;
+                        pszIpAddr = inet_ntop(af, (void *)&sockIpv6->sin6_addr,
+                                              szIpAddr, INET6_ADDRSTRLEN);
+                        break;
+                     default:
+                        err = EINVAL;
+                        bail_on_error(err);
+                        break;
+                }
+
+                if (pszIpAddr == NULL)
+                {
+                    err =  errno;
+                    bail_on_error(err);
+                }
+
+                err = get_prefix_from_netmask(ifa->ifa_netmask, &prefix);
+                bail_on_error(err);
+
+                sprintf(szIpAddr,"%s/%hhu", szIpAddr, prefix);
+
+                err = netmgr_alloc_string(szIpAddr, &ppszIpAddrList[i++]);
+                bail_on_error(err);
+            }
+        }
+    }
+
+    *pCount = count;
+    *pppszIpAddress = ppszIpAddrList;
+
+cleanup:
+    freeifaddrs(ifaddr);
+    return err;
+
+error:
+    if (pCount)
+    {
+        *pCount = 0;
+    }
+    if (pppszIpAddress)
+    {
+        *pppszIpAddress = NULL;
+    }
+    netmgr_list_free(count, (void **)ppszIpAddrList);
+    goto cleanup;
+}
+
+static uint32_t
+do_arping(
+    const char *pszInterfaceName,
+    const char *pszCommandOptions,
+    const char *pszDestIpAddr
+    )
+{
+    uint32_t err = 0;
+    size_t len = 0;
+    char *pszArpingCmd = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+        (strlen(pszInterfaceName) > IFNAMSIZ) ||
+        IS_NULL_OR_EMPTY(pszCommandOptions) ||
+        IS_NULL_OR_EMPTY(pszDestIpAddr))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    //Command has 4 spaces, additional command option -I of size 2 and 1
+    //additional byte for NULL at the end. 4+2+1= 7 extra space.
+    len = strlen(pszInterfaceName) + strlen(pszDestIpAddr) +
+          strlen(pszCommandOptions) + strlen(pszCommandOptions) + 7;
+
+    err = netmgr_alloc(len, (void **)&pszArpingCmd);
+    bail_on_error(err);
+
+    sprintf(pszArpingCmd,"%s %s -I %s %s", ARPING_COMMAND,
+            pszCommandOptions, pszInterfaceName, pszDestIpAddr);
+
+    err = netmgr_run_command(pszArpingCmd);
+    bail_on_error(err);
+
+cleanup:
+    netmgr_free(pszArpingCmd);
+    return err;
+
+error:
+    goto cleanup;
+}
+
+uint32_t
+ifup(
+    const char *pszInterfaceName
+)
+{
+    uint32_t err = 0, err1 = 0;
+    uint8_t prefix;
+    int retVal = 0;
+    size_t staticIp4Count = 0, ip4Count = 0, ip6Count = 0;
+    NET_LINK_STATE linkState = LINK_STATE_UNKNOWN;
+    NET_LINK_MODE linkMode = LINK_MODE_UNKNOWN;
+    char ipAddr[INET6_ADDRSTRLEN];
+    char **ppszIpv4AddrList = NULL, **ppszIpv6AddrList = NULL;
+    char **ppszStaticIpv4AddrList = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+        (strlen(pszInterfaceName) > IFNAMSIZ))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = get_interface_state(pszInterfaceName, &linkState);
+    bail_on_error(err);
+
+    err = get_interface_ipaddr(pszInterfaceName, STATIC_IPV4, &ip4Count,
+                               &ppszIpv4AddrList);
+    if (err == ENOENT)
+    {
+        err = 0;
+    }
+    bail_on_error(err);
+
+    if (!ip4Count)
+    {
+        err = get_interface_ipaddr(pszInterfaceName, STATIC_IPV6, &ip6Count,
+                                   &ppszIpv6AddrList);
+        if (err == ENOENT)
+        {
+            err = 0;
+        }
+        bail_on_error(err);
+    }
+
+    if ((linkState == LINK_UP) && (ip4Count || ip6Count))
+    {
+        goto cleanup;
+    }
+
+    err = get_static_ip_addr(pszInterfaceName, STATIC_IPV4, &staticIp4Count,
+                             &ppszStaticIpv4AddrList);
+    if (err == ENOENT)
+    {
+        err = 0;
+    }
+    bail_on_error(err);
+
+    err = flush_interface_ipaddr(pszInterfaceName);
+    bail_on_error(err);
+
+    err = set_interface_state(pszInterfaceName, LINK_UP);
+    bail_on_error(err);
+
+    if (staticIp4Count && ip4Count &&
+        !strcmp(ppszStaticIpv4AddrList[0], ppszIpv4AddrList[0]))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if (staticIp4Count && !ip4Count)
+    {
+        retVal = sscanf(ppszStaticIpv4AddrList[0], "%[^/]/%hhu", ipAddr,
+                        &prefix);
+        if ((retVal != 1) && (retVal != 2))
+        {
+            err = EINVAL;
+            bail_on_error(err);
+        }
+
+        err = do_arping(pszInterfaceName, ARPING_DUP_ADDR_CHECK_CMDOPT,
+                        ipAddr);
+        bail_on_error(err);
+    }
+
+    err = get_interface_mode(pszInterfaceName, &linkMode);
+    bail_on_error(err);
+
+    if (linkMode == LINK_MANUAL)
+    {
+        err = set_link_mode(pszInterfaceName, LINK_AUTO);
+        bail_on_error(err);
+    }
+
+    err = restart_network_service();
+    if (linkMode == LINK_MANUAL)
+    {
+        err1 = set_link_mode(pszInterfaceName, LINK_MANUAL);
+        bail_on_error(err1);
+    }
+    bail_on_error(err);
+
+    err = wait_for_ip(pszInterfaceName, 30, STATIC_IPV4, 0);
+    bail_on_error(err);
+
+    if (staticIp4Count && !ip4Count)
+    {
+        err = do_arping(pszInterfaceName, ARPING_UPDATE_NEIGHBOR_CMDOPT,
+                        ipAddr);
+        bail_on_error(err);
+    }
+
+cleanup:
+    netmgr_list_free(ip4Count, (void **)ppszIpv4AddrList);
+    netmgr_list_free(ip6Count, (void **)ppszIpv6AddrList);
+    netmgr_list_free(staticIp4Count, (void **)ppszStaticIpv4AddrList);
     return err;
 
 error:
@@ -274,14 +784,22 @@ error:
 uint32_t
 ifdown(
     const char *pszInterfaceName
-    )
+)
 {
     uint32_t err = 0;
-    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+        (strlen(pszInterfaceName) > IFNAMSIZ))
     {
         err = EINVAL;
         bail_on_error(err);
     }
+
+    err = flush_interface_ipaddr(pszInterfaceName);
+    bail_on_error(err);
+
+    err = set_interface_state(pszInterfaceName, LINK_DOWN);
+    bail_on_error(err);
 
 cleanup:
     return err;
@@ -314,6 +832,7 @@ set_link_mac_addr(
 cleanup:
     netmgr_free(pszCfgFileName);
     return err;
+
 error:
     goto cleanup;
 }
@@ -351,6 +870,7 @@ set_link_mtu(
 cleanup:
     netmgr_free(pszCfgFileName);
     return err;
+
 error:
     goto cleanup;
 }
@@ -415,6 +935,7 @@ cleanup:
     netmgr_free(pszAutoCfgFileName);
     netmgr_free(pszManualCfgFileName);
     return err;
+
 error:
     goto cleanup;
 }
@@ -448,6 +969,7 @@ set_link_state(
 
 cleanup:
     return err;
+
 error:
     goto cleanup;
 }
@@ -462,6 +984,17 @@ get_link_info(
     return 0;
 }
 
+uint32_t
+wait_for_ip(
+    const char *pszInterfaceName,
+    uint32_t timeout,
+    NET_ADDR_TYPE addrTypes,
+    uint32_t flags
+)
+{
+    sleep(1);
+    return 0;
+}
 
 /*
  * IP Address configuration APIs
@@ -919,7 +1452,11 @@ get_static_ip_addr(
             pKeyValue = pNextKeyValue;
         } while (pNextKeyValue != NULL);
     }
-
+    else
+    {
+        err = ENOENT;
+        bail_on_error(err);
+    }
     /* TODO: Implement get for DHCPv4, DHCPv6 and AutoV6 */
 
     *pCount = i;
@@ -1321,7 +1858,7 @@ get_ipv6_addr_mode(
 )
 {
     uint32_t err = 0, modeFlags;
-    uint32_t dhcpEnabled = 0, autoconfEnabled = 0;;
+    uint32_t dhcpEnabled = 0, autoconfEnabled = 0;
 
     err = get_ip_dhcp_mode(pszInterfaceName, &modeFlags);
     bail_on_error(err);
@@ -2486,6 +3023,7 @@ cleanup:
     netmgr_free(pszDnsDomainsValue);
     netmgr_free(pszCfgFileName);
     return err;
+
 error:
     goto cleanup;
 }
@@ -2564,6 +3102,7 @@ cleanup:
     netmgr_free(pszNewDnsDomainsList);
     netmgr_free(pszCfgFileName);
     return err;
+
 error:
     goto cleanup;
 }
@@ -2955,6 +3494,7 @@ stop_network_service()
 
 clean:
     return err;
+
 error:
     goto clean;
 }
@@ -2970,6 +3510,7 @@ restart_network_service()
 
 clean:
     return err;
+
 error:
     goto clean;
 }
@@ -2985,6 +3526,7 @@ stop_dns_service()
 
 clean:
     return err;
+
 error:
     goto clean;
 }
@@ -3000,6 +3542,7 @@ restart_dns_service()
 
 clean:
     return err;
+
 error:
     goto clean;
 }

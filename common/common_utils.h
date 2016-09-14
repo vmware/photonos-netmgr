@@ -21,4 +21,15 @@ is_ipv4_addr(const char *pszIpAddr);
 uint32_t
 is_ipv6_addr(const char *pszIpAddr);
 
+uint32_t
+flush_interface_ipaddr(
+    const char *pszInterfaceName
+);
+
+uint32_t
+get_prefix_from_netmask(
+    struct sockaddr *sin,
+    uint8_t *prefix
+);
+
 #endif /* __COMMON_UTILS_H__ */

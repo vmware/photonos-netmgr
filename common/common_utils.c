@@ -28,3 +28,43 @@ is_ipv6_addr(const char *pszIpAddr)
     return (inet_pton(AF_INET6, pszIpAddr, &(sa.sin6_addr)) != 0);
 }
 
+uint32_t
+get_prefix_from_netmask(
+    struct sockaddr *pSockAddr,
+    uint8_t *pPrefix
+)
+{
+    uint32_t err = 0;
+    size_t i = 0;
+    unsigned char byte;
+    uint8_t numBitsSet = 0;
+
+    if (!pSockAddr|| ((pSockAddr->sa_family != AF_INET) && (pSockAddr->sa_family != AF_INET6)) ||
+        !pPrefix)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    for( i = 0; i < 14; i++)
+    {
+        byte = pSockAddr->sa_data[i];
+        while (byte)
+        {
+            if (byte & 0x01)
+            {
+                numBitsSet++;
+            }
+           byte = byte >> 1 ;
+        }
+    }
+
+    *pPrefix = numBitsSet;
+
+cleanup:
+    return err;
+
+error:
+    goto cleanup;
+}
+
