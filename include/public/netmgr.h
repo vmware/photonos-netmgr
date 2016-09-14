@@ -142,13 +142,20 @@ free_interface(
 uint32_t
 ifup(
     const char *pszInterfaceName
-    );
+);
 
 uint32_t
 ifdown(
     const char * pszInterfaceName
-    );
+);
 
+uint32_t
+get_interface_ipaddr(
+    const char *pszInterfaceName,
+    NET_ADDR_TYPE addrType,
+    size_t *pCount,
+    char ***pppszIpAddress
+);
 
 /*
  * Interface configuration APIs
@@ -371,6 +378,17 @@ uint32_t
 get_duid(
     const char *pszInterfaceName,
     char **ppszDuid
+);
+
+
+/*
+ * Misc APIs
+ */
+uint32_t
+wait_for_ip(
+    const char *pszInterfaceName,
+    uint32_t timeout,
+    NET_ADDR_TYPE addrTypes
 );
 
 
