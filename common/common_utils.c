@@ -28,3 +28,40 @@ is_ipv6_addr(const char *pszIpAddr)
     return (inet_pton(AF_INET6, pszIpAddr, &(sa.sin6_addr)) != 0);
 }
 
+uint32_t
+get_ipaddr_prefix(
+    struct sockaddr *sin,
+    uint8_t *prefix
+)
+{
+    uint32_t err = 0;
+    int i = 0;
+    unsigned char l;
+    uint8_t numBitsSet = 0;
+
+    if (!sin || ((sin->sa_family != AF_INET) && (sin->sa_family != AF_INET6)) ||
+        !prefix)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    for(i = 0; i < 14; i++)
+    {
+        l = sin->sa_data[i];
+        while (l)
+        {
+            numBitsSet++;
+            l = l >> 1 ;
+        }
+    }
+
+    *prefix = numBitsSet;
+
+cleanup:
+    return err;
+
+error:
+    goto cleanup;
+}
+
