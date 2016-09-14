@@ -35,6 +35,13 @@ netmgr_alloc_string_len(
     char**      ppszDst
     );
 
+uint32_t
+netmgr_alloc_string_printf(
+    char** ppszDst,
+    const char* pszFmt,
+    ...
+    );
+
 void
 netmgr_free(
     void* pMemory
