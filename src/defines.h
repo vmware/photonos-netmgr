@@ -21,6 +21,10 @@
 #define SYSTEMD_PATH                   "/etc/systemd/"
 #define SYSTEMD_NET_PATH               "/etc/systemd/network/"
 
+#define ARPING_COMMAND                 "/sbin/arping"
+#define ARPING_DUP_ADDR_CHECK_CMDOPT   "-D -q -c 2"
+#define ARPING_UPDATE_NEIGHBOR_CMDOPT  "-A -c 3"
+
 #define SECTION_RESOLVE                "Resolve"
 #define SECTION_NETWORK                "Network"
 #define SECTION_DHCP                   "DHCP"
