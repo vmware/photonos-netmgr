@@ -188,7 +188,6 @@ set_link_state(
 uint32_t
 get_link_info(
     const char *pszInterfaceName,
-    size_t *pCount,
     NET_LINK_INFO **ppLinkInfo
 );
 

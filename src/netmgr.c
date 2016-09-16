@@ -610,6 +610,123 @@ error:
     goto cleanup;
 }
 
+static int
+get_interface_mtu(
+    const char *pszInterfaceName,
+    int *pMtu
+)
+{
+    uint32_t err = 0;
+    int sockFd = -1;
+    struct ifreq ifr;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+        (strlen(pszInterfaceName) > IFNAMSIZ) || !pMtu)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
+
+    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockFd < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    err = ioctl(sockFd, SIOCGIFMTU, &ifr);
+    if (err != 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    *pMtu = ifr.ifr_mtu;
+
+cleanup:
+    if (sockFd > -1)
+    {
+        close(sockFd);
+    }
+    return err;
+error:
+    if (pMtu)
+    {
+        *pMtu = 0;
+    }
+    goto cleanup;
+}
+
+static uint32_t
+get_interface_macaddr(
+    const char *pszInterfaceName,
+    char **ppszMacAddr
+)
+{
+    uint32_t err = 0;
+    int sockFd = -1;
+//    size_t len = 0;
+    char *pszMacAddr = NULL;
+    struct ifreq ifr;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+        (strlen(pszInterfaceName) > IFNAMSIZ) || !ppszMacAddr)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
+
+    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockFd < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    err = ioctl(sockFd, SIOCGIFHWADDR, &ifr);
+    if (err != 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+//    len = (6 * sizeof(ifr.ifr_hwaddr.sa_data[0])) + 6;
+//    err = netmgr_alloc(len, (void *)&pszMacAddr);
+//    bail_on_error(err);
+
+    err = netmgr_alloc_string_printf(&pszMacAddr,
+                                     "%02x:%02x:%02x:%02x:%02x:%02x",
+                                     (unsigned char)ifr.ifr_hwaddr.sa_data[0],
+                                     (unsigned char)ifr.ifr_hwaddr.sa_data[1],
+                                     (unsigned char)ifr.ifr_hwaddr.sa_data[2],
+                                     (unsigned char)ifr.ifr_hwaddr.sa_data[3],
+                                     (unsigned char)ifr.ifr_hwaddr.sa_data[4],
+                                     (unsigned char)ifr.ifr_hwaddr.sa_data[5]);
+    bail_on_error(err);
+
+    *ppszMacAddr = pszMacAddr;
+
+cleanup:
+    if (sockFd > -1)
+    {
+        close(sockFd);
+    }
+    return err;
+error:
+    if (ppszMacAddr)
+    {
+        *ppszMacAddr = NULL;
+    }
+    netmgr_free(pszMacAddr);
+    goto cleanup;
+}
+
 static uint32_t
 do_arping(
     const char *pszInterfaceName,
@@ -960,14 +1077,141 @@ error:
     goto cleanup;
 }
 
-uint32_t
-get_link_info(
+static int
+get_interface_link_info(
     const char *pszInterfaceName,
-    size_t *pCount,
     NET_LINK_INFO **ppLinkInfo
 )
 {
-    return 0;
+    uint32_t err = 0;
+    int mtu = 0;
+    char *pszMacAddr = NULL;
+    NET_LINK_STATE linkState = LINK_STATE_UNKNOWN;
+    NET_LINK_MODE linkMode = LINK_MODE_UNKNOWN;
+    NET_LINK_INFO *pLinkInfo = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) || !ppLinkInfo ||
+        (strlen(pszInterfaceName) > IFNAMSIZ))
+    {
+        err =  EINVAL;
+        bail_on_error(err);
+    }
+
+    err = netmgr_alloc(sizeof(NET_LINK_INFO), (void **)&pLinkInfo);
+    bail_on_error(err);
+
+    err = get_interface_macaddr(pszInterfaceName, &pszMacAddr);
+    bail_on_error(err);
+    pLinkInfo->pszMacAddress = pszMacAddr;
+
+    err = get_interface_mtu(pszInterfaceName, &mtu);
+    bail_on_error(err);
+    pLinkInfo->mtu = mtu;
+
+    err = netmgr_alloc_string(pszInterfaceName, &pLinkInfo->pszInterfaceName);
+    bail_on_error(err);
+
+    err = get_interface_mode(pszInterfaceName, &linkMode);
+    bail_on_error(err);
+    pLinkInfo->mode = linkMode;
+
+    err = get_interface_state(pszInterfaceName, &linkState);
+    bail_on_error(err);
+    pLinkInfo->state = linkState;
+
+    pLinkInfo->pNext = *ppLinkInfo;
+    *ppLinkInfo = pLinkInfo;
+
+cleanup:
+    return err;
+error:
+    netmgr_free(pLinkInfo);
+    goto cleanup;
+}
+
+uint32_t
+get_link_info(
+    const char *pszInterfaceName,
+    NET_LINK_INFO **ppLinkInfo
+)
+{
+    uint32_t err = 0;
+    size_t size1 = 0, size2 = 0;
+    char ifName[IFNAMSIZ];
+    char *pszStr1 = NULL, *pszStr2 = NULL;
+    NET_LINK_INFO *pLinkInfo = NULL, *pCur = NULL;
+    DIR *dirFile = NULL;
+    struct dirent *hFile;
+
+    if (!ppLinkInfo)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    {
+        dirFile = opendir(SYSTEMD_NET_PATH);
+        if (dirFile == NULL)
+        {
+            err = ENOENT;
+            bail_on_error(err);
+        }
+
+        errno = 0;
+        while ((hFile = readdir(dirFile)) != NULL)
+        {
+            if (!strcmp(hFile->d_name, ".")) continue;
+            if (!strcmp(hFile->d_name, "..")) continue;
+            if (hFile->d_name[0] == '.') continue;
+            if (strstr(hFile->d_name, ".network") == NULL) continue;
+
+            pszStr1 = strstr(hFile->d_name, "10-");
+            if (pszStr1 == NULL)
+            {
+                err = ENOENT;
+                bail_on_error(err);
+            }
+
+            size1 = strlen("10-");
+            pszStr2 = strstr(pszStr1 + size1,".");
+
+            if (pszStr2 == NULL)
+            {
+                err = ENOENT;
+                bail_on_error(err);
+            }
+            size2 = pszStr2 - (pszStr1 + size1);
+            memcpy(ifName, pszStr1 + size1, size2);
+            ifName[size2] = '\0';
+            err = get_interface_link_info(ifName, &pLinkInfo);
+            bail_on_error(err);
+        }
+    }
+    else
+    {
+        err = get_interface_link_info(pszInterfaceName, &pLinkInfo);
+        bail_on_error(err);
+    }
+
+    *ppLinkInfo = pLinkInfo;
+
+cleanup:
+    if (dirFile != NULL)
+    {
+        closedir(dirFile);
+    }
+    return err;
+error:
+    while (pLinkInfo)
+    {
+        pCur = pLinkInfo->pNext;
+        netmgr_free(pLinkInfo->pszInterfaceName);
+        netmgr_free(pLinkInfo->pszMacAddress);
+        netmgr_free(pLinkInfo);
+        pLinkInfo = pCur;
+    }
+    goto cleanup;
 }
 
 uint32_t

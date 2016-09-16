@@ -616,14 +616,44 @@ error:
     goto cleanup;
 }
 
+//Both functions below should be moved to utils where
+//NET_LINK_STATE and NET_LINK_MODE can be used.
+
+static char *
+state_to_string(
+    NET_LINK_STATE state)
+{
+    switch(state)
+    {
+        case LINK_UP:   return "up";
+        case LINK_DOWN: return "down";
+        default:        return "unknown";
+    }
+}
+
+static char *
+mode_to_string(
+    NET_LINK_MODE mode)
+{
+    switch(mode)
+    {
+       case LINK_AUTO:   return "auto";
+       case LINK_MANUAL: return "manual";
+       default:          return "unknown";
+    }
+
+}
+
 static uint32_t
 cmd_link_info(PNETMGR_CMD pCmd)
 {
     uint32_t err = 0, mtu = 0;
+    size_t i = 0;
     char *pszIfname = NULL, *pszLinkMode = NULL, *pszLinkState = NULL;
     char *pszMacAddr = NULL, *pszMtu = NULL, *pszEnd = NULL;
     NET_LINK_MODE linkMode = LINK_MODE_UNKNOWN;
     NET_LINK_STATE linkState = LINK_STATE_UNKNOWN;
+    NET_LINK_INFO *pNetLinkInfo = NULL, *pCur = NULL;
 
     switch (pCmd->op)
     {
@@ -714,6 +744,27 @@ cmd_link_info(PNETMGR_CMD pCmd)
             break;
         case OP_GET:
             err = netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
+
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            err = get_link_info(pszIfname, &pNetLinkInfo);
+            bail_on_error(err);
+
+            fprintf(stdout, "Link Information\n");
+            while (pNetLinkInfo)
+            {
+                fprintf(stdout, "Link #%zu\n", ++i);
+                fprintf(stdout, "\tInterface = %s\n", pNetLinkInfo->pszInterfaceName);
+                fprintf(stdout, "\tMTU = %lu\n", (unsigned long)pNetLinkInfo->mtu);
+                fprintf(stdout, "\tMacAdrress = %s\n", pNetLinkInfo->pszMacAddress);
+                fprintf(stdout, "\tState = %s\n", state_to_string(pNetLinkInfo->state));
+                fprintf(stdout, "\tMode = %s\n", mode_to_string(pNetLinkInfo->mode));
+                pNetLinkInfo = pNetLinkInfo->pNext;
+            }
             break;
         default:
             err =  EINVAL;
@@ -725,7 +776,16 @@ cleanup:
     netmgr_free(pszLinkMode);
     netmgr_free(pszMtu);
     netmgr_free(pszLinkState);
+    while (pNetLinkInfo)
+    {
+        pCur = pNetLinkInfo->pNext;
+        netmgr_free(pNetLinkInfo->pszInterfaceName);
+        netmgr_free(pNetLinkInfo->pszMacAddress);
+        netmgr_free(pNetLinkInfo);
+        pNetLinkInfo = pCur;
+    }
     return err;
+
 error:
     goto cleanup;
 }
