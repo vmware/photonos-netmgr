@@ -128,6 +128,9 @@ typedef struct _NETMGR_INTERFACE
     struct _NETMGR_INTERFACE* pNext;
 } NETMGR_INTERFACE, *PNETMGR_INTERFACE;
 
+extern const char *szLinkModeString[];
+extern const char *szLinkStateString[];
+
 uint32_t
 enum_interfaces(
     int nFamily,
@@ -155,6 +158,16 @@ get_interface_ipaddr(
     NET_ADDR_TYPE addrType,
     size_t *pCount,
     char ***pppszIpAddress
+);
+
+const char *
+link_state_to_string(
+    NET_LINK_STATE state
+);
+
+const char *
+link_mode_to_string(
+    NET_LINK_MODE mode
 );
 
 /*
@@ -188,10 +201,13 @@ set_link_state(
 uint32_t
 get_link_info(
     const char *pszInterfaceName,
-    size_t *pCount,
     NET_LINK_INFO **ppLinkInfo
 );
 
+void
+free_link_info(
+    NET_LINK_INFO * pNetLinkInfo
+);
 
 /*
  * IP Address configuration APIs
