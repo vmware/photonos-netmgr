@@ -139,6 +139,11 @@ free_interface(
     PNETMGR_INTERFACE pInterface
     );
 
+void
+netmgr_free_link_info(
+    NET_LINK_INFO * pNetLinkInfo
+);
+
 uint32_t
 ifup(
     const char *pszInterfaceName
@@ -188,7 +193,6 @@ set_link_state(
 uint32_t
 get_link_info(
     const char *pszInterfaceName,
-    size_t *pCount,
     NET_LINK_INFO **ppLinkInfo
 );
 
