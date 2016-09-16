@@ -616,14 +616,56 @@ error:
     goto cleanup;
 }
 
+//Both functions below should be moved to utils where
+//NET_LINK_STATE and NET_LINK_MODE can be used.
+
+const char *szLinkStateString[] =
+{
+    "down",
+    "up",
+    "unknown"
+};
+
+static const char *
+link_state_to_string(
+    NET_LINK_STATE state)
+{
+    if (state > LINK_STATE_UNKNOWN)
+    {
+        state = LINK_STATE_UNKNOWN;
+    }
+    return szLinkStateString[state];
+
+}
+
+char *szLinkModeString[] =
+{
+    "auto",
+    "manual",
+    "unknown"
+};
+
+static const char *
+link_mode_to_string(
+    NET_LINK_MODE mode)
+{
+    if (mode > LINK_MODE_UNKNOWN)
+    {
+        mode = LINK_MODE_UNKNOWN;
+    }
+    return szLinkModeString[mode];
+}
+
 static uint32_t
 cmd_link_info(PNETMGR_CMD pCmd)
 {
     uint32_t err = 0, mtu = 0;
+    size_t i = 0;
     char *pszIfname = NULL, *pszLinkMode = NULL, *pszLinkState = NULL;
     char *pszMacAddr = NULL, *pszMtu = NULL, *pszEnd = NULL;
     NET_LINK_MODE linkMode = LINK_MODE_UNKNOWN;
     NET_LINK_STATE linkState = LINK_STATE_UNKNOWN;
+    NET_LINK_INFO *pNetLinkInfo = NULL;
 
     switch (pCmd->op)
     {
@@ -714,6 +756,27 @@ cmd_link_info(PNETMGR_CMD pCmd)
             break;
         case OP_GET:
             err = netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
+
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            err = get_link_info(pszIfname, &pNetLinkInfo);
+            bail_on_error(err);
+
+            fprintf(stdout, "Link Information\n");
+            while (pNetLinkInfo)
+            {
+                fprintf(stdout, "Link #%zu\n", ++i);
+                fprintf(stdout, "\tInterface=%s\n", pNetLinkInfo->pszInterfaceName);
+                fprintf(stdout, "\tMacAdrress=%s\n", pNetLinkInfo->pszMacAddress);
+                fprintf(stdout, "\tMode=%s\n", link_mode_to_string(pNetLinkInfo->mode));
+                fprintf(stdout, "\tMTU=%u\n", pNetLinkInfo->mtu);
+                fprintf(stdout, "\tState=%s\n", link_state_to_string(pNetLinkInfo->state));
+                pNetLinkInfo = pNetLinkInfo->pNext;
+            }
             break;
         default:
             err =  EINVAL;
@@ -725,7 +788,9 @@ cleanup:
     netmgr_free(pszLinkMode);
     netmgr_free(pszMtu);
     netmgr_free(pszLinkState);
+    netmgr_free_link_info(pNetLinkInfo);
     return err;
+
 error:
     goto cleanup;
 }
