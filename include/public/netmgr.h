@@ -121,6 +121,17 @@ typedef struct _NETMGR_INTERFACE
     struct _NETMGR_INTERFACE* pNext;
 } NETMGR_INTERFACE, *PNETMGR_INTERFACE;
 
+
+const char *
+link_state_to_string(
+    NET_LINK_STATE state
+);
+
+const char *
+link_mode_to_string(
+    NET_LINK_MODE mode
+);
+
 uint32_t
 enum_interfaces(
     int nFamily,
@@ -132,6 +143,9 @@ free_interface(
     PNETMGR_INTERFACE pInterface
     );
 
+/*
+ * Interface configuration APIs
+ */
 uint32_t
 ifup(
     const char *pszInterfaceName
@@ -150,9 +164,6 @@ get_interface_ipaddr(
     char ***pppszIpAddress
 );
 
-/*
- * Interface configuration APIs
- */
 // Override the 'factory/nvram' mac address. mtu=0 -> use default 1500
 uint32_t
 set_link_mac_addr(
@@ -181,10 +192,13 @@ set_link_state(
 uint32_t
 get_link_info(
     const char *pszInterfaceName,
-    size_t *pCount,
     NET_LINK_INFO **ppLinkInfo
 );
 
+void
+free_link_info(
+    NET_LINK_INFO *pNetLinkInfo
+);
 
 /*
  * IP Address configuration APIs
