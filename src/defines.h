@@ -52,6 +52,11 @@
 #define STR_SEARCH                     "search"
 
 
+#define fDHCP_IPV4         0x00000001
+#define fDHCP_IPV6         0x00000010
+#define fAUTO_IPV6         0x00000020
+
+
 #define bail_on_error(errcode) \
     do { \
        if (errcode) { \

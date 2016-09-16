@@ -1664,7 +1664,7 @@ get_ipv4_addr_gateway(
     err = get_ip_dhcp_mode(pszInterfaceName, &modeFlags);
     bail_on_error(err);
 
-    if (TEST_FLAG(ip4Mode, fDHCP_IPV4))
+    if (TEST_FLAG(modeFlags, fDHCP_IPV4))
     {
         ip4Mode = IPV4_ADDR_MODE_DHCP;
 
@@ -1677,6 +1677,10 @@ get_ipv4_addr_gateway(
 
         err = get_static_ip_addr(pszInterfaceName, STATIC_IPV4, &ipCount,
                                  &ppszIpAddrList);
+        if (err == ENOENT)
+        {
+            err = 0;
+        }
         bail_on_error(err);
 
         if (ppszIpAddrList != NULL)

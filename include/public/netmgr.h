@@ -62,10 +62,6 @@ typedef enum _NET_IPV4_ADDR_MODE
     IPV4_ADDR_MODE_MAX
 } NET_IPV4_ADDR_MODE;
 
-#define fDHCP_IPV4         0x00000001
-#define fDHCP_IPV6         0x00000010
-#define fAUTO_IPV6         0x00000020
-
 typedef enum _NET_ADDR_TYPE
 {
     STATIC_IPV4  =  0x00000001,
@@ -105,9 +101,6 @@ typedef struct _NET_IP_ROUTE
     uint32_t metric;
     uint32_t table;
 } NET_IP_ROUTE;
-
-#define fCLEAR_ROUTES_LIST     0x00000001
-#define fSCOPE_HOST            0x00000010
 
 
 /*
