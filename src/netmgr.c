@@ -192,105 +192,308 @@ get_resolved_conf_filename(
     return alloc_conf_filename(ppszFilename, SYSTEMD_PATH, "resolved.conf");
 }
 
+
+/*
+ * Interface configuration APIs
+ */
 uint32_t
-enum_interfaces(
-    int nFamily,
-    PNETMGR_INTERFACE* ppInterfaces
-    )
+set_link_mac_addr(
+    const char *pszInterfaceName,
+    const char *pszMacAddress
+)
 {
     uint32_t err = 0;
-    int fd = 0;
-    int i = 0;
-    struct ifreq *pIFReq;
-    struct ifconf stIFConf;
-    char szBuff[1024];
-    size_t nLen;
-    PNETMGR_INTERFACE pInterfaces = NULL;
-    PNETMGR_INTERFACE pInterface = NULL;
+    char *pszCfgFileName = NULL;
 
-    if(nFamily != PF_INET && nFamily != PF_INET6 && !ppInterfaces)
+    if (IS_NULL_OR_EMPTY(pszInterfaceName))
     {
         err = EINVAL;
         bail_on_error(err);
     }
 
-    fd = socket(nFamily, SOCK_DGRAM, 0);
-    if(fd < 0)
+    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    bail_on_error(err);
+
+    err = set_key_value(pszCfgFileName, SECTION_LINK, KEY_MAC_ADDRESS,
+                        pszMacAddress, 0);
+    bail_on_error(err);
+
+    err = restart_network_service();
+    bail_on_error(err);
+
+cleanup:
+    netmgr_free(pszCfgFileName);
+    return err;
+
+error:
+    goto cleanup;
+}
+
+uint32_t
+get_link_mac_addr(
+    const char *pszInterfaceName,
+    char **ppszMacAddress
+)
+{
+    uint32_t err = 0;
+    int sockFd = -1;
+    char *pszMacAddress = NULL;
+    struct ifreq ifr;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+        (strlen(pszInterfaceName) > IFNAMSIZ) || !ppszMacAddress)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
+
+    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockFd < 0)
     {
         err = errno;
         bail_on_error(err);
     }
 
-    stIFConf.ifc_len = sizeof(szBuff);
-    stIFConf.ifc_buf = szBuff;
-    if(ioctl(fd, SIOCGIFCONF, &stIFConf) != 0)
+    err = ioctl(sockFd, SIOCGIFHWADDR, &ifr);
+    if (err != 0)
     {
         err = errno;
         bail_on_error(err);
     }
 
-    pIFReq = stIFConf.ifc_req;
-    for(i = 0; i < stIFConf.ifc_len;)
+    err = netmgr_alloc_string_printf(&pszMacAddress,
+                                     "%02x:%02x:%02x:%02x:%02x:%02x",
+                                     (unsigned char)ifr.ifr_hwaddr.sa_data[0],
+                                     (unsigned char)ifr.ifr_hwaddr.sa_data[1],
+                                     (unsigned char)ifr.ifr_hwaddr.sa_data[2],
+                                     (unsigned char)ifr.ifr_hwaddr.sa_data[3],
+                                     (unsigned char)ifr.ifr_hwaddr.sa_data[4],
+                                     (unsigned char)ifr.ifr_hwaddr.sa_data[5]);
+    bail_on_error(err);
+
+    *ppszMacAddress = pszMacAddress;
+
+cleanup:
+    if (sockFd > -1)
     {
-        err = netmgr_alloc(sizeof(NETMGR_INTERFACE), (void**)&pInterface);
-        bail_on_error(err);
-
-        err = netmgr_alloc_string(pIFReq->ifr_name, &pInterface->pszName);
-        bail_on_error(err);
-
-        nLen = sizeof(*pIFReq);
-        pIFReq = (struct ifreq*)((char*)pIFReq + nLen);
-        i += nLen;
-
-        pInterface->pNext = pInterfaces;
-        pInterfaces = pInterface;
-        pInterface = NULL;
-    }
-
-    *ppInterfaces = pInterfaces;
-
-clean:
-    if(fd >= 0)
-    {
-       close(fd);
+        close(sockFd);
     }
     return err;
 error:
-    if(ppInterfaces)
+    if (ppszMacAddress)
     {
-        *ppInterfaces = NULL;
+        *ppszMacAddress = NULL;
     }
-    if(pInterfaces)
-    {
-        free_interface(pInterfaces);
-    }
-    if(pInterface)
-    {
-        free_interface(pInterface);
-    }
-    goto clean;
+    netmgr_free(pszMacAddress);
+    goto cleanup;
 }
 
-void
-free_interface(
-    PNETMGR_INTERFACE pInterface
-    )
+uint32_t
+set_link_mode(
+    const char *pszInterfaceName,
+    NET_LINK_MODE mode
+)
 {
-    while(pInterface)
-    {
-        PNETMGR_INTERFACE pCurrent = pInterface;
-        pInterface = pCurrent->pNext;
+    uint32_t err = 0;
+    char *pszAutoCfgFileName = NULL, *pszManualCfgFileName = NULL;
+    char *pszCurrentCfgFileName = NULL;
 
-        if(pCurrent->pszName)
-        {
-            netmgr_free(pCurrent->pszName);
-        }
-        netmgr_free(pCurrent);
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) || (mode >= LINK_MODE_UNKNOWN))
+    {
+        err = EINVAL;
+        bail_on_error(err);
     }
+
+    err = get_network_auto_conf_filename(pszInterfaceName, &pszAutoCfgFileName);
+    bail_on_error(err);
+
+    err = get_network_manual_conf_filename(pszInterfaceName,
+                                           &pszManualCfgFileName);
+    bail_on_error(err);
+
+    err = get_network_conf_filename(pszInterfaceName, &pszCurrentCfgFileName);
+    bail_on_error(err);
+
+    switch (mode)
+    {
+        case LINK_MANUAL:
+            if (strcmp(pszCurrentCfgFileName, pszManualCfgFileName))
+            {
+                err = rename(pszAutoCfgFileName, pszManualCfgFileName);
+                if (err != 0)
+                {
+                    err = errno;
+                    bail_on_error(err);
+                }
+            }
+            break;
+        case LINK_AUTO:
+            if (strcmp(pszCurrentCfgFileName, pszAutoCfgFileName))
+            {
+                err = rename(pszManualCfgFileName, pszAutoCfgFileName);
+                if (err != 0)
+                {
+                    err = errno;
+                    bail_on_error(err);
+                }
+            }
+            break;
+        default:
+            err = EINVAL;
+            break;
+    }
+
+cleanup:
+    netmgr_free(pszCurrentCfgFileName);
+    netmgr_free(pszAutoCfgFileName);
+    netmgr_free(pszManualCfgFileName);
+    return err;
+
+error:
+    goto cleanup;
 }
 
-static uint32_t
-set_interface_state(
+uint32_t
+get_link_mode(
+    const char *pszInterfaceName,
+    NET_LINK_MODE *pLinkMode
+)
+{
+    uint32_t err = 0;
+    char *pszCfgFileName = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+        (strlen(pszInterfaceName) > IFNAMSIZ) || !pLinkMode)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    bail_on_error(err);
+
+    if (strstr(pszCfgFileName, ".manual"))
+    {
+        *pLinkMode = LINK_MANUAL;
+    }
+    else if (strstr(pszCfgFileName, ".network"))
+    {
+        *pLinkMode = LINK_AUTO;
+    }
+    else
+    {
+        *pLinkMode = LINK_MODE_UNKNOWN;
+    }
+
+cleanup:
+    netmgr_free(pszCfgFileName);
+    return err;
+
+error:
+    if (pLinkMode)
+    {
+        *pLinkMode = LINK_MODE_UNKNOWN;
+    }
+    goto cleanup;
+}
+
+uint32_t
+set_link_mtu(
+    const char *pszInterfaceName,
+    uint32_t mtu
+)
+{
+    uint32_t err = 0;
+    char *pszCfgFileName = NULL;
+    char szValue[MAX_LINE] = "";
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    bail_on_error(err);
+
+    if (mtu > 0)
+    {
+        sprintf(szValue, "%u", mtu);
+    }
+    else
+    {
+        sprintf(szValue, "%u", DEFAULT_MTU_VALUE);
+    }
+
+    err = set_key_value(pszCfgFileName, SECTION_LINK, KEY_MTU, szValue, 0);
+    bail_on_error(err);
+
+    err = restart_network_service();
+    bail_on_error(err);
+
+cleanup:
+    netmgr_free(pszCfgFileName);
+    return err;
+
+error:
+    goto cleanup;
+}
+
+uint32_t
+get_link_mtu(
+    const char *pszInterfaceName,
+    uint32_t *pMtu
+)
+{
+    uint32_t err = 0;
+    int sockFd = -1;
+    struct ifreq ifr;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+        (strlen(pszInterfaceName) > IFNAMSIZ) || !pMtu)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
+
+    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockFd < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    err = ioctl(sockFd, SIOCGIFMTU, &ifr);
+    if (err != 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    *pMtu = ifr.ifr_mtu;
+
+cleanup:
+    if (sockFd > -1)
+    {
+        close(sockFd);
+    }
+    return err;
+error:
+    if (pMtu)
+    {
+        *pMtu = 0;
+    }
+    goto cleanup;
+}
+
+uint32_t
+set_link_state(
     const char *pszInterfaceName,
     NET_LINK_STATE linkState
 )
@@ -364,57 +567,7 @@ error:
 }
 
 uint32_t
-flush_interface_ipaddr(
-    const char *pszInterfaceName
-)
-{
-    uint32_t err = 0;
-    int sockFd = -1;
-    struct ifreq ifr;
-    struct sockaddr_in sin;
-
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) > IFNAMSIZ))
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
-
-    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockFd < 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-    // TODO: Flush IPV6 Address
-
-    memset(&sin, 0, sizeof(struct sockaddr_in));
-    inet_aton("0.0.0.0", &sin.sin_addr);
-    sin.sin_family = AF_INET;
-    memcpy(&ifr.ifr_addr, &sin, sizeof(struct sockaddr_in));
-
-    err = ioctl(sockFd, SIOCSIFADDR, &ifr);
-    if (err != 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-
-cleanup:
-    if (sockFd > -1)
-    {
-        close(sockFd);
-    }
-    return err;
-error:
-    goto cleanup;
-}
-
-static uint32_t
-get_interface_state(
+get_link_state(
     const char *pszInterfaceName,
     NET_LINK_STATE *pLinkState
 )
@@ -465,47 +618,426 @@ error:
 }
 
 static uint32_t
-get_interface_mode(
+do_arping(
     const char *pszInterfaceName,
-    NET_LINK_MODE *pLinkMode
+    const char *pszCommandOptions,
+    const char *pszDestIPv4Addr
 )
 {
     uint32_t err = 0;
-    char *pszCfgFileName = NULL;
+    char *pszArpingCmd = NULL;
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) > IFNAMSIZ) || !pLinkMode)
+        (strlen(pszInterfaceName) > IFNAMSIZ) ||
+        IS_NULL_OR_EMPTY(pszCommandOptions) ||
+        IS_NULL_OR_EMPTY(pszDestIPv4Addr))
     {
         err = EINVAL;
         bail_on_error(err);
     }
 
-    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = netmgr_alloc_string_printf(&pszArpingCmd, "%s %s -I %s %s",
+                                     ARPING_COMMAND, pszCommandOptions,
+                                     pszInterfaceName, pszDestIPv4Addr);
     bail_on_error(err);
 
-    if (strstr(pszCfgFileName, ".manual"))
-    {
-        *pLinkMode = LINK_MANUAL;
-    }
-    else if (strstr(pszCfgFileName, ".network"))
-    {
-        *pLinkMode = LINK_AUTO;
-    }
-    else
-    {
-        *pLinkMode = LINK_MODE_UNKNOWN;
-    }
+    err = netmgr_run_command(pszArpingCmd);
+    bail_on_error(err);
 
 cleanup:
-    netmgr_free(pszCfgFileName);
+    netmgr_free(pszArpingCmd);
     return err;
 
 error:
-    if (pLinkMode)
+    goto cleanup;
+}
+
+#if 0
+static uint32_t
+do_ndsend(
+    const char *pszInterfaceName,
+    const char *pszCommandOptions,
+    const char *pszDestIPv6Addr
+)
+{
+    //TODO: Implement
+    return 00;
+}
+#endif
+
+uint32_t
+ifup(
+    const char *pszInterfaceName
+)
+{
+    uint32_t err = 0, err1 = 0;
+    uint8_t prefix;
+    int retVal = 0;
+    size_t staticIp4Count = 0, ip4Count = 0, ip6Count = 0;
+    NET_LINK_STATE linkState = LINK_STATE_UNKNOWN;
+    NET_LINK_MODE linkMode = LINK_MODE_UNKNOWN;
+    char ipAddr[INET6_ADDRSTRLEN];
+    char **ppszIpv4AddrList = NULL, **ppszIpv6AddrList = NULL;
+    char **ppszStaticIpv4AddrList = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+        (strlen(pszInterfaceName) > IFNAMSIZ))
     {
-        *pLinkMode = LINK_MODE_UNKNOWN;
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = get_link_state(pszInterfaceName, &linkState);
+    bail_on_error(err);
+
+    err = get_interface_ipaddr(pszInterfaceName, STATIC_IPV4, &ip4Count,
+                               &ppszIpv4AddrList);
+    if (err == ENOENT)
+    {
+        err = 0;
+    }
+    bail_on_error(err);
+
+    if (!ip4Count)
+    {
+        err = get_interface_ipaddr(pszInterfaceName, STATIC_IPV6, &ip6Count,
+                                   &ppszIpv6AddrList);
+        if (err == ENOENT)
+        {
+            err = 0;
+        }
+        bail_on_error(err);
+    }
+
+    if ((linkState == LINK_UP) && (ip4Count || ip6Count))
+    {
+        goto cleanup;
+    }
+
+    err = get_static_ip_addr(pszInterfaceName, STATIC_IPV4, &staticIp4Count,
+                             &ppszStaticIpv4AddrList);
+    if (err == ENOENT)
+    {
+        err = 0;
+    }
+    bail_on_error(err);
+
+    err = flush_interface_ipaddr(pszInterfaceName);
+    bail_on_error(err);
+
+    err = set_link_state(pszInterfaceName, LINK_UP);
+    bail_on_error(err);
+
+    if (staticIp4Count && ip4Count &&
+        (strcmp(ppszStaticIpv4AddrList[0], ppszIpv4AddrList[0]) != 0))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if (staticIp4Count && !ip4Count)
+    {
+        retVal = sscanf(ppszStaticIpv4AddrList[0], "%[^/]/%hhu", ipAddr,
+                        &prefix);
+        if ((retVal != 1) && (retVal != 2))
+        {
+            err = EINVAL;
+            bail_on_error(err);
+        }
+
+        err = do_arping(pszInterfaceName, ARPING_DUP_ADDR_CHECK_CMDOPT,
+                        ipAddr);
+        bail_on_error(err);
+    }
+
+    err = get_link_mode(pszInterfaceName, &linkMode);
+    bail_on_error(err);
+
+    if (linkMode == LINK_MANUAL)
+    {
+        err = set_link_mode(pszInterfaceName, LINK_AUTO);
+        bail_on_error(err);
+    }
+
+    err = restart_network_service();
+    if (linkMode == LINK_MANUAL)
+    {
+        err1 = set_link_mode(pszInterfaceName, LINK_MANUAL);
+        bail_on_error(err1);
+    }
+    bail_on_error(err);
+
+    err = wait_for_ip(pszInterfaceName, DEFAULT_WAIT_FOR_IP_TIMEOUT, STATIC_IPV4);
+    bail_on_error(err);
+
+    if (staticIp4Count && !ip4Count)
+    {
+        err = do_arping(pszInterfaceName, ARPING_UPDATE_NEIGHBOR_CMDOPT,
+                        ipAddr);
+        bail_on_error(err);
+    }
+
+cleanup:
+    netmgr_list_free(ip4Count, (void **)ppszIpv4AddrList);
+    netmgr_list_free(ip6Count, (void **)ppszIpv6AddrList);
+    netmgr_list_free(staticIp4Count, (void **)ppszStaticIpv4AddrList);
+    return err;
+
+error:
+    goto cleanup;
+}
+
+uint32_t
+ifdown(
+    const char *pszInterfaceName
+)
+{
+    uint32_t err = 0;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+        (strlen(pszInterfaceName) > IFNAMSIZ))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = flush_interface_ipaddr(pszInterfaceName);
+    bail_on_error(err);
+
+    err = set_link_state(pszInterfaceName, LINK_DOWN);
+    bail_on_error(err);
+
+cleanup:
+    return err;
+
+error:
+    goto cleanup;
+}
+
+static void
+free_netmgr_interface_list(
+    PNETMGR_INTERFACE pInterfaceList
+)
+{
+    while (pInterfaceList)
+    {
+        PNETMGR_INTERFACE pCurrent = pInterfaceList;
+        pInterfaceList = pCurrent->pNext;
+        netmgr_free(pCurrent->pszName);
+        netmgr_free(pCurrent);
+    }
+}
+
+static uint32_t
+enumerate_systemd_interfaces(
+    PNETMGR_INTERFACE *ppInterfaces
+)
+{
+    uint32_t err = 0;
+    size_t size1 = 0, size2 = 0;
+    char *pszStr1 = NULL, *pszStr2 = NULL;
+    DIR *dirFile = NULL;
+    struct dirent *hFile;
+    PNETMGR_INTERFACE pInterfaceList = NULL;
+    PNETMGR_INTERFACE pInterface = NULL;
+
+    if (!ppInterfaces)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    dirFile = opendir(SYSTEMD_NET_PATH);
+    if (dirFile == NULL)
+    {
+        err = ENOENT;
+        bail_on_error(err);
+    }
+
+    errno = 0;
+    while ((hFile = readdir(dirFile)) != NULL)
+    {
+        if (!strcmp(hFile->d_name, ".")) continue;
+        if (!strcmp(hFile->d_name, "..")) continue;
+        if (hFile->d_name[0] == '.') continue;
+        if (strstr(hFile->d_name, ".network") == NULL) continue;
+
+        pszStr1 = strstr(hFile->d_name, "10-");
+        if (pszStr1 == NULL)
+        {
+            err = ENOENT;
+            bail_on_error(err);
+        }
+
+        size1 = strlen("10-");
+        pszStr2 = strstr(pszStr1 + size1, ".");
+
+        if (pszStr2 == NULL)
+        {
+            err = ENOENT;
+            bail_on_error(err);
+        }
+        size2 = pszStr2 - (pszStr1 + size1);
+
+        err = netmgr_alloc(sizeof(NETMGR_INTERFACE), (void**)&pInterface);
+        bail_on_error(err);
+
+        err = netmgr_alloc_string_len(pszStr1 + size1, size2,
+                                      &pInterface->pszName);
+        bail_on_error(err);
+
+        pInterface->pNext = pInterfaceList;
+        pInterfaceList = pInterface;
+        pInterface = NULL;
+    }
+
+    *ppInterfaces = pInterfaceList;
+
+cleanup:
+    if (dirFile != NULL)
+    {
+        closedir(dirFile);
+    }
+    return err;
+
+error:
+    if (ppInterfaces)
+    {
+        *ppInterfaces = NULL;
+    }
+    if (pInterface)
+    {
+        free_netmgr_interface_list(pInterface);
+    }
+    if (pInterfaceList)
+    {
+        free_netmgr_interface_list(pInterfaceList);
     }
     goto cleanup;
+}
+
+static uint32_t
+get_interface_info(
+    const char *pszInterfaceName,
+    NET_LINK_INFO **ppLinkInfo
+)
+{
+    uint32_t err = 0, mtu = 0;
+    char *pszMacAddress = NULL;
+    NET_LINK_STATE linkState = LINK_STATE_UNKNOWN;
+    NET_LINK_MODE linkMode = LINK_MODE_UNKNOWN;
+    NET_LINK_INFO *pLinkInfo = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) || !ppLinkInfo ||
+        (strlen(pszInterfaceName) > IFNAMSIZ))
+    {
+        err =  EINVAL;
+        bail_on_error(err);
+    }
+
+    err = netmgr_alloc(sizeof(NET_LINK_INFO), (void **)&pLinkInfo);
+    bail_on_error(err);
+
+    err = get_link_mac_addr(pszInterfaceName, &pszMacAddress);
+    bail_on_error(err);
+
+    err = get_link_mtu(pszInterfaceName, &mtu);
+    bail_on_error(err);
+
+    err = get_link_mode(pszInterfaceName, &linkMode);
+    bail_on_error(err);
+
+    err = get_link_state(pszInterfaceName, &linkState);
+    bail_on_error(err);
+
+    err = netmgr_alloc_string(pszInterfaceName, &pLinkInfo->pszInterfaceName);
+    bail_on_error(err);
+
+    pLinkInfo->pszMacAddress = pszMacAddress;
+    pLinkInfo->mtu = mtu;
+    pLinkInfo->mode = linkMode;
+    pLinkInfo->state = linkState;
+
+    pLinkInfo->pNext = *ppLinkInfo;
+    *ppLinkInfo = pLinkInfo;
+
+cleanup:
+    return err;
+
+error:
+    if (pLinkInfo)
+    {
+        netmgr_free(pLinkInfo->pszInterfaceName);
+        netmgr_free(pLinkInfo->pszMacAddress);
+        netmgr_free(pLinkInfo);
+    }
+    goto cleanup;
+}
+
+uint32_t
+get_link_info(
+    const char *pszInterfaceName,
+    NET_LINK_INFO **ppLinkInfo
+)
+{
+    uint32_t err = 0;
+    NET_LINK_INFO *pLinkInfo = NULL;
+    PNETMGR_INTERFACE pInterfaceList = NULL, pCurInterface = NULL;
+
+    if (!ppLinkInfo)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    {
+        err = enumerate_systemd_interfaces(&pInterfaceList);
+        bail_on_error(err);
+
+        pCurInterface = pInterfaceList;
+        while (pCurInterface)
+        {
+            err = get_interface_info(pCurInterface->pszName, &pLinkInfo);
+            bail_on_error(err);
+            pCurInterface = pCurInterface->pNext;
+        }
+    }
+    else
+    {
+        err = get_interface_info(pszInterfaceName, &pLinkInfo);
+        bail_on_error(err);
+    }
+
+    *ppLinkInfo = pLinkInfo;
+
+cleanup:
+    return err;
+
+error:
+    if (ppLinkInfo)
+    {
+        *ppLinkInfo = NULL;
+    }
+    free_link_info(pLinkInfo);
+    free_netmgr_interface_list(pInterfaceList);
+    goto cleanup;
+}
+
+void
+free_link_info(
+    NET_LINK_INFO *pNetLinkInfo
+)
+{
+    NET_LINK_INFO *pCurrent = NULL;
+    while (pNetLinkInfo)
+    {
+        pCurrent = pNetLinkInfo;
+        pNetLinkInfo = pNetLinkInfo->pNext;
+        netmgr_free(pCurrent->pszMacAddress);
+        netmgr_free(pCurrent->pszInterfaceName);
+        netmgr_free(pCurrent);
+    }
 }
 
 uint32_t
@@ -648,18 +1180,18 @@ error:
     goto cleanup;
 }
 
-static uint32_t
-get_interface_mtu(
-    const char *pszInterfaceName,
-    uint32_t *pMtu
+uint32_t
+flush_interface_ipaddr(
+    const char *pszInterfaceName
 )
 {
     uint32_t err = 0;
     int sockFd = -1;
     struct ifreq ifr;
+    struct sockaddr_in sin;
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) > IFNAMSIZ) || !pMtu)
+        (strlen(pszInterfaceName) > IFNAMSIZ))
     {
         err = EINVAL;
         bail_on_error(err);
@@ -674,15 +1206,19 @@ get_interface_mtu(
         err = errno;
         bail_on_error(err);
     }
+    // TODO: Flush IPV6 Address
 
-    err = ioctl(sockFd, SIOCGIFMTU, &ifr);
+    memset(&sin, 0, sizeof(struct sockaddr_in));
+    inet_aton("0.0.0.0", &sin.sin_addr);
+    sin.sin_family = AF_INET;
+    memcpy(&ifr.ifr_addr, &sin, sizeof(struct sockaddr_in));
+
+    err = ioctl(sockFd, SIOCSIFADDR, &ifr);
     if (err != 0)
     {
         err = errno;
         bail_on_error(err);
     }
-
-    *pMtu = ifr.ifr_mtu;
 
 cleanup:
     if (sockFd > -1)
@@ -691,634 +1227,7 @@ cleanup:
     }
     return err;
 error:
-    if (pMtu)
-    {
-        *pMtu = 0;
-    }
     goto cleanup;
-}
-
-static uint32_t
-get_interface_macaddr(
-    const char *pszInterfaceName,
-    char **ppszMacAddr
-)
-{
-    uint32_t err = 0;
-    int sockFd = -1;
-    char *pszMacAddr = NULL;
-    struct ifreq ifr;
-
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) > IFNAMSIZ) || !ppszMacAddr)
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
-
-    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockFd < 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-
-    err = ioctl(sockFd, SIOCGIFHWADDR, &ifr);
-    if (err != 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-
-    err = netmgr_alloc_string_printf(&pszMacAddr,
-                                     "%02x:%02x:%02x:%02x:%02x:%02x",
-                                     (unsigned char)ifr.ifr_hwaddr.sa_data[0],
-                                     (unsigned char)ifr.ifr_hwaddr.sa_data[1],
-                                     (unsigned char)ifr.ifr_hwaddr.sa_data[2],
-                                     (unsigned char)ifr.ifr_hwaddr.sa_data[3],
-                                     (unsigned char)ifr.ifr_hwaddr.sa_data[4],
-                                     (unsigned char)ifr.ifr_hwaddr.sa_data[5]);
-    bail_on_error(err);
-
-    *ppszMacAddr = pszMacAddr;
-
-cleanup:
-    if (sockFd > -1)
-    {
-        close(sockFd);
-    }
-    return err;
-error:
-    if (ppszMacAddr)
-    {
-        *ppszMacAddr = NULL;
-    }
-    netmgr_free(pszMacAddr);
-    goto cleanup;
-}
-
-static uint32_t
-do_arping(
-    const char *pszInterfaceName,
-    const char *pszCommandOptions,
-    const char *pszDestIpAddr
-    )
-{
-    uint32_t err = 0;
-    char *pszArpingCmd = NULL;
-
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) > IFNAMSIZ) ||
-        IS_NULL_OR_EMPTY(pszCommandOptions) ||
-        IS_NULL_OR_EMPTY(pszDestIpAddr))
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    err = netmgr_alloc_string_printf(&pszArpingCmd, "%s %s -I %s %s",
-                                     ARPING_COMMAND, pszCommandOptions,
-                                     pszInterfaceName, pszDestIpAddr);
-    bail_on_error(err);
-
-    err = netmgr_run_command(pszArpingCmd);
-    bail_on_error(err);
-
-cleanup:
-    netmgr_free(pszArpingCmd);
-    return err;
-
-error:
-    goto cleanup;
-}
-
-uint32_t
-ifup(
-    const char *pszInterfaceName
-)
-{
-    uint32_t err = 0, err1 = 0;
-    uint8_t prefix;
-    int retVal = 0;
-    size_t staticIp4Count = 0, ip4Count = 0, ip6Count = 0;
-    NET_LINK_STATE linkState = LINK_STATE_UNKNOWN;
-    NET_LINK_MODE linkMode = LINK_MODE_UNKNOWN;
-    char ipAddr[INET6_ADDRSTRLEN];
-    char **ppszIpv4AddrList = NULL, **ppszIpv6AddrList = NULL;
-    char **ppszStaticIpv4AddrList = NULL;
-
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) > IFNAMSIZ))
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    err = get_interface_state(pszInterfaceName, &linkState);
-    bail_on_error(err);
-
-    err = get_interface_ipaddr(pszInterfaceName, STATIC_IPV4, &ip4Count,
-                               &ppszIpv4AddrList);
-    if (err == ENOENT)
-    {
-        err = 0;
-    }
-    bail_on_error(err);
-
-    if (!ip4Count)
-    {
-        err = get_interface_ipaddr(pszInterfaceName, STATIC_IPV6, &ip6Count,
-                                   &ppszIpv6AddrList);
-        if (err == ENOENT)
-        {
-            err = 0;
-        }
-        bail_on_error(err);
-    }
-
-    if ((linkState == LINK_UP) && (ip4Count || ip6Count))
-    {
-        goto cleanup;
-    }
-
-    err = get_static_ip_addr(pszInterfaceName, STATIC_IPV4, &staticIp4Count,
-                             &ppszStaticIpv4AddrList);
-    if (err == ENOENT)
-    {
-        err = 0;
-    }
-    bail_on_error(err);
-
-    err = flush_interface_ipaddr(pszInterfaceName);
-    bail_on_error(err);
-
-    err = set_interface_state(pszInterfaceName, LINK_UP);
-    bail_on_error(err);
-
-    if (staticIp4Count && ip4Count &&
-        (strcmp(ppszStaticIpv4AddrList[0], ppszIpv4AddrList[0]) != 0))
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    if (staticIp4Count && !ip4Count)
-    {
-        retVal = sscanf(ppszStaticIpv4AddrList[0], "%[^/]/%hhu", ipAddr,
-                        &prefix);
-        if ((retVal != 1) && (retVal != 2))
-        {
-            err = EINVAL;
-            bail_on_error(err);
-        }
-
-        err = do_arping(pszInterfaceName, ARPING_DUP_ADDR_CHECK_CMDOPT,
-                        ipAddr);
-        bail_on_error(err);
-    }
-
-    err = get_interface_mode(pszInterfaceName, &linkMode);
-    bail_on_error(err);
-
-    if (linkMode == LINK_MANUAL)
-    {
-        err = set_link_mode(pszInterfaceName, LINK_AUTO);
-        bail_on_error(err);
-    }
-
-    err = restart_network_service();
-    if (linkMode == LINK_MANUAL)
-    {
-        err1 = set_link_mode(pszInterfaceName, LINK_MANUAL);
-        bail_on_error(err1);
-    }
-    bail_on_error(err);
-
-    err = wait_for_ip(pszInterfaceName, DEFAULT_WAIT_FOR_IP_TIMEOUT, STATIC_IPV4);
-    bail_on_error(err);
-
-    if (staticIp4Count && !ip4Count)
-    {
-        err = do_arping(pszInterfaceName, ARPING_UPDATE_NEIGHBOR_CMDOPT,
-                        ipAddr);
-        bail_on_error(err);
-    }
-
-cleanup:
-    netmgr_list_free(ip4Count, (void **)ppszIpv4AddrList);
-    netmgr_list_free(ip6Count, (void **)ppszIpv6AddrList);
-    netmgr_list_free(staticIp4Count, (void **)ppszStaticIpv4AddrList);
-    return err;
-
-error:
-    goto cleanup;
-}
-
-uint32_t
-ifdown(
-    const char *pszInterfaceName
-)
-{
-    uint32_t err = 0;
-
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) > IFNAMSIZ))
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    err = flush_interface_ipaddr(pszInterfaceName);
-    bail_on_error(err);
-
-    err = set_interface_state(pszInterfaceName, LINK_DOWN);
-    bail_on_error(err);
-
-cleanup:
-    return err;
-
-error:
-    goto cleanup;
-}
-
-uint32_t
-set_link_mac_addr(
-    const char *pszInterfaceName,
-    const char *pszMacAddress
-)
-{
-    uint32_t err = 0;
-    char *pszCfgFileName = NULL;
-
-    if (IS_NULL_OR_EMPTY(pszInterfaceName))
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
-    bail_on_error(err);
-
-    err = set_key_value(pszCfgFileName, SECTION_LINK, KEY_MAC_ADDRESS,
-                        pszMacAddress, 0);
-
-cleanup:
-    netmgr_free(pszCfgFileName);
-    return err;
-
-error:
-    goto cleanup;
-}
-
-uint32_t
-set_link_mtu(
-    const char *pszInterfaceName,
-    uint32_t mtu
-)
-{
-    uint32_t err = 0;
-    char *pszCfgFileName = NULL;
-    char szValue[MAX_LINE] = "";
-
-    if (IS_NULL_OR_EMPTY(pszInterfaceName))
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
-    bail_on_error(err);
-
-    if (mtu > 0)
-    {
-        sprintf(szValue, "%u", mtu);
-    }
-    else
-    {
-        sprintf(szValue, "%u", DEFAULT_MTU_VALUE);
-    }
-
-    err = set_key_value(pszCfgFileName, SECTION_LINK, KEY_MTU, szValue, 0);
-
-cleanup:
-    netmgr_free(pszCfgFileName);
-    return err;
-
-error:
-    goto cleanup;
-}
-
-uint32_t
-set_link_mode(
-    const char *pszInterfaceName,
-    NET_LINK_MODE mode
-)
-{
-    uint32_t err = 0;
-    char *pszAutoCfgFileName = NULL, *pszManualCfgFileName = NULL;
-    char *pszCurrentCfgFileName = NULL;
-
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) || (mode >= LINK_MODE_UNKNOWN))
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    err = get_network_auto_conf_filename(pszInterfaceName, &pszAutoCfgFileName);
-    bail_on_error(err);
-
-    err = get_network_manual_conf_filename(pszInterfaceName,
-                                           &pszManualCfgFileName);
-    bail_on_error(err);
-
-    err = get_network_conf_filename(pszInterfaceName, &pszCurrentCfgFileName);
-    bail_on_error(err);
-
-    switch (mode)
-    {
-        case LINK_MANUAL:
-            if (strcmp(pszCurrentCfgFileName, pszManualCfgFileName))
-            {
-                err = rename(pszAutoCfgFileName, pszManualCfgFileName);
-                if (err != 0)
-                {
-                    err = errno;
-                    bail_on_error(err);
-                }
-            }
-            break;
-        case LINK_AUTO:
-            if (strcmp(pszCurrentCfgFileName, pszAutoCfgFileName))
-            {
-                err = rename(pszManualCfgFileName, pszAutoCfgFileName);
-                if (err != 0)
-                {
-                    err = errno;
-                    bail_on_error(err);
-                }
-            }
-            break;
-        default:
-            err = EINVAL;
-            break;
-    }
-
-cleanup:
-    netmgr_free(pszCurrentCfgFileName);
-    netmgr_free(pszAutoCfgFileName);
-    netmgr_free(pszManualCfgFileName);
-    return err;
-
-error:
-    goto cleanup;
-}
-
-uint32_t
-set_link_state(
-    const char *pszInterfaceName,
-    NET_LINK_STATE state
-)
-{
-    uint32_t err = 0;
-
-    if (IS_NULL_OR_EMPTY(pszInterfaceName))
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    switch (state)
-    {
-        case LINK_UP:
-            err = ifup(pszInterfaceName);
-            break;
-        case LINK_DOWN:
-            err = ifdown(pszInterfaceName);
-            break;
-        default:
-            err = EINVAL;
-    }
-    bail_on_error(err);
-
-cleanup:
-    return err;
-
-error:
-    goto cleanup;
-}
-
-static uint32_t
-get_interface_link_info(
-    const char *pszInterfaceName,
-    NET_LINK_INFO **ppLinkInfo
-)
-{
-    uint32_t err = 0, mtu = 0;
-    char *pszMacAddr = NULL;
-    NET_LINK_STATE linkState = LINK_STATE_UNKNOWN;
-    NET_LINK_MODE linkMode = LINK_MODE_UNKNOWN;
-    NET_LINK_INFO *pLinkInfo = NULL;
-
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) || !ppLinkInfo ||
-        (strlen(pszInterfaceName) > IFNAMSIZ))
-    {
-        err =  EINVAL;
-        bail_on_error(err);
-    }
-
-    err = netmgr_alloc(sizeof(NET_LINK_INFO), (void **)&pLinkInfo);
-    bail_on_error(err);
-
-    err = get_interface_macaddr(pszInterfaceName, &pszMacAddr);
-    bail_on_error(err);
-
-    err = get_interface_mtu(pszInterfaceName, &mtu);
-    bail_on_error(err);
-
-    err = get_interface_mode(pszInterfaceName, &linkMode);
-    bail_on_error(err);
-
-    err = get_interface_state(pszInterfaceName, &linkState);
-    bail_on_error(err);
-
-    err = netmgr_alloc_string(pszInterfaceName, &pLinkInfo->pszInterfaceName);
-    bail_on_error(err);
-
-    pLinkInfo->pszMacAddress = pszMacAddr;
-    pLinkInfo->mtu = mtu;
-    pLinkInfo->mode = linkMode;
-    pLinkInfo->state = linkState;
-
-    pLinkInfo->pNext = *ppLinkInfo;
-    *ppLinkInfo = pLinkInfo;
-
-cleanup:
-    return err;
-
-error:
-    if (pLinkInfo)
-    {
-        netmgr_free(pLinkInfo->pszInterfaceName);
-        netmgr_free(pLinkInfo->pszMacAddress);
-    }
-    netmgr_free(pLinkInfo);
-    goto cleanup;
-}
-
-static uint32_t
-enumerate_systemd_interfaces(
-    PNETMGR_INTERFACE *ppInterfaces
-)
-{
-    uint32_t err = 0;
-    size_t size1 = 0, size2 = 0;
-    char *pszStr1 = NULL, *pszStr2 = NULL;
-    DIR *dirFile = NULL;
-    struct dirent *hFile;
-    PNETMGR_INTERFACE pInterfaces = NULL;
-    PNETMGR_INTERFACE pInterface = NULL;
-
-    if (!ppInterfaces)
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    dirFile = opendir(SYSTEMD_NET_PATH);
-    if (dirFile == NULL)
-    {
-        err = ENOENT;
-        bail_on_error(err);
-    }
-
-    errno = 0;
-    while ((hFile = readdir(dirFile)) != NULL)
-    {
-        if (!strcmp(hFile->d_name, ".")) continue;
-        if (!strcmp(hFile->d_name, "..")) continue;
-        if (hFile->d_name[0] == '.') continue;
-        if (strstr(hFile->d_name, ".network") == NULL) continue;
-
-        pszStr1 = strstr(hFile->d_name, "10-");
-        if (pszStr1 == NULL)
-        {
-            err = ENOENT;
-            bail_on_error(err);
-        }
-
-        size1 = strlen("10-");
-        pszStr2 = strstr(pszStr1 + size1, ".");
-
-        if (pszStr2 == NULL)
-        {
-            err = ENOENT;
-            bail_on_error(err);
-        }
-        size2 = pszStr2 - (pszStr1 + size1);
-
-        err = netmgr_alloc(sizeof(NETMGR_INTERFACE), (void**)&pInterface);
-        bail_on_error(err);
-
-        err = netmgr_alloc_string_len(pszStr1 + size1, size2,
-                                      &pInterface->pszName);
-        bail_on_error(err);
-
-        pInterface->pNext = pInterfaces;
-        pInterfaces = pInterface;
-        pInterface = NULL;
-    }
-
-    *ppInterfaces = pInterfaces;
-
-cleanup:
-    if (dirFile != NULL)
-    {
-        closedir(dirFile);
-    }
-    return err;
-
-error:
-    if (ppInterfaces)
-    {
-        *ppInterfaces = NULL;
-    }
-    if (pInterfaces)
-    {
-        free_interface(pInterfaces);
-    }
-    if (pInterface)
-    {
-        free_interface(pInterface);
-    }
-    goto cleanup;
-}
-
-uint32_t
-get_link_info(
-    const char *pszInterfaceName,
-    NET_LINK_INFO **ppLinkInfo
-)
-{
-    uint32_t err = 0;
-    NET_LINK_INFO *pLinkInfo = NULL;
-    PNETMGR_INTERFACE pInterfaces = NULL, pCurInterface = NULL;
-
-    if (!ppLinkInfo)
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    if (IS_NULL_OR_EMPTY(pszInterfaceName))
-    {
-        err = enumerate_systemd_interfaces(&pInterfaces);
-        bail_on_error(err);
-
-        pCurInterface = pInterfaces;
-        while (pCurInterface)
-        {
-            err = get_interface_link_info(pCurInterface->pszName, &pLinkInfo);
-            bail_on_error(err);
-            pCurInterface = pCurInterface->pNext;
-        }
-    }
-    else
-    {
-        err = get_interface_link_info(pszInterfaceName, &pLinkInfo);
-        bail_on_error(err);
-    }
-
-    *ppLinkInfo = pLinkInfo;
-
-cleanup:
-    return err;
-
-error:
-    if (ppLinkInfo)
-    {
-        *ppLinkInfo = NULL;
-    }
-    free_link_info(pLinkInfo);
-    free_interface(pInterfaces);
-    goto cleanup;
-}
-
-void
-free_link_info(
-    NET_LINK_INFO *pNetLinkInfo
-    )
-{
-    NET_LINK_INFO *pCurrent = NULL;
-    while (pNetLinkInfo)
-    {
-        pCurrent = pNetLinkInfo;
-        pNetLinkInfo = pNetLinkInfo->pNext;
-        netmgr_free(pCurrent->pszMacAddress);
-        netmgr_free(pCurrent->pszInterfaceName);
-    }
 }
 
 uint32_t
@@ -1333,10 +1242,10 @@ wait_for_ip(
     return 0;
 }
 
+
 /*
  * IP Address configuration APIs
  */
-
 static uint32_t
 set_ip_dhcp_mode(
     const char *pszInterfaceName,
@@ -1453,8 +1362,7 @@ error:
 static uint32_t
 set_ip_default_gateway(
     const char *pszInterfaceName,
-    const char *pszIpGwAddr,
-    uint32_t flags
+    const char *pszIpGwAddr
 );
 
 static uint32_t
@@ -1475,8 +1383,7 @@ static uint32_t
 set_static_ipv4_addr(
     const char *pszInterfaceName,
     const char *pszIPv4Addr,
-    uint8_t prefix,
-    uint32_t flags
+    uint8_t prefix
 );
 
 static uint32_t
@@ -1487,8 +1394,7 @@ delete_static_ipv4_addr(
 static uint32_t
 set_ip_default_gateway(
     const char *pszInterfaceName,
-    const char *pszIpGwAddr,
-    uint32_t flags
+    const char *pszIpGwAddr
 )
 {
     uint32_t err = 0, addrType;
@@ -1830,8 +1736,7 @@ static uint32_t
 set_static_ipv4_addr(
     const char *pszInterfaceName,
     const char *pszIPv4Addr,
-    uint8_t prefix,
-    uint32_t flags
+    uint8_t prefix
 )
 {
     uint32_t err = 0;
@@ -1856,6 +1761,10 @@ set_static_ipv4_addr(
     sprintf(szIpAddr, "%s/%hhu", pszIPv4Addr, prefix);
 
     err = delete_static_ipv4_addr(pszInterfaceName);
+    if (err == ENOENT)
+    {
+        err = 0;
+    }
     bail_on_error(err);
 
     err = add_key_value(pszCfgFileName, SECTION_NETWORK, KEY_ADDRESS, szIpAddr, 0);
@@ -1916,8 +1825,7 @@ set_ipv4_addr_gateway(
     const char *pszInterfaceName,
     NET_IPV4_ADDR_MODE mode,
     const char *pszIPv4AddrPrefix,
-    const char *pszIPv4Gateway,
-    uint32_t flags
+    const char *pszIPv4Gateway
 )
 {
     int n = 0;
@@ -1962,11 +1870,11 @@ set_ipv4_addr_gateway(
     switch (mode)
     {
         case IPV4_ADDR_MODE_STATIC:
-            err = set_static_ipv4_addr(pszInterfaceName, szIpAddr, prefix, 0);
+            err = set_static_ipv4_addr(pszInterfaceName, szIpAddr, prefix);
             bail_on_error(err);
             if (!IS_NULL_OR_EMPTY(pszIPv4Gateway))
             {
-                err = set_ip_default_gateway(pszInterfaceName, pszIPv4Gateway, 0);
+                err = set_ip_default_gateway(pszInterfaceName, pszIPv4Gateway);
                 bail_on_error(err);
             }
             /* fall-thru */
@@ -1983,6 +1891,9 @@ set_ipv4_addr_gateway(
     }
 
     err = set_ip_dhcp_mode(pszInterfaceName, currModeFlags);
+    bail_on_error(err);
+
+    err = restart_network_service();
     bail_on_error(err);
 
 cleanup:
@@ -2087,8 +1998,7 @@ error:
 uint32_t
 add_static_ipv6_addr(
     const char *pszInterfaceName,
-    const char *pszIPv6AddrPrefix,
-    uint32_t flags
+    const char *pszIPv6AddrPrefix
 )
 {
     int n = 0;
@@ -2112,6 +2022,9 @@ add_static_ipv6_addr(
                         pszIPv6AddrPrefix, 0);
     bail_on_error(err);
 
+    err = restart_network_service();
+    bail_on_error(err);
+
 cleanup:
     netmgr_free(pszCfgFileName);
     return err;
@@ -2122,8 +2035,7 @@ error:
 uint32_t
 delete_static_ipv6_addr(
     const char *pszInterfaceName,
-    const char *pszIPv6AddrPrefix,
-    uint32_t flags
+    const char *pszIPv6AddrPrefix
 )
 {
     int n;
@@ -2145,6 +2057,9 @@ delete_static_ipv6_addr(
 
     err = delete_key_value(pszCfgFileName, SECTION_NETWORK, KEY_ADDRESS,
                            pszIPv6AddrPrefix, 0);
+    bail_on_error(err);
+
+    err = restart_network_service();
     bail_on_error(err);
 
 cleanup:
@@ -2185,6 +2100,9 @@ set_ipv6_addr_mode(
     }
 
     err = set_ip_dhcp_mode(pszInterfaceName, modeFlags);
+    bail_on_error(err);
+
+    err = restart_network_service();
     bail_on_error(err);
 
 error:
@@ -2229,20 +2147,34 @@ error:
 uint32_t
 set_ipv6_gateway(
     const char *pszInterfaceName,
-    const char *pszIPv6Gateway,
-    uint32_t flags
+    const char *pszIPv6Gateway
 )
 {
     uint32_t err = 0;
 
-    if (!pszInterfaceName || IS_NULL_OR_EMPTY(pszIPv6Gateway) ||
-        !is_ipv6_addr(pszIPv6Gateway))
+    if (!pszInterfaceName || (!IS_NULL_OR_EMPTY(pszIPv6Gateway) &&
+        !is_ipv6_addr(pszIPv6Gateway)))
     {
         err = EINVAL;
         bail_on_error(err);
     }
 
-    err = set_ip_default_gateway(pszInterfaceName, pszIPv6Gateway, flags);
+    if (pszIPv6Gateway)
+    {
+        err = set_ip_default_gateway(pszInterfaceName, pszIPv6Gateway);
+        bail_on_error(err);
+    }
+    else
+    {
+        err = delete_ip_default_gateway(pszInterfaceName, STATIC_IPV6);
+        if (err == ENOENT)
+        {
+            err = 0;
+        }
+        bail_on_error(err);
+    }
+
+    err = restart_network_service();
     bail_on_error(err);
 
 error:
@@ -2295,7 +2227,6 @@ error:
 /*
  * Route configuration APIs
  */
-
 static uint32_t
 add_route_section(
     NET_IP_ROUTE *pRoute
@@ -2545,8 +2476,7 @@ error:
 
 uint32_t
 add_static_ip_route(
-    NET_IP_ROUTE *pRoute,
-    uint32_t flags
+    NET_IP_ROUTE *pRoute
 )
 {
     uint32_t err = 0;
@@ -2594,6 +2524,9 @@ add_static_ip_route(
     err = add_route_section(&route);
     bail_on_error(err);
 
+    err = restart_network_service();
+    bail_on_error(err);
+
 cleanup:
     return err;
 error:
@@ -2602,8 +2535,7 @@ error:
 
 uint32_t
 delete_static_ip_route(
-    NET_IP_ROUTE *pRoute,
-    uint32_t flags
+    NET_IP_ROUTE *pRoute
 )
 {
     uint32_t err = 0;
@@ -2638,6 +2570,9 @@ delete_static_ip_route(
     route.pszDestNetwork = szDestAddr;
 
     err = delete_route_section(&route);
+    bail_on_error(err);
+
+    err = restart_network_service();
     bail_on_error(err);
 
 cleanup:
@@ -2853,7 +2788,9 @@ get_dns_mode(
         err = EINVAL;
     }
     bail_on_error(err);
+
     *pMode = mode;
+
 cleanup:
     if (pszUseDnsValue != NULL)
     {
@@ -2872,8 +2809,7 @@ error:
 uint32_t
 add_dns_server(
     const char *pszInterfaceName,
-    const char *pszDnsServer,
-    uint32_t flags
+    const char *pszDnsServer
 )
 {
     uint32_t err = 0;
@@ -2928,13 +2864,10 @@ add_dns_server(
                         pszNewDnsServersValue, 0);
     bail_on_error(err);
 
-    if (!TEST_FLAG(flags, fNO_RESTART))
-    {
-        err = restart_network_service();
-        bail_on_error(err);
-        err = restart_dns_service();
-        bail_on_error(err);
-    }
+    err = restart_network_service();
+    bail_on_error(err);
+    err = restart_dns_service();
+    bail_on_error(err);
 
 cleanup:
     netmgr_free(pszCurrentDnsServers);
@@ -2948,8 +2881,7 @@ error:
 uint32_t
 delete_dns_server(
     const char *pszInterfaceName,
-    const char *pszDnsServer,
-    uint32_t flags
+    const char *pszDnsServer
 )
 {
     uint32_t err = 0;
@@ -3016,13 +2948,10 @@ delete_dns_server(
                         pszNewDnsServersValue, 0);
     bail_on_error(err);
 
-    if (!TEST_FLAG(flags, fNO_RESTART))
-    {
-        err = restart_network_service();
-        bail_on_error(err);
-        err = restart_dns_service();
-        bail_on_error(err);
-    }
+    err = restart_network_service();
+    bail_on_error(err);
+    err = restart_dns_service();
+    bail_on_error(err);
 
 cleanup:
     netmgr_free(pszCurrentDnsServers);
@@ -3037,8 +2966,7 @@ set_dns_servers(
     const char *pszInterfaceName,
     NET_DNS_MODE mode,
     size_t count,
-    const char **ppszDnsServers,
-    uint32_t flags
+    const char **ppszDnsServers
 )
 {
     uint32_t err = 0;
@@ -3113,13 +3041,10 @@ set_dns_servers(
         }
     }
 
-    if (!TEST_FLAG(flags, fNO_RESTART))
-    {
-        err = restart_network_service();
-        bail_on_error(err);
-        err = restart_dns_service();
-        bail_on_error(err);
-    }
+    err = restart_network_service();
+    bail_on_error(err);
+    err = restart_dns_service();
+    bail_on_error(err);
 
 error:
     if (dirFile != NULL)
@@ -3198,7 +3123,6 @@ error:
 uint32_t
 get_dns_servers(
     const char *pszInterfaceName,
-    uint32_t flags,
     NET_DNS_MODE *pMode,
     size_t *pCount,
     char ***pppszDnsServers
@@ -3307,8 +3231,7 @@ error:
 uint32_t
 add_dns_domain(
     const char *pszInterfaceName,
-    const char *pszDnsDomain,
-    uint32_t flags
+    const char *pszDnsDomain
 )
 {
     uint32_t err = 0;
@@ -3351,13 +3274,10 @@ add_dns_domain(
                         pszDnsDomainsValue, 0);
     bail_on_error(err);
 
-    if (!TEST_FLAG(flags, fNO_RESTART))
-    {
-        err = restart_network_service();
-        bail_on_error(err);
-        err = restart_dns_service();
-        bail_on_error(err);
-    }
+    err = restart_network_service();
+    bail_on_error(err);
+    err = restart_dns_service();
+    bail_on_error(err);
 
 cleanup:
     netmgr_free(pszCurrentDnsDomains);
@@ -3372,8 +3292,7 @@ error:
 uint32_t
 delete_dns_domain(
     const char *pszInterfaceName,
-    const char *pszDnsDomain,
-    uint32_t flags
+    const char *pszDnsDomain
 )
 {
     uint32_t err = 0;
@@ -3431,13 +3350,10 @@ delete_dns_domain(
                         pszNewDnsDomainsList, 0);
     bail_on_error(err);
 
-    if (!TEST_FLAG(flags, fNO_RESTART))
-    {
-        err = restart_network_service();
-        bail_on_error(err);
-        err = restart_dns_service();
-        bail_on_error(err);
-    }
+    err = restart_network_service();
+    bail_on_error(err);
+    err = restart_dns_service();
+    bail_on_error(err);
 
 cleanup:
     netmgr_free(pszNewDnsDomainsList);
@@ -3452,8 +3368,7 @@ uint32_t
 set_dns_domains(
     const char *pszInterfaceName,
     size_t count,
-    const char **ppszDnsDomains,
-    uint32_t flags
+    const char **ppszDnsDomains
 )
 {
     uint32_t err = 0;
@@ -3488,13 +3403,10 @@ set_dns_domains(
     }
     bail_on_error(err);
 
-    if (!TEST_FLAG(flags, fNO_RESTART))
-    {
-        err = restart_network_service();
-        bail_on_error(err);
-        err = restart_dns_service();
-        bail_on_error(err);
-    }
+    err = restart_network_service();
+    bail_on_error(err);
+    err = restart_dns_service();
+    bail_on_error(err);
 
 error:
     netmgr_free(pszDnsDomainsValue);
@@ -3505,7 +3417,6 @@ error:
 uint32_t
 get_dns_domains(
     const char *pszInterfaceName,
-    uint32_t flags,
     size_t *pCount,
     char ***pppszDnsDomains
 )
@@ -3629,6 +3540,10 @@ set_iaid(
     {
         err = set_key_value(pszCfgFileName, SECTION_DHCP, KEY_IAID, NULL, 0);
     }
+    bail_on_error(err);
+
+    err = restart_network_service();
+    bail_on_error(err);
 
 error:
     netmgr_free(pszCfgFileName);
@@ -3728,6 +3643,7 @@ set_duid(
 
         err = set_key_value(pszCfgFileName, SECTION_DHCP, KEY_DUID_RAWDATA, NULL,
                             F_CREATE_CFG_FILE);
+        bail_on_error(err);
     }
     else
     {
@@ -3751,7 +3667,11 @@ set_duid(
 
         err = set_key_value(pszCfgFileName, SECTION_DHCP, KEY_DUID_RAWDATA, szDuid,
                             F_CREATE_CFG_FILE);
+        bail_on_error(err);
     }
+
+    err = restart_network_service();
+    bail_on_error(err);
 
 error:
     netmgr_free(pszCfgFileName);

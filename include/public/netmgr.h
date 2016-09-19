@@ -20,9 +20,6 @@
 #define TEST_FLAG(v, f) (((v) & (f)) != 0)
 
 
-#define fNO_RESTART        0x00000001
-
-
 /*
  * Interface configuration structs
  */
@@ -132,20 +129,70 @@ link_mode_to_string(
     NET_LINK_MODE mode
 );
 
-uint32_t
-enum_interfaces(
-    int nFamily,
-    PNETMGR_INTERFACE* ppInterface
-    );
-
-void
-free_interface(
-    PNETMGR_INTERFACE pInterface
-    );
 
 /*
  * Interface configuration APIs
  */
+// Override the 'factory/nvram' mac address. mtu=0 -> use default 1500
+uint32_t
+set_link_mac_addr(
+    const char *pszInterfaceName,
+    const char *pszMacAddress
+);
+
+uint32_t
+get_link_mac_addr(
+    const char *pszInterfaceName,
+    char **ppszMacAddress
+);
+
+uint32_t
+set_link_mode(
+    const char *pszInterfaceName,
+    NET_LINK_MODE mode
+);
+
+uint32_t
+get_link_mode(
+    const char *pszInterfaceName,
+    NET_LINK_MODE *pLinkMode
+);
+
+uint32_t
+set_link_mtu(
+    const char *pszInterfaceName,
+    uint32_t mtu
+);
+
+uint32_t
+get_link_mtu(
+    const char *pszInterfaceName,
+    uint32_t *pMtu
+);
+
+uint32_t
+set_link_state(
+    const char *pszInterfaceName,
+    NET_LINK_STATE state
+);
+
+uint32_t
+get_link_state(
+    const char *pszInterfaceName,
+    NET_LINK_STATE *pLinkState
+);
+
+uint32_t
+get_link_info(
+    const char *pszInterfaceName,
+    NET_LINK_INFO **ppLinkInfo
+);
+
+void
+free_link_info(
+    NET_LINK_INFO *pNetLinkInfo
+);
+
 uint32_t
 ifup(
     const char *pszInterfaceName
@@ -164,41 +211,6 @@ get_interface_ipaddr(
     char ***pppszIpAddress
 );
 
-// Override the 'factory/nvram' mac address. mtu=0 -> use default 1500
-uint32_t
-set_link_mac_addr(
-    const char *pszInterfaceName,
-    const char *pszMacAddress
-);
-
-uint32_t
-set_link_mtu(
-    const char *pszInterfaceName,
-    uint32_t mtu
-);
-
-uint32_t
-set_link_mode(
-    const char *pszInterfaceName,
-    NET_LINK_MODE mode
-);
-
-uint32_t
-set_link_state(
-    const char *pszInterfaceName,
-    NET_LINK_STATE state
-);
-
-uint32_t
-get_link_info(
-    const char *pszInterfaceName,
-    NET_LINK_INFO **ppLinkInfo
-);
-
-void
-free_link_info(
-    NET_LINK_INFO *pNetLinkInfo
-);
 
 /*
  * IP Address configuration APIs
@@ -217,8 +229,7 @@ set_ipv4_addr_gateway(
     const char *pszInterfaceName,
     NET_IPV4_ADDR_MODE mode,
     const char *pszIPv4AddrPrefix,
-    const char *pszIPv4Gateway,
-    uint32_t flags
+    const char *pszIPv4Gateway
 );
 
 uint32_t
@@ -232,15 +243,13 @@ get_ipv4_addr_gateway(
 uint32_t
 add_static_ipv6_addr(
     const char *pszInterfaceName,
-    const char *pszIPv6AddrPrefix,
-    uint32_t flags
+    const char *pszIPv6AddrPrefix
 );
 
 uint32_t
 delete_static_ipv6_addr(
     const char *pszInterfaceName,
-    const char *pszIPv6AddrPrefix,
-    uint32_t flags
+    const char *pszIPv6AddrPrefix
 );
 
 uint32_t
@@ -260,8 +269,7 @@ get_ipv6_addr_mode(
 uint32_t
 set_ipv6_gateway(
     const char *pszInterfaceName,
-    const char *pszIPv6Gateway,
-    uint32_t flags
+    const char *pszIPv6Gateway
 );
 
 uint32_t
@@ -276,14 +284,12 @@ get_ipv6_gateway(
  */
 uint32_t
 add_static_ip_route(
-    NET_IP_ROUTE *pRoute,
-    uint32_t flags
+    NET_IP_ROUTE *pRoute
 );
 
 uint32_t
 delete_static_ip_route(
-    NET_IP_ROUTE *pRoute,
-    uint32_t flags
+    NET_IP_ROUTE *pRoute
 );
 
 uint32_t
@@ -302,28 +308,24 @@ set_dns_servers(
     const char *pszInterfaceName,
     NET_DNS_MODE mode,
     size_t count,
-    const char **ppszDnsServers,
-    uint32_t flags
+    const char **ppszDnsServers
 );
 
 uint32_t
 add_dns_server(
     const char *pszInterfaceName,
-    const char *pszDnsServer,
-    uint32_t flags
+    const char *pszDnsServer
 );
 
 uint32_t
 delete_dns_server(
     const char *pszInterfaceName,
-    const char *pszDnsServer,
-    uint32_t flags
+    const char *pszDnsServer
 );
 
 uint32_t
 get_dns_servers(
     const char *pszInterfaceName,
-    uint32_t flags,
     NET_DNS_MODE *pMode,
     size_t *pCount,
     char ***pppszDnsServers
@@ -333,28 +335,24 @@ uint32_t
 set_dns_domains(
     const char *pszInterfaceName,
     size_t count,
-    const char **ppszDnsDomains,
-    uint32_t flags
+    const char **ppszDnsDomains
 );
 
 uint32_t
 add_dns_domain(
     const char *pszInterfaceName,
-    const char *pszDnsDomain,
-    uint32_t flags
+    const char *pszDnsDomain
 );
 
 uint32_t
 delete_dns_domain(
     const char *pszInterfaceName,
-    const char *pszDnsDomain,
-    uint32_t flags
+    const char *pszDnsDomain
 );
 
 uint32_t
 get_dns_domains(
     const char *pszInterfaceName,
-    uint32_t flags,
     size_t *pCount,
     char ***pppszDnsDomains
 );

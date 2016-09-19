@@ -219,7 +219,7 @@ cli_ip6_address(
     PNETMGR_CMD pCmd
     )
 {
-    uint32_t err = 0, validIfName = 0, validAddr = 0;
+    uint32_t err = 0, validIfName = 0, validAddr = 0, validGW = 0;
     int nOptionIndex = 0, nOption = 0;
     CMD_OP op = OP_INVALID;
 
@@ -294,6 +294,7 @@ cli_ip6_address(
                 if (strlen(optarg) > 0)
                 {
                     err = netmgrcli_alloc_keyvalue("gateway", optarg, pCmd);
+                    validGW = 1;
                 }
                 break;
             case '?':
@@ -304,7 +305,7 @@ cli_ip6_address(
     }
 
     if ((op == OP_INVALID) || !validIfName ||
-        (((op == OP_ADD) || (op == OP_DEL)) && !validAddr))
+        (((op == OP_ADD) || (op == OP_DEL)) && !(validAddr || validGW)))
     {
         err = EDOM;
         bail_on_error(err);
