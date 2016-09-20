@@ -114,8 +114,8 @@ typedef enum _NET_DNS_MODE
 
 typedef struct _NETMGR_INTERFACE
 {
-    char* pszName;
-    struct _NETMGR_INTERFACE* pNext;
+    char *pszName;
+    struct _NETMGR_INTERFACE *pNext;
 } NETMGR_INTERFACE, *PNETMGR_INTERFACE;
 
 
@@ -200,7 +200,7 @@ ifup(
 
 uint32_t
 ifdown(
-    const char * pszInterfaceName
+    const char *pszInterfaceName
 );
 
 uint32_t

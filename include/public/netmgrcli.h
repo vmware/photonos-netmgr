@@ -64,7 +64,7 @@ netmgrcli_show_version();
 uint32_t
 netmgrcli_parse_cmdline(
     int argc,
-    char** argv,
+    char **argv,
     PNETMGR_CMD *ppCmd
 );
 

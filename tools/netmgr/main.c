@@ -15,6 +15,133 @@
 #include "includes.h"
 
 static uint32_t
+cmd_link_info(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0, mtu = 0;
+    char *pszIfname = NULL, *pszLinkMode = NULL, *pszLinkState = NULL;
+    char *pszMacAddr = NULL, *pszMtu = NULL, *pszEnd = NULL;
+    NET_LINK_MODE linkMode = LINK_MODE_UNKNOWN;
+    NET_LINK_STATE linkState = LINK_STATE_UNKNOWN;
+    NET_LINK_INFO *pNetLinkInfo = NULL;
+
+    switch (pCmd->op)
+    {
+        case OP_SET:
+            err = netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
+            bail_on_error(err);
+
+            err = netmgrcli_find_cmdopt(pCmd, "macaddr", &pszMacAddr);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+            if (pszMacAddr != NULL)
+            {
+                err = set_link_mac_addr(pszIfname, pszMacAddr);
+                bail_on_error(err);
+            }
+
+            err = netmgrcli_find_cmdopt(pCmd, "mode", &pszLinkMode);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+            if (pszLinkMode != NULL)
+            {
+                if (!strcmp(pszLinkMode, "manual"))
+                {
+                    linkMode = LINK_MANUAL;
+                }
+                else if (!strcmp(pszLinkMode, "auto"))
+                {
+                    linkMode = LINK_AUTO;
+                }
+                if (linkMode == LINK_MODE_UNKNOWN)
+                {
+                    err = EDOM;
+                    bail_on_error(err);
+                }
+                err = set_link_mode(pszIfname, linkMode);
+                bail_on_error(err);
+            }
+
+            err = netmgrcli_find_cmdopt(pCmd, "mtu", &pszMtu);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+            if (pszMtu != NULL)
+            {
+                mtu = (uint32_t)strtoul(pszMtu, &pszEnd, 10);
+                err = set_link_mtu(pszIfname, mtu);
+                bail_on_error(err);
+            }
+
+            err = netmgrcli_find_cmdopt(pCmd, "state", &pszLinkState);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+            if (pszLinkState != NULL)
+            {
+                if (!strcmp(pszLinkState, "up"))
+                {
+                    err = ifup(pszIfname);
+                }
+                else if (!strcmp(pszLinkState, "down"))
+                {
+                    err = ifdown(pszIfname);
+                }
+                if (linkState == LINK_STATE_UNKNOWN)
+                {
+                    err = EDOM;
+                }
+                bail_on_error(err);
+            }
+            break;
+
+        case OP_GET:
+            err = netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
+
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            err = get_link_info(pszIfname, &pNetLinkInfo);
+            bail_on_error(err);
+
+            fprintf(stdout, "%-10s\t%-17s\t%-10s\t%-10s\t%-10s\n", "Name", "MacAddress", "Mode", "MTU", "State");
+            while (pNetLinkInfo)
+            {
+                fprintf(stdout, "%-10s\t", pNetLinkInfo->pszInterfaceName);
+                fprintf(stdout, "%-17s\t", pNetLinkInfo->pszMacAddress);
+                fprintf(stdout, "%-10s\t", link_mode_to_string(pNetLinkInfo->mode));
+                fprintf(stdout, "%-10u\t", pNetLinkInfo->mtu);
+                fprintf(stdout, "%-25s\n", link_state_to_string(pNetLinkInfo->state));
+                pNetLinkInfo = pNetLinkInfo->pNext;
+            }
+            break;
+
+        default:
+            err =  EINVAL;
+    }
+    bail_on_error(err);
+
+cleanup:
+    free_link_info(pNetLinkInfo);
+    return err;
+
+error:
+    goto cleanup;
+}
+
+static uint32_t
 cmd_ip4_address(PNETMGR_CMD pCmd)
 {
     uint32_t err = 0;
@@ -654,136 +781,6 @@ error:
     goto cleanup;
 }
 
-static uint32_t
-cmd_link_info(PNETMGR_CMD pCmd)
-{
-    uint32_t err = 0, mtu = 0;
-    char *pszIfname = NULL, *pszLinkMode = NULL, *pszLinkState = NULL;
-    char *pszMacAddr = NULL, *pszMtu = NULL, *pszEnd = NULL;
-    NET_LINK_MODE linkMode = LINK_MODE_UNKNOWN;
-    NET_LINK_STATE linkState = LINK_STATE_UNKNOWN;
-    NET_LINK_INFO *pNetLinkInfo = NULL;
-
-    switch (pCmd->op)
-    {
-        case OP_SET:
-            err = netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
-            bail_on_error(err);
-
-            err = netmgrcli_find_cmdopt(pCmd, "macaddr", &pszMacAddr);
-            if (err == ENOENT)
-            {
-                err = 0;
-            }
-            bail_on_error(err);
-            if (pszMacAddr != NULL)
-            {
-                err = set_link_mac_addr(pszIfname, pszMacAddr);
-                bail_on_error(err);
-            }
-
-            err = netmgrcli_find_cmdopt(pCmd, "mode", &pszLinkMode);
-            if (err == ENOENT)
-            {
-                err = 0;
-            }
-            bail_on_error(err);
-            if (pszLinkMode != NULL)
-            {
-                if (!strcmp(pszLinkMode, "manual"))
-                {
-                    linkMode = LINK_MANUAL;
-                }
-                else if (!strcmp(pszLinkMode, "auto"))
-                {
-                    linkMode = LINK_AUTO;
-                }
-                if (linkMode == LINK_MODE_UNKNOWN)
-                {
-                    err = EDOM;
-                    bail_on_error(err);
-                }
-                err = set_link_mode(pszIfname, linkMode);
-                bail_on_error(err);
-            }
-
-            err = netmgrcli_find_cmdopt(pCmd, "mtu", &pszMtu);
-            if (err == ENOENT)
-            {
-                err = 0;
-            }
-            bail_on_error(err);
-            if (pszMtu != NULL)
-            {
-                mtu = (uint32_t)strtoul(pszMtu, &pszEnd, 10);
-                err = set_link_mtu(pszIfname, mtu);
-                bail_on_error(err);
-            }
-
-            err = netmgrcli_find_cmdopt(pCmd, "state", &pszLinkState);
-            if (err == ENOENT)
-            {
-                err = 0;
-            }
-            bail_on_error(err);
-            if (pszLinkState != NULL)
-            {
-                if (!strcmp(pszLinkState, "up"))
-                {
-                    err = ifup(pszIfname);
-                }
-                else if (!strcmp(pszLinkState, "down"))
-                {
-                    err = ifdown(pszIfname);
-                }
-                if (linkState == LINK_STATE_UNKNOWN)
-                {
-                    err = EDOM;
-                }
-                bail_on_error(err);
-            }
-            break;
-
-        case OP_GET:
-            err = netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
-
-            if (err == ENOENT)
-            {
-                err = 0;
-            }
-            bail_on_error(err);
-
-            err = get_link_info(pszIfname, &pNetLinkInfo);
-            bail_on_error(err);
-
-            fprintf(stdout, "%-10s\t%-17s\t%-10s\t%-10s\t%-10s\n", "Name", "MacAddress", "Mode", "MTU", "State");
-            while (pNetLinkInfo)
-            {
-                fprintf(stdout, "%-10s\t", pNetLinkInfo->pszInterfaceName);
-                fprintf(stdout, "%-17s\t", pNetLinkInfo->pszMacAddress);
-                fprintf(stdout, "%-10s\t", link_mode_to_string(pNetLinkInfo->mode));
-                fprintf(stdout, "%-10u\t", pNetLinkInfo->mtu);
-                fprintf(stdout, "%-25s\n", link_state_to_string(pNetLinkInfo->state));
-                pNetLinkInfo = pNetLinkInfo->pNext;
-            }
-            break;
-
-        default:
-            err =  EINVAL;
-    }
-    bail_on_error(err);
-
-cleanup:
-    netmgr_free(pszMacAddr);
-    netmgr_free(pszLinkMode);
-    netmgr_free(pszMtu);
-    netmgr_free(pszLinkState);
-    free_link_info(pNetLinkInfo);
-    return err;
-
-error:
-    goto cleanup;
-}
 
 typedef struct _NETMGR_CLI_HANDLER
 {

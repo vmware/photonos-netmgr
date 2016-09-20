@@ -218,6 +218,7 @@ set_link_mac_addr(
                         pszMacAddress, 0);
     bail_on_error(err);
 
+    // BUGBUG TODO: ifdown, modify mac addr using ioctl, ifup instead of this
     err = restart_network_service();
     bail_on_error(err);
 
@@ -431,6 +432,7 @@ set_link_mtu(
     err = set_key_value(pszCfgFileName, SECTION_LINK, KEY_MTU, szValue, 0);
     bail_on_error(err);
 
+    // BUGBUG TODO: ifdown, modify mtu using ioctl, ifup instead of this
     err = restart_network_service();
     bail_on_error(err);
 
