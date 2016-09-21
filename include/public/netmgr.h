@@ -71,10 +71,10 @@ typedef enum _NET_ADDR_TYPE
 
 typedef struct _NET_IP_ADDR
 {
+    char *pszInterfaceName;
     NET_ADDR_TYPE type;
-    char *pszIPAddr;
-    uint8_t prefix;
-} NET_IP_ADDR;
+    char *pszIPAddrPrefix;
+} NET_IP_ADDR, *PNET_IP_ADDR;
 
 
 /*
@@ -114,8 +114,8 @@ typedef enum _NET_DNS_MODE
 
 typedef struct _NETMGR_INTERFACE
 {
-    char* pszName;
-    struct _NETMGR_INTERFACE* pNext;
+    char *pszName;
+    struct _NETMGR_INTERFACE *pNext;
 } NETMGR_INTERFACE, *PNETMGR_INTERFACE;
 
 
@@ -183,6 +183,16 @@ get_link_state(
 );
 
 uint32_t
+ifup(
+    const char *pszInterfaceName
+);
+
+uint32_t
+ifdown(
+    const char *pszInterfaceName
+);
+
+uint32_t
 get_link_info(
     const char *pszInterfaceName,
     NET_LINK_INFO **ppLinkInfo
@@ -191,16 +201,6 @@ get_link_info(
 void
 free_link_info(
     NET_LINK_INFO *pNetLinkInfo
-);
-
-uint32_t
-ifup(
-    const char *pszInterfaceName
-);
-
-uint32_t
-ifdown(
-    const char * pszInterfaceName
 );
 
 uint32_t
