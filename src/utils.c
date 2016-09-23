@@ -15,7 +15,7 @@
 #include "includes.h"
 
 uint32_t
-set_key_value(
+nm_set_key_value(
     const char *pszConfigFileName,
     const char *pszSection,
     const char *pszKey,
@@ -110,7 +110,7 @@ error:
 }
 
 uint32_t
-add_key_value(
+nm_add_key_value(
     const char *pszConfigFileName,
     const char *pszSection,
     const char *pszKey,
@@ -179,7 +179,7 @@ error:
 }
 
 uint32_t
-delete_key_value(
+nm_delete_key_value(
     const char *pszConfigFileName,
     const char *pszSection,
     const char *pszKey,
@@ -248,7 +248,7 @@ error:
 }
 
 uint32_t
-get_key_value(
+nm_get_key_value(
     const char *pszConfigFileName,
     const char *pszSection,
     const char *pszKey,
@@ -310,7 +310,7 @@ error:
 }
 
 uint32_t
-netmgr_run_command(
+nm_run_command(
     const char *pszCommand
 )
 {

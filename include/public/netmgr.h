@@ -112,20 +112,20 @@ typedef enum _NET_DNS_MODE
 } NET_DNS_MODE;
 
 
-typedef struct _NETMGR_INTERFACE
+typedef struct _NET_INTERFACE
 {
     char *pszName;
-    struct _NETMGR_INTERFACE *pNext;
-} NETMGR_INTERFACE, *PNETMGR_INTERFACE;
+    struct _NET_INTERFACE *pNext;
+} NET_INTERFACE, *PNET_INTERFACE;
 
 
 const char *
-link_state_to_string(
+nm_link_state_to_string(
     NET_LINK_STATE state
 );
 
 const char *
-link_mode_to_string(
+nm_link_mode_to_string(
     NET_LINK_MODE mode
 );
 
@@ -135,76 +135,76 @@ link_mode_to_string(
  */
 // Override the 'factory/nvram' mac address. mtu=0 -> use default 1500
 uint32_t
-set_link_mac_addr(
+nm_set_link_mac_addr(
     const char *pszInterfaceName,
     const char *pszMacAddress
 );
 
 uint32_t
-get_link_mac_addr(
+nm_get_link_mac_addr(
     const char *pszInterfaceName,
     char **ppszMacAddress
 );
 
 uint32_t
-set_link_mode(
+nm_set_link_mode(
     const char *pszInterfaceName,
     NET_LINK_MODE mode
 );
 
 uint32_t
-get_link_mode(
+nm_get_link_mode(
     const char *pszInterfaceName,
     NET_LINK_MODE *pLinkMode
 );
 
 uint32_t
-set_link_mtu(
+nm_set_link_mtu(
     const char *pszInterfaceName,
     uint32_t mtu
 );
 
 uint32_t
-get_link_mtu(
+nm_get_link_mtu(
     const char *pszInterfaceName,
     uint32_t *pMtu
 );
 
 uint32_t
-set_link_state(
+nm_set_link_state(
     const char *pszInterfaceName,
     NET_LINK_STATE state
 );
 
 uint32_t
-get_link_state(
+nm_get_link_state(
     const char *pszInterfaceName,
     NET_LINK_STATE *pLinkState
 );
 
 uint32_t
-ifup(
+nm_ifup(
     const char *pszInterfaceName
 );
 
 uint32_t
-ifdown(
+nm_ifdown(
     const char *pszInterfaceName
 );
 
 uint32_t
-get_link_info(
+nm_get_link_info(
     const char *pszInterfaceName,
     NET_LINK_INFO **ppLinkInfo
 );
 
 void
-free_link_info(
+nm_free_link_info(
     NET_LINK_INFO *pNetLinkInfo
 );
 
 uint32_t
-get_interface_ipaddr(
+nm_get_interface_ipaddr(
     const char *pszInterfaceName,
     NET_ADDR_TYPE addrType,
     size_t *pCount,
@@ -216,7 +216,7 @@ get_interface_ipaddr(
  * IP Address configuration APIs
  */
 uint32_t
-get_static_ip_addr(
+nm_get_static_ip_addr(
     const char *pszInterfaceName,
     uint32_t addrTypes,
     size_t *pCount,
@@ -225,7 +225,7 @@ get_static_ip_addr(
 
 //TODO: Support address for virtual interface e.g. "eth1:0"
 uint32_t
-set_ipv4_addr_gateway(
+nm_set_ipv4_addr_gateway(
     const char *pszInterfaceName,
     NET_IPV4_ADDR_MODE mode,
     const char *pszIPv4AddrPrefix,
@@ -233,7 +233,7 @@ set_ipv4_addr_gateway(
 );
 
 uint32_t
-get_ipv4_addr_gateway(
+nm_get_ipv4_addr_gateway(
     const char *pszInterfaceName,
     NET_IPV4_ADDR_MODE *pMode,
     char **ppszIPv4AddrPrefix,
@@ -241,39 +241,39 @@ get_ipv4_addr_gateway(
 );
 
 uint32_t
-add_static_ipv6_addr(
+nm_add_static_ipv6_addr(
     const char *pszInterfaceName,
     const char *pszIPv6AddrPrefix
 );
 
 uint32_t
-delete_static_ipv6_addr(
+nm_delete_static_ipv6_addr(
     const char *pszInterfaceName,
     const char *pszIPv6AddrPrefix
 );
 
 uint32_t
-set_ipv6_addr_mode(
+nm_set_ipv6_addr_mode(
     const char *pszInterfaceName,
     uint32_t enableDhcp,
     uint32_t enableAutoconf
 );
 
 uint32_t
-get_ipv6_addr_mode(
+nm_get_ipv6_addr_mode(
     const char *pszInterfaceName,
     uint32_t *pDhcpEnabled,
     uint32_t *pAutoconfEnabled
 );
 
 uint32_t
-set_ipv6_gateway(
+nm_set_ipv6_gateway(
     const char *pszInterfaceName,
     const char *pszIPv6Gateway
 );
 
 uint32_t
-get_ipv6_gateway(
+nm_get_ipv6_gateway(
     const char *pszInterfaceName,
     char **ppszIPv6Gateway
 );
@@ -283,17 +283,17 @@ get_ipv6_gateway(
  * Route configuration APIs
  */
 uint32_t
-add_static_ip_route(
+nm_add_static_ip_route(
     NET_IP_ROUTE *pRoute
 );
 
 uint32_t
-delete_static_ip_route(
+nm_delete_static_ip_route(
     NET_IP_ROUTE *pRoute
 );
 
 uint32_t
-get_static_ip_routes(
+nm_get_static_ip_routes(
     const char *pszInterfaceName,
     size_t *pCount,
     NET_IP_ROUTE ***pppRouteList
@@ -304,7 +304,7 @@ get_static_ip_routes(
  * DNS configuration APIs
  */
 uint32_t
-set_dns_servers(
+nm_set_dns_servers(
     const char *pszInterfaceName,
     NET_DNS_MODE mode,
     size_t count,
@@ -312,19 +312,19 @@ set_dns_servers(
 );
 
 uint32_t
-add_dns_server(
+nm_add_dns_server(
     const char *pszInterfaceName,
     const char *pszDnsServer
 );
 
 uint32_t
-delete_dns_server(
+nm_delete_dns_server(
     const char *pszInterfaceName,
     const char *pszDnsServer
 );
 
 uint32_t
-get_dns_servers(
+nm_get_dns_servers(
     const char *pszInterfaceName,
     NET_DNS_MODE *pMode,
     size_t *pCount,
@@ -332,26 +332,26 @@ get_dns_servers(
 );
 
 uint32_t
-set_dns_domains(
+nm_set_dns_domains(
     const char *pszInterfaceName,
     size_t count,
     const char **ppszDnsDomains
 );
 
 uint32_t
-add_dns_domain(
+nm_add_dns_domain(
     const char *pszInterfaceName,
     const char *pszDnsDomain
 );
 
 uint32_t
-delete_dns_domain(
+nm_delete_dns_domain(
     const char *pszInterfaceName,
     const char *pszDnsDomain
 );
 
 uint32_t
-get_dns_domains(
+nm_get_dns_domains(
     const char *pszInterfaceName,
     size_t *pCount,
     char ***pppszDnsDomains
@@ -362,25 +362,25 @@ get_dns_domains(
  * DHCP options, DUID, IAID configuration APIs
  */
 uint32_t
-set_iaid(
+nm_set_iaid(
     const char *pszInterfaceName,
     uint32_t iaid
 );
 
 uint32_t
-get_iaid(
+nm_get_iaid(
     const char *pszInterfaceName,
     uint32_t *pIaid
 );
 
 uint32_t
-set_duid(
+nm_set_duid(
     const char *pszInterfaceName,
     const char *pszDuid
 );
 
 uint32_t
-get_duid(
+nm_get_duid(
     const char *pszInterfaceName,
     char **ppszDuid
 );
@@ -390,10 +390,30 @@ get_duid(
  * Misc APIs
  */
 uint32_t
-wait_for_ip(
+nm_wait_for_link_up(
+    const char *pszInterfaceName,
+    uint32_t timeout
+);
+
+uint32_t
+nm_wait_for_ip(
     const char *pszInterfaceName,
     uint32_t timeout,
     NET_ADDR_TYPE addrTypes
+);
+
+uint32_t
+nm_set_network_param(
+    const char *pszInterfaceName,
+    const char *pszParamName,
+    const char *pszParamValue
+);
+
+uint32_t
+nm_get_network_param(
+    const char *pszInterfaceName,
+    const char *pszParamName,
+    char **ppszParamValue
 );
 
 
@@ -401,16 +421,16 @@ wait_for_ip(
  * Service management APIs
  */
 uint32_t
-stop_network_service();
+nm_stop_network_service();
 
 uint32_t
-restart_network_service();
+nm_restart_network_service();
 
 uint32_t
-stop_dns_service();
+nm_stop_dns_service();
 
 uint32_t
-restart_dns_service();
+nm_restart_dns_service();
 
 
 #endif /* __NETMGR_H__ */

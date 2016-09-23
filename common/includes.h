@@ -12,13 +12,16 @@
  * under the License.
  */
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdarg.h>
 #include <string.h>
-#include <errno.h>
+#include <unistd.h>
 #include <arpa/inet.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
 
 #include "defines.h"
 #include "prototypes.h"

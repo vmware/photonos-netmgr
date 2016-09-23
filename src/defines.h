@@ -48,6 +48,8 @@
 #define KEY_MTU                        "MTUBytes"
 #define KEY_MAC_ADDRESS                "MACAddress"
 
+#define SECTION_KEY_DELIM              "_"
+
 #define STR_NAMESERVER                 "nameserver"
 #define STR_SEARCH                     "search"
 

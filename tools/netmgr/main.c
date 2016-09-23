@@ -38,7 +38,7 @@ cmd_link_info(PNETMGR_CMD pCmd)
             bail_on_error(err);
             if (pszMacAddr != NULL)
             {
-                err = set_link_mac_addr(pszIfname, pszMacAddr);
+                err = nm_set_link_mac_addr(pszIfname, pszMacAddr);
                 bail_on_error(err);
             }
 
@@ -63,7 +63,7 @@ cmd_link_info(PNETMGR_CMD pCmd)
                     err = EDOM;
                     bail_on_error(err);
                 }
-                err = set_link_mode(pszIfname, linkMode);
+                err = nm_set_link_mode(pszIfname, linkMode);
                 bail_on_error(err);
             }
 
@@ -76,7 +76,7 @@ cmd_link_info(PNETMGR_CMD pCmd)
             if (pszMtu != NULL)
             {
                 mtu = (uint32_t)strtoul(pszMtu, &pszEnd, 10);
-                err = set_link_mtu(pszIfname, mtu);
+                err = nm_set_link_mtu(pszIfname, mtu);
                 bail_on_error(err);
             }
 
@@ -90,11 +90,11 @@ cmd_link_info(PNETMGR_CMD pCmd)
             {
                 if (!strcmp(pszLinkState, "up"))
                 {
-                    err = ifup(pszIfname);
+                    err = nm_ifup(pszIfname);
                 }
                 else if (!strcmp(pszLinkState, "down"))
                 {
-                    err = ifdown(pszIfname);
+                    err = nm_ifdown(pszIfname);
                 }
                 if (linkState == LINK_STATE_UNKNOWN)
                 {
@@ -113,7 +113,7 @@ cmd_link_info(PNETMGR_CMD pCmd)
             }
             bail_on_error(err);
 
-            err = get_link_info(pszIfname, &pNetLinkInfo);
+            err = nm_get_link_info(pszIfname, &pNetLinkInfo);
             bail_on_error(err);
 
             fprintf(stdout, "%-10s\t%-17s\t%-10s\t%-10s\t%-10s\n", "Name",
@@ -123,10 +123,10 @@ cmd_link_info(PNETMGR_CMD pCmd)
                 fprintf(stdout, "%-10s\t", pNetLinkInfo->pszInterfaceName);
                 fprintf(stdout, "%-17s\t", pNetLinkInfo->pszMacAddress);
                 fprintf(stdout, "%-10s\t",
-                        link_mode_to_string(pNetLinkInfo->mode));
+                        nm_link_mode_to_string(pNetLinkInfo->mode));
                 fprintf(stdout, "%-10u\t", pNetLinkInfo->mtu);
                 fprintf(stdout, "%-25s\n",
-                        link_state_to_string(pNetLinkInfo->state));
+                        nm_link_state_to_string(pNetLinkInfo->state));
                 pNetLinkInfo = pNetLinkInfo->pNext;
             }
             break;
@@ -137,7 +137,7 @@ cmd_link_info(PNETMGR_CMD pCmd)
     bail_on_error(err);
 
 cleanup:
-    free_link_info(pNetLinkInfo);
+    nm_free_link_info(pNetLinkInfo);
     return err;
 
 error:
@@ -182,16 +182,16 @@ cmd_ip4_address(PNETMGR_CMD pCmd)
 
             netmgrcli_find_cmdopt(pCmd, "gateway", &pszGateway);
 
-            err = set_ipv4_addr_gateway(pszIfName, ip4Mode, pszIpAddr,
-                                        pszGateway);
+            err = nm_set_ipv4_addr_gateway(pszIfName, ip4Mode, pszIpAddr,
+                                           pszGateway);
             pszIpAddr = NULL;
             pszGateway = NULL;
             bail_on_error(err);
             break;
 
         case OP_GET:
-            err = get_ipv4_addr_gateway(pszIfName, &ip4Mode, &pszIpAddr,
-                                        &pszGateway);
+            err = nm_get_ipv4_addr_gateway(pszIfName, &ip4Mode, &pszIpAddr,
+                                           &pszGateway);
             bail_on_error(err);
 
             if (ip4Mode == IPV4_ADDR_MODE_NONE)
@@ -243,7 +243,7 @@ cmd_ip6_address(PNETMGR_CMD pCmd)
 
     netmgrcli_find_cmdopt(pCmd, "interface", &pszIfName);
 
-    err = get_ipv6_addr_mode(pszIfName, &dhcpEnabled, &autoconfEnabled);
+    err = nm_get_ipv6_addr_mode(pszIfName, &dhcpEnabled, &autoconfEnabled);
     bail_on_error(err);
 
     switch (pCmd->op)
@@ -268,11 +268,11 @@ cmd_ip6_address(PNETMGR_CMD pCmd)
                     }
                     if (pCmd->op == OP_ADD)
                     {
-                        err = add_static_ipv6_addr(pszIfName, a1);
+                        err = nm_add_static_ipv6_addr(pszIfName, a1);
                     }
                     else
                     {
-                        err = delete_static_ipv6_addr(pszIfName, a1);
+                        err = nm_delete_static_ipv6_addr(pszIfName, a1);
                     }
                     bail_on_error(err);
                 } while (a2 != NULL);
@@ -287,7 +287,7 @@ cmd_ip6_address(PNETMGR_CMD pCmd)
 
             if (pszNewGateway != NULL)
             {
-                err = get_ipv6_gateway(pszIfName, &pszGateway);
+                err = nm_get_ipv6_gateway(pszIfName, &pszGateway);
                 if (err == ENOENT)
                 {
                     err = 0;
@@ -302,7 +302,7 @@ cmd_ip6_address(PNETMGR_CMD pCmd)
                     }
                     else
                     {
-                        err = set_ipv6_gateway(pszIfName, pszNewGateway);
+                        err = nm_set_ipv6_gateway(pszIfName, pszNewGateway);
                     }
                 }
                 else
@@ -313,7 +313,7 @@ cmd_ip6_address(PNETMGR_CMD pCmd)
                     }
                     else
                     {
-                        err = set_ipv6_gateway(pszIfName, NULL);
+                        err = nm_set_ipv6_gateway(pszIfName, NULL);
                     }
                 }
                 bail_on_error(err);
@@ -349,22 +349,24 @@ cmd_ip6_address(PNETMGR_CMD pCmd)
             }
 
             // TODO: Implement configuration of autoconf IPv6 enable / disable
-            err = set_ipv6_addr_mode(pszIfName, dhcpEnabled, autoconfEnabled);
+            err = nm_set_ipv6_addr_mode(pszIfName, dhcpEnabled,
+                                        autoconfEnabled);
             bail_on_error(err);
             break;
 
         case OP_GET:
 
-            // TODO: Implement a function to get IPv6 addr from interface ioctls,
+            // TODO: Implement function to get IPv6 addr from ioctls,
             // and query static IP addr if that fails.
-            err = get_static_ip_addr(pszIfName, STATIC_IPV6, &count, &ppszAddrList);
+            err = nm_get_static_ip_addr(pszIfName, STATIC_IPV6, &count,
+                                        &ppszAddrList);
             if (err == ENOENT)
             {
                 err = 0;
             }
             bail_on_error(err);
 
-            err = get_ipv6_gateway(pszIfName, &pszGateway);
+            err = nm_get_ipv6_gateway(pszIfName, &pszGateway);
             if (err == ENOENT)
             {
                 err = 0;
@@ -446,17 +448,18 @@ cmd_ip_route(PNETMGR_CMD pCmd)
 
             if (pCmd->op == OP_ADD)
             {
-                err = add_static_ip_route(&ipRoute);
+                err = nm_add_static_ip_route(&ipRoute);
             }
             else
             {
-                err = delete_static_ip_route(&ipRoute);
+                err = nm_delete_static_ip_route(&ipRoute);
             }
             bail_on_error(err);
             break;
 
         case OP_GET:
-            err = get_static_ip_routes(ipRoute.pszInterfaceName, &count, &ppRoutesList);
+            err = nm_get_static_ip_routes(ipRoute.pszInterfaceName, &count,
+                                          &ppRoutesList);
             fprintf(stdout, "Static IP Routes:\n");
             for (i = 0; i < count; i++)
             {
@@ -496,14 +499,14 @@ cmd_dhcp_duid(PNETMGR_CMD pCmd)
         err = netmgrcli_find_cmdopt(pCmd, "duid", &pszDuid);
         bail_on_error(err);
 
-        err = set_duid(pszIfname, pszDuid);
+        err = nm_set_duid(pszIfname, pszDuid);
         pszDuid = NULL;
         bail_on_error(err);
     }
 
     if (pCmd->op == OP_GET)
     {
-        err = get_duid(pszIfname, &pszDuid);
+        err = nm_get_duid(pszIfname, &pszDuid);
         bail_on_error(err);
 
         fprintf(stdout, "DUID=%s\n", pszDuid);
@@ -531,13 +534,13 @@ cmd_if_iaid(PNETMGR_CMD pCmd)
         err = netmgrcli_find_cmdopt(pCmd, "iaid", &pszIaid);
         bail_on_error(err);
 
-        err = set_iaid(pszIfname, (uint32_t)atoi(pszIaid));
+        err = nm_set_iaid(pszIfname, (uint32_t)atoi(pszIaid));
         bail_on_error(err);
     }
 
     if (pCmd->op == OP_GET)
     {
-        err = get_iaid(pszIfname, &iaid);
+        err = nm_get_iaid(pszIfname, &iaid);
         bail_on_error(err);
 
         fprintf(stdout, "IAID=%u\n", iaid);
@@ -611,7 +614,8 @@ cmd_dns_servers(PNETMGR_CMD pCmd)
                     s1 = strsep(&s2, ",");
                     if (strlen(s1) > 0)
                     {
-                        err = netmgr_alloc_string(s1, &(ppszDnsServersList[i++]));
+                        err = netmgr_alloc_string(s1,
+                                                  &(ppszDnsServersList[i++]));
                         bail_on_error(err);
                     }
                 } while (s2 != NULL);
@@ -628,22 +632,22 @@ cmd_dns_servers(PNETMGR_CMD pCmd)
             }
             if (pCmd->op == OP_SET)
             {
-                err = set_dns_servers(pszIfname, dnsMode, count,
-                                      (const char **)ppszDnsServersList);
+                err = nm_set_dns_servers(pszIfname, dnsMode, count,
+                                         (const char **)ppszDnsServersList);
             }
             else if (pCmd->op == OP_ADD)
             {
-                err = add_dns_server(pszIfname, ppszDnsServersList[0]);
+                err = nm_add_dns_server(pszIfname, ppszDnsServersList[0]);
             }
             else if (pCmd->op == OP_DEL)
             {
-                err = delete_dns_server(pszIfname, ppszDnsServersList[0]);
+                err = nm_delete_dns_server(pszIfname, ppszDnsServersList[0]);
             }
             break;
 
         case OP_GET:
-            err = get_dns_servers(pszIfname, &dnsMode, &count,
-                                  &ppszDnsServersList);
+            err = nm_get_dns_servers(pszIfname, &dnsMode, &count,
+                                     &ppszDnsServersList);
             bail_on_error(err);
 
             if (dnsMode == STATIC_DNS)
@@ -687,7 +691,7 @@ cmd_dns_domains(PNETMGR_CMD pCmd)
 
     netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
 
-    switch(pCmd->op)
+    switch (pCmd->op)
     {
         case OP_SET:
         case OP_ADD:
@@ -726,7 +730,8 @@ cmd_dns_domains(PNETMGR_CMD pCmd)
                     s1 = strsep(&s2, ",");
                     if (strlen(s1) > 0)
                     {
-                        err = netmgr_alloc_string(s1, &(ppszDnsDomainsList[i++]));
+                        err = netmgr_alloc_string(s1,
+                                                  &(ppszDnsDomainsList[i++]));
                         bail_on_error(err);
                     }
                 } while (s2 != NULL);
@@ -743,23 +748,23 @@ cmd_dns_domains(PNETMGR_CMD pCmd)
             }
             if (pCmd->op == OP_SET)
             {
-                err = set_dns_domains(pszIfname, count,
-                                      (const char **)ppszDnsDomainsList);
+                err = nm_set_dns_domains(pszIfname, count,
+                                         (const char **)ppszDnsDomainsList);
             }
             else if (pCmd->op == OP_ADD)
             {
-                err = add_dns_domain(pszIfname, ppszDnsDomainsList[0]);
+                err = nm_add_dns_domain(pszIfname, ppszDnsDomainsList[0]);
             }
             else if (pCmd->op == OP_DEL)
             {
-                err = delete_dns_domain(pszIfname, ppszDnsDomainsList[0]);
+                err = nm_delete_dns_domain(pszIfname, ppszDnsDomainsList[0]);
                 bail_on_error(err);
             }
             bail_on_error(err);
             break;
 
         case OP_GET:
-            err = get_dns_domains(pszIfname, &count, &ppszDnsDomainsList);
+            err = nm_get_dns_domains(pszIfname, &count, &ppszDnsDomainsList);
             bail_on_error(err);
 
             fprintf(stdout, "Domains=");
@@ -784,6 +789,59 @@ error:
     goto cleanup;
 }
 
+static uint32_t
+cmd_net_info(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    char *pszIfname = NULL, *pszParamName = NULL, *pszParamValue = NULL;
+
+    netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
+
+    switch (pCmd->op)
+    {
+        case OP_SET:
+            err = netmgrcli_find_cmdopt(pCmd, "paramname", &pszParamName);
+            bail_on_error(err);
+
+            err = netmgrcli_find_cmdopt(pCmd, "paramvalue", &pszParamValue);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            if (pszParamName != NULL)
+            {
+                err = nm_set_network_param(pszIfname, pszParamName,
+                                           pszParamValue);
+                pszParamValue = NULL;
+                bail_on_error(err);
+            }
+            break;
+
+        case OP_GET:
+            err = netmgrcli_find_cmdopt(pCmd, "paramname", &pszParamName);
+            bail_on_error(err);
+
+            err = nm_get_network_param(pszIfname, pszParamName, &pszParamValue);
+            bail_on_error(err);
+
+            fprintf(stdout, "ParamName: %s, ParamValue: %s\n", pszParamName,
+                    pszParamValue);
+            break;
+
+        default:
+            err = EINVAL;
+    }
+    bail_on_error(err);
+
+cleanup:
+    netmgr_free(pszParamValue);
+    return err;
+
+error:
+    goto cleanup;
+}
 
 typedef struct _NETMGR_CLI_HANDLER
 {
@@ -801,6 +859,7 @@ NETMGR_CLI_HANDLER cmdHandler[] =
     { CMD_IF_IAID,             cmd_if_iaid         },
     { CMD_DNS_SERVERS,         cmd_dns_servers     },
     { CMD_DNS_DOMAINS,         cmd_dns_domains     },
+    { CMD_NET_INFO ,           cmd_net_info        },
 };
 
 void

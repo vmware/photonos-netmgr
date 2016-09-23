@@ -29,7 +29,7 @@ static const char *szLinkModeString[] =
 };
 
 const char *
-link_state_to_string(
+nm_link_state_to_string(
     NET_LINK_STATE state
 )
 {
@@ -41,7 +41,7 @@ link_state_to_string(
 }
 
 const char *
-link_mode_to_string(
+nm_link_mode_to_string(
     NET_LINK_MODE mode
 )
 {
@@ -53,7 +53,7 @@ link_mode_to_string(
 }
 
 static uint32_t
-alloc_conf_filename(
+nm_alloc_conf_filename(
     char **ppszFilename,
     const char *pszPath,
     const char *pszFname)
@@ -88,14 +88,14 @@ error:
 }
 
 static uint32_t
-get_networkd_conf_filename(
+nm_get_networkd_conf_filename(
     char **ppszFilename)
 {
-    return alloc_conf_filename(ppszFilename, SYSTEMD_PATH, "networkd.conf");
+    return nm_alloc_conf_filename(ppszFilename, SYSTEMD_PATH, "networkd.conf");
 }
 
 static uint32_t
-get_network_auto_conf_filename(
+nm_get_network_auto_conf_filename(
     const char *pszIfname,
     char **ppszFilename)
 {
@@ -108,13 +108,13 @@ get_network_auto_conf_filename(
         bail_on_error(err);
     }
     sprintf(fname, "10-%s.network", pszIfname);
-    err = alloc_conf_filename(ppszFilename, SYSTEMD_NET_PATH, fname);
+    err = nm_alloc_conf_filename(ppszFilename, SYSTEMD_NET_PATH, fname);
 error:
     return err;
 }
 
 static uint32_t
-get_network_manual_conf_filename(
+nm_get_network_manual_conf_filename(
     const char *pszIfname,
     char **ppszFilename)
 {
@@ -127,13 +127,13 @@ get_network_manual_conf_filename(
         bail_on_error(err);
     }
     sprintf(fname, "10-%s.network.manual", pszIfname);
-    err = alloc_conf_filename(ppszFilename, SYSTEMD_NET_PATH, fname);
+    err = nm_alloc_conf_filename(ppszFilename, SYSTEMD_NET_PATH, fname);
 error:
     return err;
 }
 
 static uint32_t
-get_network_conf_filename(
+nm_get_network_conf_filename(
     const char *pszIfname,
     char **ppszFilename)
 {
@@ -146,7 +146,7 @@ get_network_conf_filename(
         bail_on_error(err);
     }
 
-    err = get_network_manual_conf_filename(pszIfname, &pszCfgFileName);
+    err = nm_get_network_manual_conf_filename(pszIfname, &pszCfgFileName);
     bail_on_error(err);
 
     if (access(pszCfgFileName, R_OK|W_OK) == 0)
@@ -186,10 +186,10 @@ error:
 }
 
 static uint32_t
-get_resolved_conf_filename(
+nm_get_resolved_conf_filename(
     char **ppszFilename)
 {
-    return alloc_conf_filename(ppszFilename, SYSTEMD_PATH, "resolved.conf");
+    return nm_alloc_conf_filename(ppszFilename, SYSTEMD_PATH, "resolved.conf");
 }
 
 
@@ -197,7 +197,7 @@ get_resolved_conf_filename(
  * Interface configuration APIs
  */
 uint32_t
-set_link_mac_addr(
+nm_set_link_mac_addr(
     const char *pszInterfaceName,
     const char *pszMacAddress
 )
@@ -211,15 +211,15 @@ set_link_mac_addr(
         bail_on_error(err);
     }
 
-    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
-    err = set_key_value(pszCfgFileName, SECTION_LINK, KEY_MAC_ADDRESS,
-                        pszMacAddress, 0);
+    err = nm_set_key_value(pszCfgFileName, SECTION_LINK, KEY_MAC_ADDRESS,
+                           pszMacAddress, 0);
     bail_on_error(err);
 
     // BUGBUG TODO: ifdown, modify mac addr using ioctl, ifup instead of this
-    err = restart_network_service();
+    err = nm_restart_network_service();
     bail_on_error(err);
 
 cleanup:
@@ -231,7 +231,7 @@ error:
 }
 
 uint32_t
-get_link_mac_addr(
+nm_get_link_mac_addr(
     const char *pszInterfaceName,
     char **ppszMacAddress
 )
@@ -293,7 +293,7 @@ error:
 }
 
 uint32_t
-set_link_mode(
+nm_set_link_mode(
     const char *pszInterfaceName,
     NET_LINK_MODE mode
 )
@@ -308,14 +308,16 @@ set_link_mode(
         bail_on_error(err);
     }
 
-    err = get_network_auto_conf_filename(pszInterfaceName, &pszAutoCfgFileName);
+    err = nm_get_network_auto_conf_filename(pszInterfaceName,
+                                            &pszAutoCfgFileName);
     bail_on_error(err);
 
-    err = get_network_manual_conf_filename(pszInterfaceName,
-                                           &pszManualCfgFileName);
+    err = nm_get_network_manual_conf_filename(pszInterfaceName,
+                                              &pszManualCfgFileName);
     bail_on_error(err);
 
-    err = get_network_conf_filename(pszInterfaceName, &pszCurrentCfgFileName);
+    err = nm_get_network_conf_filename(pszInterfaceName,
+                                       &pszCurrentCfgFileName);
     bail_on_error(err);
 
     switch (mode)
@@ -358,7 +360,7 @@ error:
 }
 
 uint32_t
-get_link_mode(
+nm_get_link_mode(
     const char *pszInterfaceName,
     NET_LINK_MODE *pLinkMode
 )
@@ -373,7 +375,7 @@ get_link_mode(
         bail_on_error(err);
     }
 
-    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
     if (strstr(pszCfgFileName, ".manual"))
@@ -402,7 +404,7 @@ error:
 }
 
 uint32_t
-set_link_mtu(
+nm_set_link_mtu(
     const char *pszInterfaceName,
     uint32_t mtu
 )
@@ -417,7 +419,7 @@ set_link_mtu(
         bail_on_error(err);
     }
 
-    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
     if (mtu > 0)
@@ -429,11 +431,11 @@ set_link_mtu(
         sprintf(szValue, "%u", DEFAULT_MTU_VALUE);
     }
 
-    err = set_key_value(pszCfgFileName, SECTION_LINK, KEY_MTU, szValue, 0);
+    err = nm_set_key_value(pszCfgFileName, SECTION_LINK, KEY_MTU, szValue, 0);
     bail_on_error(err);
 
     // BUGBUG TODO: ifdown, modify mtu using ioctl, ifup instead of this
-    err = restart_network_service();
+    err = nm_restart_network_service();
     bail_on_error(err);
 
 cleanup:
@@ -445,7 +447,7 @@ error:
 }
 
 uint32_t
-get_link_mtu(
+nm_get_link_mtu(
     const char *pszInterfaceName,
     uint32_t *pMtu
 )
@@ -495,7 +497,7 @@ error:
 }
 
 uint32_t
-set_link_state(
+nm_set_link_state(
     const char *pszInterfaceName,
     NET_LINK_STATE linkState
 )
@@ -569,7 +571,7 @@ error:
 }
 
 uint32_t
-get_link_state(
+nm_get_link_state(
     const char *pszInterfaceName,
     NET_LINK_STATE *pLinkState
 )
@@ -620,7 +622,7 @@ error:
 }
 
 static uint32_t
-do_arping(
+nm_do_arping(
     const char *pszInterfaceName,
     const char *pszCommandOptions,
     const char *pszDestIPv4Addr
@@ -643,7 +645,7 @@ do_arping(
                                      pszInterfaceName, pszDestIPv4Addr);
     bail_on_error(err);
 
-    err = netmgr_run_command(pszArpingCmd);
+    err = nm_run_command(pszArpingCmd);
     bail_on_error(err);
 
 cleanup:
@@ -656,7 +658,7 @@ error:
 
 #if 0
 static uint32_t
-do_ndsend(
+nm_do_ndsend(
     const char *pszInterfaceName,
     const char *pszCommandOptions,
     const char *pszDestIPv6Addr
@@ -668,7 +670,7 @@ do_ndsend(
 #endif
 
 uint32_t
-ifup(
+nm_ifup(
     const char *pszInterfaceName
 )
 {
@@ -689,11 +691,11 @@ ifup(
         bail_on_error(err);
     }
 
-    err = get_link_state(pszInterfaceName, &linkState);
+    err = nm_get_link_state(pszInterfaceName, &linkState);
     bail_on_error(err);
 
-    err = get_interface_ipaddr(pszInterfaceName, STATIC_IPV4, &ip4Count,
-                               &ppszIpv4AddrList);
+    err = nm_get_interface_ipaddr(pszInterfaceName, STATIC_IPV4, &ip4Count,
+                                  &ppszIpv4AddrList);
     if (err == ENOENT)
     {
         err = 0;
@@ -702,8 +704,8 @@ ifup(
 
     if (!ip4Count)
     {
-        err = get_interface_ipaddr(pszInterfaceName, STATIC_IPV6, &ip6Count,
-                                   &ppszIpv6AddrList);
+        err = nm_get_interface_ipaddr(pszInterfaceName, STATIC_IPV6, &ip6Count,
+                                      &ppszIpv6AddrList);
         if (err == ENOENT)
         {
             err = 0;
@@ -716,8 +718,8 @@ ifup(
         goto cleanup;
     }
 
-    err = get_static_ip_addr(pszInterfaceName, STATIC_IPV4, &staticIp4Count,
-                             &ppszStaticIpv4AddrList);
+    err = nm_get_static_ip_addr(pszInterfaceName, STATIC_IPV4, &staticIp4Count,
+                                &ppszStaticIpv4AddrList);
     if (err == ENOENT)
     {
         err = 0;
@@ -727,7 +729,7 @@ ifup(
     err = flush_interface_ipaddr(pszInterfaceName);
     bail_on_error(err);
 
-    err = set_link_state(pszInterfaceName, LINK_UP);
+    err = nm_set_link_state(pszInterfaceName, LINK_UP);
     bail_on_error(err);
 
     if (staticIp4Count && ip4Count &&
@@ -747,35 +749,36 @@ ifup(
             bail_on_error(err);
         }
 
-        err = do_arping(pszInterfaceName, ARPING_DUP_ADDR_CHECK_CMDOPT,
-                        ipAddr);
+        err = nm_do_arping(pszInterfaceName, ARPING_DUP_ADDR_CHECK_CMDOPT,
+                           ipAddr);
         bail_on_error(err);
     }
 
-    err = get_link_mode(pszInterfaceName, &linkMode);
+    err = nm_get_link_mode(pszInterfaceName, &linkMode);
     bail_on_error(err);
 
     if (linkMode == LINK_MANUAL)
     {
-        err = set_link_mode(pszInterfaceName, LINK_AUTO);
+        err = nm_set_link_mode(pszInterfaceName, LINK_AUTO);
         bail_on_error(err);
     }
 
-    err = restart_network_service();
+    err = nm_restart_network_service();
     if (linkMode == LINK_MANUAL)
     {
-        err1 = set_link_mode(pszInterfaceName, LINK_MANUAL);
+        err1 = nm_set_link_mode(pszInterfaceName, LINK_MANUAL);
         bail_on_error(err1);
     }
     bail_on_error(err);
 
-    err = wait_for_ip(pszInterfaceName, DEFAULT_WAIT_FOR_IP_TIMEOUT, STATIC_IPV4);
+    err = nm_wait_for_ip(pszInterfaceName, DEFAULT_WAIT_FOR_IP_TIMEOUT,
+                         STATIC_IPV4);
     bail_on_error(err);
 
     if (staticIp4Count && !ip4Count)
     {
-        err = do_arping(pszInterfaceName, ARPING_UPDATE_NEIGHBOR_CMDOPT,
-                        ipAddr);
+        err = nm_do_arping(pszInterfaceName, ARPING_UPDATE_NEIGHBOR_CMDOPT,
+                           ipAddr);
         bail_on_error(err);
     }
 
@@ -790,7 +793,7 @@ error:
 }
 
 uint32_t
-ifdown(
+nm_ifdown(
     const char *pszInterfaceName
 )
 {
@@ -806,7 +809,7 @@ ifdown(
     err = flush_interface_ipaddr(pszInterfaceName);
     bail_on_error(err);
 
-    err = set_link_state(pszInterfaceName, LINK_DOWN);
+    err = nm_set_link_state(pszInterfaceName, LINK_DOWN);
     bail_on_error(err);
 
 cleanup:
@@ -817,13 +820,13 @@ error:
 }
 
 static void
-free_netmgr_interface_list(
-    PNETMGR_INTERFACE pInterfaceList
+nm_free_interface_list(
+    PNET_INTERFACE pInterfaceList
 )
 {
     while (pInterfaceList)
     {
-        PNETMGR_INTERFACE pCurrent = pInterfaceList;
+        PNET_INTERFACE pCurrent = pInterfaceList;
         pInterfaceList = pCurrent->pNext;
         netmgr_free(pCurrent->pszName);
         netmgr_free(pCurrent);
@@ -831,8 +834,8 @@ free_netmgr_interface_list(
 }
 
 static uint32_t
-enumerate_systemd_interfaces(
-    PNETMGR_INTERFACE *ppInterfaces
+nm_enumerate_systemd_interfaces(
+    PNET_INTERFACE *ppInterfaces
 )
 {
     uint32_t err = 0;
@@ -840,8 +843,8 @@ enumerate_systemd_interfaces(
     char *pszStr1 = NULL, *pszStr2 = NULL;
     DIR *dirFile = NULL;
     struct dirent *hFile;
-    PNETMGR_INTERFACE pInterfaceList = NULL;
-    PNETMGR_INTERFACE pInterface = NULL;
+    PNET_INTERFACE pInterfaceList = NULL;
+    PNET_INTERFACE pInterface = NULL;
 
     if (!ppInterfaces)
     {
@@ -881,7 +884,7 @@ enumerate_systemd_interfaces(
         }
         size2 = pszStr2 - (pszStr1 + size1);
 
-        err = netmgr_alloc(sizeof(NETMGR_INTERFACE), (void**)&pInterface);
+        err = netmgr_alloc(sizeof(NET_INTERFACE), (void**)&pInterface);
         bail_on_error(err);
 
         err = netmgr_alloc_string_len(pszStr1 + size1, size2,
@@ -909,17 +912,17 @@ error:
     }
     if (pInterface)
     {
-        free_netmgr_interface_list(pInterface);
+        nm_free_interface_list(pInterface);
     }
     if (pInterfaceList)
     {
-        free_netmgr_interface_list(pInterfaceList);
+        nm_free_interface_list(pInterfaceList);
     }
     goto cleanup;
 }
 
 static uint32_t
-get_interface_info(
+nm_get_interface_info(
     const char *pszInterfaceName,
     NET_LINK_INFO **ppLinkInfo
 )
@@ -940,16 +943,16 @@ get_interface_info(
     err = netmgr_alloc(sizeof(NET_LINK_INFO), (void **)&pLinkInfo);
     bail_on_error(err);
 
-    err = get_link_mac_addr(pszInterfaceName, &pszMacAddress);
+    err = nm_get_link_mac_addr(pszInterfaceName, &pszMacAddress);
     bail_on_error(err);
 
-    err = get_link_mtu(pszInterfaceName, &mtu);
+    err = nm_get_link_mtu(pszInterfaceName, &mtu);
     bail_on_error(err);
 
-    err = get_link_mode(pszInterfaceName, &linkMode);
+    err = nm_get_link_mode(pszInterfaceName, &linkMode);
     bail_on_error(err);
 
-    err = get_link_state(pszInterfaceName, &linkState);
+    err = nm_get_link_state(pszInterfaceName, &linkState);
     bail_on_error(err);
 
     err = netmgr_alloc_string(pszInterfaceName, &pLinkInfo->pszInterfaceName);
@@ -977,14 +980,14 @@ error:
 }
 
 uint32_t
-get_link_info(
+nm_get_link_info(
     const char *pszInterfaceName,
     NET_LINK_INFO **ppLinkInfo
 )
 {
     uint32_t err = 0;
     NET_LINK_INFO *pLinkInfo = NULL;
-    PNETMGR_INTERFACE pInterfaceList = NULL, pCurInterface = NULL;
+    PNET_INTERFACE pInterfaceList = NULL, pCurInterface = NULL;
 
     if (!ppLinkInfo)
     {
@@ -994,20 +997,20 @@ get_link_info(
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName))
     {
-        err = enumerate_systemd_interfaces(&pInterfaceList);
+        err = nm_enumerate_systemd_interfaces(&pInterfaceList);
         bail_on_error(err);
 
         pCurInterface = pInterfaceList;
         while (pCurInterface)
         {
-            err = get_interface_info(pCurInterface->pszName, &pLinkInfo);
+            err = nm_get_interface_info(pCurInterface->pszName, &pLinkInfo);
             bail_on_error(err);
             pCurInterface = pCurInterface->pNext;
         }
     }
     else
     {
-        err = get_interface_info(pszInterfaceName, &pLinkInfo);
+        err = nm_get_interface_info(pszInterfaceName, &pLinkInfo);
         bail_on_error(err);
     }
 
@@ -1021,13 +1024,13 @@ error:
     {
         *ppLinkInfo = NULL;
     }
-    free_link_info(pLinkInfo);
-    free_netmgr_interface_list(pInterfaceList);
+    nm_free_link_info(pLinkInfo);
+    nm_free_interface_list(pInterfaceList);
     goto cleanup;
 }
 
 void
-free_link_info(
+nm_free_link_info(
     NET_LINK_INFO *pNetLinkInfo
 )
 {
@@ -1043,7 +1046,7 @@ free_link_info(
 }
 
 uint32_t
-get_interface_ipaddr(
+nm_get_interface_ipaddr(
     const char *pszInterfaceName,
     NET_ADDR_TYPE addrType,
     size_t *pCount,
@@ -1182,66 +1185,32 @@ error:
     goto cleanup;
 }
 
-uint32_t
-flush_interface_ipaddr(
-    const char *pszInterfaceName
+static uint32_t
+nm_get_ip_default_gateway(
+    const char *pszInterfaceName,
+    NET_ADDR_TYPE addrType,
+    char **ppszGateway
 )
 {
     uint32_t err = 0;
-    int sockFd = -1;
-    struct ifreq ifr;
-    struct sockaddr_in sin;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) > IFNAMSIZ))
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) || !ppszGateway)
     {
         err = EINVAL;
         bail_on_error(err);
     }
 
-    memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
-
-    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockFd < 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-    // TODO: Flush IPV6 Address
-
-    memset(&sin, 0, sizeof(struct sockaddr_in));
-    inet_aton("0.0.0.0", &sin.sin_addr);
-    sin.sin_family = AF_INET;
-    memcpy(&ifr.ifr_addr, &sin, sizeof(struct sockaddr_in));
-
-    err = ioctl(sockFd, SIOCSIFADDR, &ifr);
-    if (err != 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
+    //TODO: Implement
+    err = ENOENT;
 
 cleanup:
-    if (sockFd > -1)
-    {
-        close(sockFd);
-    }
     return err;
 error:
+    if (ppszGateway)
+    {
+        *ppszGateway = NULL;
+    }
     goto cleanup;
-}
-
-uint32_t
-wait_for_ip(
-    const char *pszInterfaceName,
-    uint32_t timeout,
-    NET_ADDR_TYPE addrTypes
-)
-{
-    // TODO:Implment this fucntion, sleep(1) for now
-    sleep(1);
-    return 0;
 }
 
 
@@ -1249,7 +1218,7 @@ wait_for_ip(
  * IP Address configuration APIs
  */
 static uint32_t
-set_ip_dhcp_mode(
+nm_set_ip_dhcp_mode(
     const char *pszInterfaceName,
     uint32_t dhcpModeFlags
 )
@@ -1263,7 +1232,7 @@ set_ip_dhcp_mode(
         bail_on_error(err);
     }
 
-    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
     if (TEST_FLAG(dhcpModeFlags, fDHCP_IPV4) && TEST_FLAG(dhcpModeFlags, fDHCP_IPV6))
@@ -1288,7 +1257,8 @@ set_ip_dhcp_mode(
         bail_on_error(err);
     }
 
-    err = set_key_value(pszCfgFileName, SECTION_NETWORK, KEY_DHCP, szDhcpValue, 0);
+    err = nm_set_key_value(pszCfgFileName, SECTION_NETWORK, KEY_DHCP,
+                           szDhcpValue, 0);
     bail_on_error(err);
 
     /* TODO: set IPv6 autoconf setting */
@@ -1301,7 +1271,7 @@ error:
 }
 
 static uint32_t
-get_ip_dhcp_mode(
+nm_get_ip_dhcp_mode(
     const char *pszInterfaceName,
     uint32_t *pDhcpModeFlags
 )
@@ -1316,10 +1286,11 @@ get_ip_dhcp_mode(
         bail_on_error(err);
     }
 
-    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
-    err = get_key_value(pszCfgFileName, SECTION_NETWORK, KEY_DHCP, &pszDhcpValue);
+    err = nm_get_key_value(pszCfgFileName, SECTION_NETWORK, KEY_DHCP,
+                           &pszDhcpValue);
     if ((err == ENOENT) || !strcmp(pszDhcpValue, "no"))
     {
         mode = 0;
@@ -1362,19 +1333,19 @@ error:
 }
 
 static uint32_t
-set_ip_default_gateway(
+nm_set_static_ip_gateway(
     const char *pszInterfaceName,
     const char *pszIpGwAddr
 );
 
 static uint32_t
-delete_ip_default_gateway(
+nm_delete_static_ip_gateway(
     const char *pszInterfaceName,
     uint32_t addrTypes
 );
 
 static uint32_t
-get_ip_default_gateway(
+nm_get_static_ip_gateway(
     const char *pszInterfaceName,
     uint32_t addrTypes,
     size_t *pCount,
@@ -1382,19 +1353,19 @@ get_ip_default_gateway(
 );
 
 static uint32_t
-set_static_ipv4_addr(
+nm_set_static_ipv4_addr(
     const char *pszInterfaceName,
     const char *pszIPv4Addr,
     uint8_t prefix
 );
 
 static uint32_t
-delete_static_ipv4_addr(
+nm_delete_static_ipv4_addr(
     const char *pszInterfaceName
 );
 
 static uint32_t
-set_ip_default_gateway(
+nm_set_static_ip_gateway(
     const char *pszInterfaceName,
     const char *pszIpGwAddr
 )
@@ -1423,14 +1394,14 @@ set_ip_default_gateway(
         bail_on_error(err);
     }
 
-    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
-    err = delete_ip_default_gateway(pszInterfaceName, addrType);
+    err = nm_delete_static_ip_gateway(pszInterfaceName, addrType);
     bail_on_error(err);
 
-    err = add_key_value(pszCfgFileName, SECTION_NETWORK, KEY_GATEWAY,
-                        pszIpGwAddr, 0);
+    err = nm_add_key_value(pszCfgFileName, SECTION_NETWORK, KEY_GATEWAY,
+                           pszIpGwAddr, 0);
     bail_on_error(err);
 
 cleanup:
@@ -1441,7 +1412,7 @@ error:
 }
 
 static uint32_t
-delete_ip_default_gateway(
+nm_delete_static_ip_gateway(
     const char *pszInterfaceName,
     uint32_t addrTypes
 )
@@ -1457,17 +1428,17 @@ delete_ip_default_gateway(
         bail_on_error(err);
     }
 
-    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
-    err = get_ip_default_gateway(pszInterfaceName, addrTypes, &count,
-                                 &ppszGwAddrList);
+    err = nm_get_static_ip_gateway(pszInterfaceName, addrTypes, &count,
+                                   &ppszGwAddrList);
     bail_on_error(err);
 
     for (i = 0; i < count; i++)
     {
-        err = delete_key_value(pszCfgFileName, SECTION_NETWORK, KEY_GATEWAY,
-                               ppszGwAddrList[i], 0);
+        err = nm_delete_key_value(pszCfgFileName, SECTION_NETWORK, KEY_GATEWAY,
+                                  ppszGwAddrList[i], 0);
         bail_on_error(err);
     }
 
@@ -1480,7 +1451,7 @@ error:
 }
 
 static uint32_t
-get_ip_default_gateway(
+nm_get_static_ip_gateway(
     const char *pszInterfaceName,
     uint32_t addrTypes,
     size_t *pCount,
@@ -1500,7 +1471,7 @@ get_ip_default_gateway(
         bail_on_error(err);
     }
 
-    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
     err = ini_cfg_read(pszCfgFileName, &pConfig);
@@ -1605,7 +1576,7 @@ error:
 }
 
 uint32_t
-get_static_ip_addr(
+nm_get_static_ip_addr(
     const char *pszInterfaceName,
     uint32_t addrTypes,
     size_t *pCount,
@@ -1625,7 +1596,7 @@ get_static_ip_addr(
         bail_on_error(err);
     }
 
-    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
     err = ini_cfg_read(pszCfgFileName, &pConfig);
@@ -1735,7 +1706,7 @@ error:
 }
 
 static uint32_t
-set_static_ipv4_addr(
+nm_set_static_ipv4_addr(
     const char *pszInterfaceName,
     const char *pszIPv4Addr,
     uint8_t prefix
@@ -1757,19 +1728,20 @@ set_static_ipv4_addr(
         bail_on_error(err);
     }
 
-    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
     sprintf(szIpAddr, "%s/%hhu", pszIPv4Addr, prefix);
 
-    err = delete_static_ipv4_addr(pszInterfaceName);
+    err = nm_delete_static_ipv4_addr(pszInterfaceName);
     if (err == ENOENT)
     {
         err = 0;
     }
     bail_on_error(err);
 
-    err = add_key_value(pszCfgFileName, SECTION_NETWORK, KEY_ADDRESS, szIpAddr, 0);
+    err = nm_add_key_value(pszCfgFileName, SECTION_NETWORK, KEY_ADDRESS,
+                           szIpAddr, 0);
     bail_on_error(err);
 
 cleanup:
@@ -1780,7 +1752,7 @@ error:
 }
 
 static uint32_t
-delete_static_ipv4_addr(
+nm_delete_static_ipv4_addr(
     const char *pszInterfaceName
 )
 {
@@ -1795,11 +1767,11 @@ delete_static_ipv4_addr(
         bail_on_error(err);
     }
 
-    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
-    err = get_static_ip_addr(pszInterfaceName, STATIC_IPV4, &count,
-                             &ppszIpAddrList);
+    err = nm_get_static_ip_addr(pszInterfaceName, STATIC_IPV4, &count,
+                                &ppszIpAddrList);
     bail_on_error(err);
     if (count > 1)
     {
@@ -1809,8 +1781,8 @@ delete_static_ipv4_addr(
 
     if (count)
     {
-        err = delete_key_value(pszCfgFileName, SECTION_NETWORK, KEY_ADDRESS,
-                               ppszIpAddrList[0], 0);
+        err = nm_delete_key_value(pszCfgFileName, SECTION_NETWORK, KEY_ADDRESS,
+                                  ppszIpAddrList[0], 0);
         bail_on_error(err);
     }
 
@@ -1823,7 +1795,7 @@ error:
 }
 
 uint32_t
-set_ipv4_addr_gateway(
+nm_set_ipv4_addr_gateway(
     const char *pszInterfaceName,
     NET_IPV4_ADDR_MODE mode,
     const char *pszIPv4AddrPrefix,
@@ -1850,19 +1822,19 @@ set_ipv4_addr_gateway(
         bail_on_error(err);
     }
 
-    err = get_ip_dhcp_mode(pszInterfaceName, &currModeFlags);
+    err = nm_get_ip_dhcp_mode(pszInterfaceName, &currModeFlags);
     bail_on_error(err);
 
     prefix = ((mode == IPV4_ADDR_MODE_STATIC) && (n == 1)) ? 32 : prefix;
 
-    err = delete_static_ipv4_addr(pszInterfaceName);
+    err = nm_delete_static_ipv4_addr(pszInterfaceName);
     if (err == ENOENT)
     {
         err = 0;
     }
     bail_on_error(err);
 
-    err = delete_ip_default_gateway(pszInterfaceName, STATIC_IPV4);
+    err = nm_delete_static_ip_gateway(pszInterfaceName, STATIC_IPV4);
     if (err == ENOENT)
     {
         err = 0;
@@ -1872,11 +1844,12 @@ set_ipv4_addr_gateway(
     switch (mode)
     {
         case IPV4_ADDR_MODE_STATIC:
-            err = set_static_ipv4_addr(pszInterfaceName, szIpAddr, prefix);
+            err = nm_set_static_ipv4_addr(pszInterfaceName, szIpAddr, prefix);
             bail_on_error(err);
             if (!IS_NULL_OR_EMPTY(pszIPv4Gateway))
             {
-                err = set_ip_default_gateway(pszInterfaceName, pszIPv4Gateway);
+                err = nm_set_static_ip_gateway(pszInterfaceName,
+                                               pszIPv4Gateway);
                 bail_on_error(err);
             }
             /* fall-thru */
@@ -1892,10 +1865,10 @@ set_ipv4_addr_gateway(
             break;
     }
 
-    err = set_ip_dhcp_mode(pszInterfaceName, currModeFlags);
+    err = nm_set_ip_dhcp_mode(pszInterfaceName, currModeFlags);
     bail_on_error(err);
 
-    err = restart_network_service();
+    err = nm_restart_network_service();
     bail_on_error(err);
 
 cleanup:
@@ -1905,7 +1878,7 @@ error:
 }
 
 uint32_t
-get_ipv4_addr_gateway(
+nm_get_ipv4_addr_gateway(
     const char *pszInterfaceName,
     NET_IPV4_ADDR_MODE *pMode,
     char **ppszIPv4AddrPrefix,
@@ -1925,49 +1898,87 @@ get_ipv4_addr_gateway(
         bail_on_error(err);
     }
 
-    err = get_ip_dhcp_mode(pszInterfaceName, &modeFlags);
+    err = nm_get_ip_dhcp_mode(pszInterfaceName, &modeFlags);
     bail_on_error(err);
 
     if (TEST_FLAG(modeFlags, fDHCP_IPV4))
     {
         ip4Mode = IPV4_ADDR_MODE_DHCP;
 
-        //TODO: Get DHCP IP addresss from interface via ioctl.
-    }
-    else
-    {
-        //TODO: Get IP addresss from interface via ioctl. If that fails
-        // get it as below from file.
-
-        err = get_static_ip_addr(pszInterfaceName, STATIC_IPV4, &ipCount,
-                                 &ppszIpAddrList);
+        err = nm_get_interface_ipaddr(pszInterfaceName, DHCP_IPV4, &ipCount,
+                                      &ppszIpAddrList);
         if (err == ENOENT)
         {
             err = 0;
         }
         bail_on_error(err);
 
+        //TODO: Get DHCP IPv4 gateway from routes
+        err = nm_get_ip_default_gateway(pszInterfaceName, DHCP_IPV4,
+                                        &pszIPv4Gateway);
+        if (err == ENOENT)
+        {
+            err = 0;
+        }
+        bail_on_error(err);
+    }
+    else
+    {
+        //TODO: Get IP addresss from interface via ioctl. If that fails
+        // get it as below from file.
+        err = nm_get_interface_ipaddr(pszInterfaceName, STATIC_IPV4, &ipCount,
+                                      &ppszIpAddrList);
+        if (err == ENOENT)
+        {
+            err = 0;
+        }
+        bail_on_error(err);
+
+        if (ipCount == 0)
+        {
+            err = nm_get_static_ip_addr(pszInterfaceName, STATIC_IPV4,
+                                        &ipCount, &ppszIpAddrList);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+        }
+
         if (ppszIpAddrList != NULL)
         {
             ip4Mode = IPV4_ADDR_MODE_STATIC;
 
-            err = netmgr_alloc_string(ppszIpAddrList[0], &pszIPv4AddrPrefix);
-            bail_on_error(err);
-
-            err = get_ip_default_gateway(pszInterfaceName, STATIC_IPV4,
-                                         &gwCount, &ppszGwAddrList);
-            bail_on_error(err);
-
-            if (gwCount)
+            err = nm_get_ip_default_gateway(pszInterfaceName, STATIC_IPV4,
+                                            &pszIPv4Gateway);
+            if (err == ENOENT)
             {
-                err = netmgr_alloc_string(ppszGwAddrList[0], &pszIPv4Gateway);
+                err = 0;
+            }
+            bail_on_error(err);
+            if (pszIPv4Gateway == NULL)
+            {
+                err = nm_get_static_ip_gateway(pszInterfaceName, STATIC_IPV4,
+                                               &gwCount, &ppszGwAddrList);
                 bail_on_error(err);
+
+                if (gwCount)
+                {
+                    err = netmgr_alloc_string(ppszGwAddrList[0], &pszIPv4Gateway);
+                    bail_on_error(err);
+                }
             }
         }
         else
         {
             ip4Mode = IPV4_ADDR_MODE_NONE;
         }
+    }
+
+    if (ppszIpAddrList != NULL)
+    {
+        err = netmgr_alloc_string(ppszIpAddrList[0], &pszIPv4AddrPrefix);
+        bail_on_error(err);
     }
 
     *pMode = ip4Mode;
@@ -1998,7 +2009,7 @@ error:
 }
 
 uint32_t
-add_static_ipv6_addr(
+nm_add_static_ipv6_addr(
     const char *pszInterfaceName,
     const char *pszIPv6AddrPrefix
 )
@@ -2017,14 +2028,14 @@ add_static_ipv6_addr(
         bail_on_error(err);
     }
 
-    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
-    err = add_key_value(pszCfgFileName, SECTION_NETWORK, KEY_ADDRESS,
-                        pszIPv6AddrPrefix, 0);
+    err = nm_add_key_value(pszCfgFileName, SECTION_NETWORK, KEY_ADDRESS,
+                           pszIPv6AddrPrefix, 0);
     bail_on_error(err);
 
-    err = restart_network_service();
+    err = nm_restart_network_service();
     bail_on_error(err);
 
 cleanup:
@@ -2035,7 +2046,7 @@ error:
 }
 
 uint32_t
-delete_static_ipv6_addr(
+nm_delete_static_ipv6_addr(
     const char *pszInterfaceName,
     const char *pszIPv6AddrPrefix
 )
@@ -2054,14 +2065,14 @@ delete_static_ipv6_addr(
         bail_on_error(err);
     }
 
-    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
-    err = delete_key_value(pszCfgFileName, SECTION_NETWORK, KEY_ADDRESS,
-                           pszIPv6AddrPrefix, 0);
+    err = nm_delete_key_value(pszCfgFileName, SECTION_NETWORK, KEY_ADDRESS,
+                              pszIPv6AddrPrefix, 0);
     bail_on_error(err);
 
-    err = restart_network_service();
+    err = nm_restart_network_service();
     bail_on_error(err);
 
 cleanup:
@@ -2072,7 +2083,7 @@ error:
 }
 
 uint32_t
-set_ipv6_addr_mode(
+nm_set_ipv6_addr_mode(
     const char *pszInterfaceName,
     uint32_t enableDhcp,
     uint32_t enableAutoconf
@@ -2080,7 +2091,7 @@ set_ipv6_addr_mode(
 {
     uint32_t err = 0, modeFlags;
 
-    err = get_ip_dhcp_mode(pszInterfaceName, &modeFlags);
+    err = nm_get_ip_dhcp_mode(pszInterfaceName, &modeFlags);
     bail_on_error(err);
 
     if (enableDhcp)
@@ -2101,10 +2112,10 @@ set_ipv6_addr_mode(
         CLEAR_FLAG(modeFlags, fAUTO_IPV6);
     }
 
-    err = set_ip_dhcp_mode(pszInterfaceName, modeFlags);
+    err = nm_set_ip_dhcp_mode(pszInterfaceName, modeFlags);
     bail_on_error(err);
 
-    err = restart_network_service();
+    err = nm_restart_network_service();
     bail_on_error(err);
 
 error:
@@ -2112,7 +2123,7 @@ error:
 }
 
 uint32_t
-get_ipv6_addr_mode(
+nm_get_ipv6_addr_mode(
     const char *pszInterfaceName,
     uint32_t *pDhcpEnabled,
     uint32_t *pAutoconfEnabled
@@ -2121,7 +2132,7 @@ get_ipv6_addr_mode(
     uint32_t err = 0, modeFlags;
     uint32_t dhcpEnabled = 0, autoconfEnabled = 0;
 
-    err = get_ip_dhcp_mode(pszInterfaceName, &modeFlags);
+    err = nm_get_ip_dhcp_mode(pszInterfaceName, &modeFlags);
     bail_on_error(err);
 
     if (TEST_FLAG(modeFlags, fDHCP_IPV6))
@@ -2147,7 +2158,7 @@ error:
 }
 
 uint32_t
-set_ipv6_gateway(
+nm_set_ipv6_gateway(
     const char *pszInterfaceName,
     const char *pszIPv6Gateway
 )
@@ -2163,12 +2174,12 @@ set_ipv6_gateway(
 
     if (pszIPv6Gateway)
     {
-        err = set_ip_default_gateway(pszInterfaceName, pszIPv6Gateway);
+        err = nm_set_static_ip_gateway(pszInterfaceName, pszIPv6Gateway);
         bail_on_error(err);
     }
     else
     {
-        err = delete_ip_default_gateway(pszInterfaceName, STATIC_IPV6);
+        err = nm_delete_static_ip_gateway(pszInterfaceName, STATIC_IPV6);
         if (err == ENOENT)
         {
             err = 0;
@@ -2176,7 +2187,7 @@ set_ipv6_gateway(
         bail_on_error(err);
     }
 
-    err = restart_network_service();
+    err = nm_restart_network_service();
     bail_on_error(err);
 
 error:
@@ -2184,7 +2195,7 @@ error:
 }
 
 uint32_t
-get_ipv6_gateway(
+nm_get_ipv6_gateway(
     const char *pszInterfaceName,
     char **ppszIPv6Gateway
 )
@@ -2199,15 +2210,25 @@ get_ipv6_gateway(
         bail_on_error(err);
     }
 
-    err = get_ip_default_gateway(pszInterfaceName, STATIC_IPV6, &count,
-                                 &ppszGwAddrList);
+    err = nm_get_ip_default_gateway(pszInterfaceName, DHCP_IPV6,
+                                    &pszIPv6Gateway);
+    if (err == ENOENT)
+    {
+        err = 0;
+    }
     bail_on_error(err);
 
-
-    if (count)
+    if (pszIPv6Gateway == NULL)
     {
-        err = netmgr_alloc_string(ppszGwAddrList[0], &pszIPv6Gateway);
+        err = nm_get_static_ip_gateway(pszInterfaceName, STATIC_IPV6, &count,
+                                       &ppszGwAddrList);
         bail_on_error(err);
+
+        if (count)
+        {
+            err = netmgr_alloc_string(ppszGwAddrList[0], &pszIPv6Gateway);
+            bail_on_error(err);
+        }
     }
 
     *ppszIPv6Gateway = pszIPv6Gateway;
@@ -2230,7 +2251,7 @@ error:
  * Route configuration APIs
  */
 static uint32_t
-add_route_section(
+nm_add_route_section(
     NET_IP_ROUTE *pRoute
 )
 {
@@ -2248,7 +2269,8 @@ add_route_section(
         bail_on_error(err);
     }
 
-    err = get_network_conf_filename(pRoute->pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename(pRoute->pszInterfaceName,
+                                       &pszCfgFileName);
     bail_on_error(err);
 
     err = ini_cfg_read(pszCfgFileName, &pConfig);
@@ -2329,7 +2351,7 @@ error:
 }
 
 static uint32_t
-delete_route_section(
+nm_delete_route_section(
     NET_IP_ROUTE *pRoute
 )
 {
@@ -2346,7 +2368,8 @@ delete_route_section(
         bail_on_error(err);
     }
 
-    err = get_network_conf_filename(pRoute->pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename(pRoute->pszInterfaceName,
+                                       &pszCfgFileName);
     bail_on_error(err);
 
     err = ini_cfg_read(pszCfgFileName, &pConfig);
@@ -2395,7 +2418,7 @@ error:
 }
 
 static uint32_t
-get_routes(
+nm_get_routes(
     const char *pszInterfaceName,
     size_t *pCount,
     NET_IP_ROUTE ***pppRoutes
@@ -2414,7 +2437,7 @@ get_routes(
         bail_on_error(err);
     }
 
-    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
     err = ini_cfg_read(pszCfgFileName, &pConfig);
@@ -2424,7 +2447,8 @@ get_routes(
                                 &dwNumSections);
     bail_on_error(err);
 
-    err = netmgr_alloc(dwNumSections * sizeof(NET_IP_ROUTE *), (void **)&ppRoutes);
+    err = netmgr_alloc(dwNumSections * sizeof(NET_IP_ROUTE *),
+                       (void **)&ppRoutes);
     bail_on_error(err);
 
     for (i = 0; i < dwNumSections; i++)
@@ -2477,7 +2501,7 @@ error:
 }
 
 uint32_t
-add_static_ip_route(
+nm_add_static_ip_route(
     NET_IP_ROUTE *pRoute
 )
 {
@@ -2523,10 +2547,10 @@ add_static_ip_route(
     sprintf(szDestAddr, "%s/%hhu", szDestAddr, prefix);
     route.pszDestNetwork = szDestAddr;
 
-    err = add_route_section(&route);
+    err = nm_add_route_section(&route);
     bail_on_error(err);
 
-    err = restart_network_service();
+    err = nm_restart_network_service();
     bail_on_error(err);
 
 cleanup:
@@ -2536,7 +2560,7 @@ error:
 }
 
 uint32_t
-delete_static_ip_route(
+nm_delete_static_ip_route(
     NET_IP_ROUTE *pRoute
 )
 {
@@ -2571,10 +2595,10 @@ delete_static_ip_route(
     sprintf(szDestAddr, "%s/%hhu", szDestAddr, prefix);
     route.pszDestNetwork = szDestAddr;
 
-    err = delete_route_section(&route);
+    err = nm_delete_route_section(&route);
     bail_on_error(err);
 
-    err = restart_network_service();
+    err = nm_restart_network_service();
     bail_on_error(err);
 
 cleanup:
@@ -2584,7 +2608,7 @@ error:
 }
 
 uint32_t
-get_static_ip_routes(
+nm_get_static_ip_routes(
     const char *pszInterfaceName,
     size_t *pCount,
     NET_IP_ROUTE ***pppRoutesList
@@ -2600,7 +2624,7 @@ get_static_ip_routes(
 
     /* TODO: If pszInterfaceName == NULL, get static route for all if */
 
-    err = get_routes(pszInterfaceName, pCount, pppRoutesList);
+    err = nm_get_routes(pszInterfaceName, pCount, pppRoutesList);
     bail_on_error(err);
 
 
@@ -2614,9 +2638,8 @@ error:
 /*
  * DNS configuration APIs
  */
-
 static uint32_t
-space_delimited_string_append(
+nm_space_delimited_string_append(
     size_t count,
     const char **ppszStrings,
     const char *pszCurrentString,
@@ -2687,7 +2710,7 @@ error:
 }
 
 static uint32_t
-space_delimited_string_to_list(
+nm_space_delimited_string_to_list(
     const char *pszString,
     size_t *pCount,
     char ***pppszStringList
@@ -2756,7 +2779,7 @@ error:
 }
 
 static uint32_t
-get_dns_mode(
+nm_get_dns_mode(
     const char *pszInterfaceName,
     NET_DNS_MODE *pMode
 )
@@ -2772,10 +2795,11 @@ get_dns_mode(
         bail_on_error(err);
     }
 
-    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
-    err = get_key_value(pszCfgFileName, SECTION_DHCP, KEY_USE_DNS, &pszUseDnsValue);
+    err = nm_get_key_value(pszCfgFileName, SECTION_DHCP, KEY_USE_DNS,
+                           &pszUseDnsValue);
     if ((err == ENOENT) || !strcmp(pszUseDnsValue, "true"))
     {
         mode = DHCP_DNS;
@@ -2809,7 +2833,7 @@ error:
 }
 
 uint32_t
-add_dns_server(
+nm_add_dns_server(
     const char *pszInterfaceName,
     const char *pszDnsServer
 )
@@ -2829,7 +2853,7 @@ add_dns_server(
     }
 
     /* Determine DNS mode from UseDNS value in 10-eth0.network */
-    err = get_dns_mode("eth0", &mode);
+    err = nm_get_dns_mode("eth0", &mode);
     bail_on_error(err);
 
     if (mode == DHCP_DNS)
@@ -2840,35 +2864,35 @@ add_dns_server(
 
     if (pszInterfaceName != NULL)
     {
-        err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+        err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
         sprintf(szSectionName, SECTION_NETWORK);
     }
     else
     {
-        err = get_resolved_conf_filename(&pszCfgFileName);
+        err = nm_get_resolved_conf_filename(&pszCfgFileName);
         sprintf(szSectionName, SECTION_RESOLVE);
     }
     bail_on_error(err);
 
-    err = get_key_value(pszCfgFileName, szSectionName, KEY_DNS,
-                        &pszCurrentDnsServers);
+    err = nm_get_key_value(pszCfgFileName, szSectionName, KEY_DNS,
+                           &pszCurrentDnsServers);
     if (err != ENOENT)
     {
         bail_on_error(err);
     }
 
-    err = space_delimited_string_append(1, &pszDnsServer,
-                                        pszCurrentDnsServers,
-                                        &pszNewDnsServersValue);
+    err = nm_space_delimited_string_append(1, &pszDnsServer,
+                                           pszCurrentDnsServers,
+                                           &pszNewDnsServersValue);
     bail_on_error(err);
 
-    err = set_key_value(pszCfgFileName, szSectionName, KEY_DNS,
-                        pszNewDnsServersValue, 0);
+    err = nm_set_key_value(pszCfgFileName, szSectionName, KEY_DNS,
+                           pszNewDnsServersValue, 0);
     bail_on_error(err);
 
-    err = restart_network_service();
+    err = nm_restart_network_service();
     bail_on_error(err);
-    err = restart_dns_service();
+    err = nm_restart_dns_service();
     bail_on_error(err);
 
 cleanup:
@@ -2881,7 +2905,7 @@ error:
 }
 
 uint32_t
-delete_dns_server(
+nm_delete_dns_server(
     const char *pszInterfaceName,
     const char *pszDnsServer
 )
@@ -2901,7 +2925,7 @@ delete_dns_server(
     }
 
     /* Determine DNS mode from UseDNS value in 10-eth0.network */
-    err = get_dns_mode("eth0", &mode);
+    err = nm_get_dns_mode("eth0", &mode);
     bail_on_error(err);
     if (mode == DHCP_DNS)
     {
@@ -2911,18 +2935,18 @@ delete_dns_server(
 
     if (pszInterfaceName != NULL)
     {
-        err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+        err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
         sprintf(szSectionName, SECTION_NETWORK);
     }
     else
     {
-        err = get_resolved_conf_filename(&pszCfgFileName);
+        err = nm_get_resolved_conf_filename(&pszCfgFileName);
         sprintf(szSectionName, SECTION_RESOLVE);
     }
     bail_on_error(err);
 
-    err = get_key_value(pszCfgFileName, szSectionName, KEY_DNS,
-                        &pszCurrentDnsServers);
+    err = nm_get_key_value(pszCfgFileName, szSectionName, KEY_DNS,
+                           &pszCurrentDnsServers);
     bail_on_error(err);
 
     pszMatch = strstr(pszCurrentDnsServers, pszDnsServer);
@@ -2946,13 +2970,13 @@ delete_dns_server(
     pszNewDnsServersValue = (strlen(pszCurrentDnsServers) > 0) ?
                                 pszCurrentDnsServers : NULL;
 
-    err = set_key_value(pszCfgFileName, szSectionName, KEY_DNS,
-                        pszNewDnsServersValue, 0);
+    err = nm_set_key_value(pszCfgFileName, szSectionName, KEY_DNS,
+                           pszNewDnsServersValue, 0);
     bail_on_error(err);
 
-    err = restart_network_service();
+    err = nm_restart_network_service();
     bail_on_error(err);
-    err = restart_dns_service();
+    err = nm_restart_dns_service();
     bail_on_error(err);
 
 cleanup:
@@ -2964,7 +2988,7 @@ error:
 }
 
 uint32_t
-set_dns_servers(
+nm_set_dns_servers(
     const char *pszInterfaceName,
     NET_DNS_MODE mode,
     size_t count,
@@ -2982,18 +3006,18 @@ set_dns_servers(
 
     if (pszInterfaceName != NULL)
     {
-        err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+        err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
         sprintf(szSectionName, SECTION_NETWORK);
     }
     else
     {
-        err = get_resolved_conf_filename(&pszCfgFileName);
+        err = nm_get_resolved_conf_filename(&pszCfgFileName);
         sprintf(szSectionName, SECTION_RESOLVE);
     }
     bail_on_error(err);
 
-    err = space_delimited_string_append(count, ppszDnsServers, NULL,
-                                        &pszDnsServersValue);
+    err = nm_space_delimited_string_append(count, ppszDnsServers, NULL,
+                                           &pszDnsServersValue);
     bail_on_error(err);
 
     err = EINVAL;
@@ -3002,7 +3026,8 @@ set_dns_servers(
         sprintf(szUseDnsValue, "true");
         if (count == 0)
         {
-            err = set_key_value(pszCfgFileName, szSectionName, KEY_DNS, NULL, 0);
+            err = nm_set_key_value(pszCfgFileName, szSectionName, KEY_DNS,
+                                   NULL, 0);
         }
     }
     else if (mode == STATIC_DNS)
@@ -3010,12 +3035,13 @@ set_dns_servers(
         sprintf(szUseDnsValue, "false");
         if (count == 0)
         {
-            err = set_key_value(pszCfgFileName, szSectionName, KEY_DNS, NULL, 0);
+            err = nm_set_key_value(pszCfgFileName, szSectionName, KEY_DNS,
+                                   NULL, 0);
         }
         else
         {
-            err = set_key_value(pszCfgFileName, szSectionName, KEY_DNS,
-                                pszDnsServersValue, 0);
+            err = nm_set_key_value(pszCfgFileName, szSectionName, KEY_DNS,
+                                   pszDnsServersValue, 0);
         }
     }
     bail_on_error(err);
@@ -3034,18 +3060,19 @@ set_dns_servers(
                 if (hFile->d_name[0] == '.') continue;
                 if (strstr(hFile->d_name, ".network"))
                 {
-                    sprintf(netCfgFileName, "%s%s", SYSTEMD_NET_PATH, hFile->d_name);
-                    err = set_key_value(netCfgFileName, SECTION_DHCP, KEY_USE_DNS,
-                                        szUseDnsValue, 0);
+                    sprintf(netCfgFileName, "%s%s", SYSTEMD_NET_PATH,
+                            hFile->d_name);
+                    err = nm_set_key_value(netCfgFileName, SECTION_DHCP,
+                                           KEY_USE_DNS, szUseDnsValue, 0);
                     bail_on_error(err);
                 }
             }
         }
     }
 
-    err = restart_network_service();
+    err = nm_restart_network_service();
     bail_on_error(err);
-    err = restart_dns_service();
+    err = nm_restart_dns_service();
     bail_on_error(err);
 
 error:
@@ -3059,7 +3086,7 @@ error:
 }
 
 static uint32_t
-read_etc_resolv_conf(char **ppszFileBuf)
+nm_read_etc_resolv_conf(char **ppszFileBuf)
 {
     uint32_t err = 0;
     long len;
@@ -3123,7 +3150,7 @@ error:
 }
 
 uint32_t
-get_dns_servers(
+nm_get_dns_servers(
     const char *pszInterfaceName,
     NET_DNS_MODE *pMode,
     size_t *pCount,
@@ -3144,12 +3171,12 @@ get_dns_servers(
     }
 
     /* Determine DNS mode from UseDNS value in 10-eth0.network */
-    err = get_dns_mode("eth0", pMode);
+    err = nm_get_dns_mode("eth0", pMode);
     bail_on_error(err);
 
     if (pszInterfaceName == NULL)
     {
-        err = read_etc_resolv_conf(&pszFileBuf);
+        err = nm_read_etc_resolv_conf(&pszFileBuf);
         bail_on_error(err);
 
         s1 = pszFileBuf;
@@ -3183,18 +3210,19 @@ get_dns_servers(
     {
         if (!strcmp(pszInterfaceName, "none"))
         {
-            err = get_resolved_conf_filename(&pszCfgFileName);
+            err = nm_get_resolved_conf_filename(&pszCfgFileName);
             sprintf(szSectionName, SECTION_RESOLVE);
         }
         else
         {
-            err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+            err = nm_get_network_conf_filename(pszInterfaceName,
+                                               &pszCfgFileName);
             sprintf(szSectionName, SECTION_NETWORK);
         }
         bail_on_error(err);
 
-        err = get_key_value(pszCfgFileName, szSectionName, KEY_DNS,
-                            &pszDnsServersValue);
+        err = nm_get_key_value(pszCfgFileName, szSectionName, KEY_DNS,
+                               &pszDnsServersValue);
         if (err == ENOENT)
         {
             err = 0;
@@ -3202,8 +3230,8 @@ get_dns_servers(
         }
         bail_on_error(err);
 
-        err = space_delimited_string_to_list(pszDnsServersValue, &count,
-                                             &ppszDnsServersList);
+        err = nm_space_delimited_string_to_list(pszDnsServersValue, &count,
+                                                &ppszDnsServersList);
         bail_on_error(err);
     }
 
@@ -3231,7 +3259,7 @@ error:
 }
 
 uint32_t
-add_dns_domain(
+nm_add_dns_domain(
     const char *pszInterfaceName,
     const char *pszDnsDomain
 )
@@ -3250,35 +3278,35 @@ add_dns_domain(
 
     if (pszInterfaceName != NULL)
     {
-        err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+        err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
         sprintf(szSectionName, SECTION_NETWORK);
     }
     else
     {
-        err = get_resolved_conf_filename(&pszCfgFileName);
+        err = nm_get_resolved_conf_filename(&pszCfgFileName);
         sprintf(szSectionName, SECTION_RESOLVE);
     }
     bail_on_error(err);
 
-    err = get_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
-                        &pszCurrentDnsDomains);
+    err = nm_get_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
+                           &pszCurrentDnsDomains);
     if (err != ENOENT)
     {
         bail_on_error(err);
     }
 
-    err = space_delimited_string_append(1, &pszDnsDomain,
-                                        pszCurrentDnsDomains,
-                                        &pszDnsDomainsValue);
+    err = nm_space_delimited_string_append(1, &pszDnsDomain,
+                                           pszCurrentDnsDomains,
+                                           &pszDnsDomainsValue);
     bail_on_error(err);
 
-    err = set_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
-                        pszDnsDomainsValue, 0);
+    err = nm_set_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
+                           pszDnsDomainsValue, 0);
     bail_on_error(err);
 
-    err = restart_network_service();
+    err = nm_restart_network_service();
     bail_on_error(err);
-    err = restart_dns_service();
+    err = nm_restart_dns_service();
     bail_on_error(err);
 
 cleanup:
@@ -3292,7 +3320,7 @@ error:
 }
 
 uint32_t
-delete_dns_domain(
+nm_delete_dns_domain(
     const char *pszInterfaceName,
     const char *pszDnsDomain
 )
@@ -3313,18 +3341,18 @@ delete_dns_domain(
 
     if (pszInterfaceName != NULL)
     {
-        err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+        err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
         sprintf(szSectionName, SECTION_NETWORK);
     }
     else
     {
-        err = get_resolved_conf_filename(&pszCfgFileName);
+        err = nm_get_resolved_conf_filename(&pszCfgFileName);
         sprintf(szSectionName, SECTION_RESOLVE);
     }
     bail_on_error(err);
 
-    err = get_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
-                        &pszCurrentDnsDomains);
+    err = nm_get_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
+                           &pszCurrentDnsDomains);
     bail_on_error(err);
 
     pszMatch = strstr(pszCurrentDnsDomains, pszDnsDomain);
@@ -3348,13 +3376,13 @@ delete_dns_domain(
     pszNewDnsDomainsList = (strlen(pszCurrentDnsDomains) > 0) ?
                                 pszCurrentDnsDomains : NULL;
 
-    err = set_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
-                        pszNewDnsDomainsList, 0);
+    err = nm_set_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
+                           pszNewDnsDomainsList, 0);
     bail_on_error(err);
 
-    err = restart_network_service();
+    err = nm_restart_network_service();
     bail_on_error(err);
-    err = restart_dns_service();
+    err = nm_restart_dns_service();
     bail_on_error(err);
 
 cleanup:
@@ -3367,7 +3395,7 @@ error:
 }
 
 uint32_t
-set_dns_domains(
+nm_set_dns_domains(
     const char *pszInterfaceName,
     size_t count,
     const char **ppszDnsDomains
@@ -3380,34 +3408,35 @@ set_dns_domains(
 
     if (pszInterfaceName != NULL)
     {
-        err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+        err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
         sprintf(szSectionName, SECTION_NETWORK);
     }
     else
     {
-        err = get_resolved_conf_filename(&pszCfgFileName);
+        err = nm_get_resolved_conf_filename(&pszCfgFileName);
         sprintf(szSectionName, SECTION_RESOLVE);
     }
     bail_on_error(err);
 
-    err = space_delimited_string_append(count, ppszDnsDomains, NULL,
-                                        &pszDnsDomainsValue);
+    err = nm_space_delimited_string_append(count, ppszDnsDomains, NULL,
+                                           &pszDnsDomainsValue);
     bail_on_error(err);
 
     if (count == 0)
     {
-        err = set_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS, NULL, 0);
+        err = nm_set_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
+                               NULL, 0);
     }
     else
     {
-        err = set_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
-                            pszDnsDomainsValue, 0);
+        err = nm_set_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
+                               pszDnsDomainsValue, 0);
     }
     bail_on_error(err);
 
-    err = restart_network_service();
+    err = nm_restart_network_service();
     bail_on_error(err);
-    err = restart_dns_service();
+    err = nm_restart_dns_service();
     bail_on_error(err);
 
 error:
@@ -3417,7 +3446,7 @@ error:
 }
 
 uint32_t
-get_dns_domains(
+nm_get_dns_domains(
     const char *pszInterfaceName,
     size_t *pCount,
     char ***pppszDnsDomains
@@ -3437,7 +3466,7 @@ get_dns_domains(
 
     if (pszInterfaceName == NULL)
     {
-        err = read_etc_resolv_conf(&pszFileBuf);
+        err = nm_read_etc_resolv_conf(&pszFileBuf);
         bail_on_error(err);
 
         pszDnsDomainsValue = strstr(pszFileBuf, STR_SEARCH);
@@ -3454,8 +3483,8 @@ get_dns_domains(
         }
         pszDnsDomainsValue++;
 
-        err = space_delimited_string_to_list(pszDnsDomainsValue, &count,
-                                             &ppszDnsDomainsList);
+        err = nm_space_delimited_string_to_list(pszDnsDomainsValue, &count,
+                                                &ppszDnsDomainsList);
         pszDnsDomainsValue = NULL;
         bail_on_error(err);
     }
@@ -3463,18 +3492,19 @@ get_dns_domains(
     {
         if (!strcmp(pszInterfaceName, "none"))
         {
-            err = get_resolved_conf_filename(&pszCfgFileName);
+            err = nm_get_resolved_conf_filename(&pszCfgFileName);
             sprintf(szSectionName, SECTION_RESOLVE);
         }
         else
         {
-            err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+            err = nm_get_network_conf_filename(pszInterfaceName,
+                                               &pszCfgFileName);
             sprintf(szSectionName, SECTION_NETWORK);
         }
         bail_on_error(err);
 
-        err = get_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
-                            &pszDnsDomainsValue);
+        err = nm_get_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
+                               &pszDnsDomainsValue);
         if (err == ENOENT)
         {
             err = 0;
@@ -3482,8 +3512,8 @@ get_dns_domains(
         }
         bail_on_error(err);
 
-        err = space_delimited_string_to_list(pszDnsDomainsValue, &count,
-                                             &ppszDnsDomainsList);
+        err = nm_space_delimited_string_to_list(pszDnsDomainsValue, &count,
+                                                &ppszDnsDomainsList);
         bail_on_error(err);
     }
 
@@ -3512,9 +3542,8 @@ error:
 /*
  * DHCP options, DUID, IAID configuration APIs
  */
-
 uint32_t
-set_iaid(
+nm_set_iaid(
     const char *pszInterfaceName,
     uint32_t iaid
 )
@@ -3529,22 +3558,23 @@ set_iaid(
         bail_on_error(err);
     }
 
-    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
     sprintf(szValue, "%u", iaid);
 
     if (iaid > 0)
     {
-        err = set_key_value(pszCfgFileName, SECTION_DHCP, KEY_IAID, szValue, 0);
+        err = nm_set_key_value(pszCfgFileName, SECTION_DHCP, KEY_IAID,
+                               szValue, 0);
     }
     else
     {
-        err = set_key_value(pszCfgFileName, SECTION_DHCP, KEY_IAID, NULL, 0);
+        err = nm_set_key_value(pszCfgFileName, SECTION_DHCP, KEY_IAID, NULL, 0);
     }
     bail_on_error(err);
 
-    err = restart_network_service();
+    err = nm_restart_network_service();
     bail_on_error(err);
 
 error:
@@ -3553,7 +3583,7 @@ error:
 }
 
 uint32_t
-get_iaid(
+nm_get_iaid(
     const char *pszInterfaceName,
     uint32_t *pIaid
 )
@@ -3568,10 +3598,10 @@ get_iaid(
         bail_on_error(err);
     }
 
-    err = get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
-    err = get_key_value(pszCfgFileName, SECTION_DHCP, KEY_IAID, &pszIaid);
+    err = nm_get_key_value(pszCfgFileName, SECTION_DHCP, KEY_IAID, &pszIaid);
     bail_on_error(err);
 
     sscanf(pszIaid, "%u", pIaid);
@@ -3592,7 +3622,7 @@ error:
     goto clean;
 }
 
-static const char * duid_strtype_from_type(uint16_t type)
+static const char * nm_duid_strtype_from_type(uint16_t type)
 {
     if ((type > _DUID_TYPE_MIN) && (type < _DUID_TYPE_MAX))
     {
@@ -3601,7 +3631,7 @@ static const char * duid_strtype_from_type(uint16_t type)
     return NULL;
 }
 
-static uint16_t duid_type_from_strtype(const char *strtype)
+static uint16_t nm_duid_type_from_strtype(const char *strtype)
 {
     DUIDType dt;
     for (dt = _DUID_TYPE_MIN+1; dt < _DUID_TYPE_MAX; dt++)
@@ -3615,7 +3645,7 @@ static uint16_t duid_type_from_strtype(const char *strtype)
 }
 
 uint32_t
-set_duid(
+nm_set_duid(
     const char *pszInterfaceName,
     const char *pszDuid
 )
@@ -3633,18 +3663,18 @@ set_duid(
     }
     else
     {
-        err = get_networkd_conf_filename(&pszCfgFileName);
+        err = nm_get_networkd_conf_filename(&pszCfgFileName);
     }
     bail_on_error(err);
 
     if ((pszDuid == NULL) || (strlen(pszDuid) == 0))
     {
-        err = set_key_value(pszCfgFileName, SECTION_DHCP, KEY_DUID_TYPE, NULL,
-                            F_CREATE_CFG_FILE);
+        err = nm_set_key_value(pszCfgFileName, SECTION_DHCP, KEY_DUID_TYPE,
+                               NULL, F_CREATE_CFG_FILE);
         bail_on_error(err);
 
-        err = set_key_value(pszCfgFileName, SECTION_DHCP, KEY_DUID_RAWDATA, NULL,
-                            F_CREATE_CFG_FILE);
+        err = nm_set_key_value(pszCfgFileName, SECTION_DHCP, KEY_DUID_RAWDATA,
+                               NULL, F_CREATE_CFG_FILE);
         bail_on_error(err);
     }
     else
@@ -3655,7 +3685,7 @@ set_duid(
             bail_on_error(err);
         }
 
-        duidType = duid_strtype_from_type((n1 << 8) | n2);
+        duidType = nm_duid_strtype_from_type((n1 << 8) | n2);
         if (duidType == NULL)
         {
             err = EINVAL;
@@ -3663,16 +3693,16 @@ set_duid(
         }
         /* TODO: Validate DUID length and DUID bytes */
 
-        err = set_key_value(pszCfgFileName, SECTION_DHCP, KEY_DUID_TYPE, duidType,
-                            F_CREATE_CFG_FILE);
+        err = nm_set_key_value(pszCfgFileName, SECTION_DHCP, KEY_DUID_TYPE,
+                               duidType, F_CREATE_CFG_FILE);
         bail_on_error(err);
 
-        err = set_key_value(pszCfgFileName, SECTION_DHCP, KEY_DUID_RAWDATA, szDuid,
-                            F_CREATE_CFG_FILE);
+        err = nm_set_key_value(pszCfgFileName, SECTION_DHCP, KEY_DUID_RAWDATA,
+                               szDuid, F_CREATE_CFG_FILE);
         bail_on_error(err);
     }
 
-    err = restart_network_service();
+    err = nm_restart_network_service();
     bail_on_error(err);
 
 error:
@@ -3681,7 +3711,7 @@ error:
 }
 
 uint32_t
-get_duid(
+nm_get_duid(
     const char *pszInterfaceName,
     char **ppszDuid
 )
@@ -3705,21 +3735,23 @@ get_duid(
     }
     else
     {
-        err = get_networkd_conf_filename(&pszCfgFileName);
+        err = nm_get_networkd_conf_filename(&pszCfgFileName);
     }
     bail_on_error(err);
 
-    err = get_key_value(pszCfgFileName, SECTION_DHCP, KEY_DUID_TYPE, &pszDuidType);
+    err = nm_get_key_value(pszCfgFileName, SECTION_DHCP, KEY_DUID_TYPE,
+                           &pszDuidType);
     bail_on_error(err);
 
-    duidType = duid_type_from_strtype(pszDuidType);
+    duidType = nm_duid_type_from_strtype(pszDuidType);
     if (duidType == 0)
     {
         err = EINVAL;
         bail_on_error(err);
     }
 
-    err = get_key_value(pszCfgFileName, SECTION_DHCP, KEY_DUID_RAWDATA, &pszDuid);
+    err = nm_get_key_value(pszCfgFileName, SECTION_DHCP, KEY_DUID_RAWDATA,
+                           &pszDuid);
     bail_on_error(err);
 
     err = netmgr_alloc((strlen(pszDuid) + 8), (void *)ppszDuid);
@@ -3746,13 +3778,138 @@ error:
     goto clean;
 }
 
+
+/*
+ * Misc APIs
+ */
 uint32_t
-stop_network_service()
+nm_wait_for_link_up(
+    const char *pszInterfaceName,
+    uint32_t timeout
+)
+{
+    //TODO: Implment..
+    return 0;
+}
+
+uint32_t
+nm_wait_for_ip(
+    const char *pszInterfaceName,
+    uint32_t timeout,
+    NET_ADDR_TYPE addrTypes
+)
+{
+    //TODO: Implment this function, sleep(1) for now
+    sleep(1);
+    return 0;
+}
+
+uint32_t
+nm_set_network_param(
+    const char *pszInterfaceName,
+    const char *pszParamName,
+    const char *pszParamValue
+)
+{
+    uint32_t err = 0;
+    char *pszCfgFileName = NULL;
+    char *pszParam = NULL, *pszParamPtr = NULL;
+    char *pszSectionName = NULL, *pszKeyName = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) || IS_NULL_OR_EMPTY(pszParamName))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    bail_on_error(err);
+
+    err = netmgr_alloc_string(pszParamName, &pszParam);
+    bail_on_error(err);
+    pszParamPtr = pszParam;
+    pszSectionName = strsep(&pszParam, SECTION_KEY_DELIM);
+    if (pszSectionName == NULL)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+    pszKeyName = pszParam;
+
+    err = nm_set_key_value(pszCfgFileName, pszSectionName, pszKeyName,
+                           pszParamValue, 0);
+    bail_on_error(err);
+
+cleanup:
+    netmgr_free(pszParamPtr);
+    netmgr_free(pszCfgFileName);
+    return err;
+error:
+    goto cleanup;
+}
+
+uint32_t
+nm_get_network_param(
+    const char *pszInterfaceName,
+    const char *pszParamName,
+    char **ppszParamValue
+)
+{
+    uint32_t err = 0;
+    char *pszCfgFileName = NULL;
+    char *pszParam = NULL, *pszParamPtr = NULL;
+    char *pszSectionName = NULL, *pszKeyName = NULL, *pszParamValue = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) || IS_NULL_OR_EMPTY(pszParamName) ||
+        !ppszParamValue)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    bail_on_error(err);
+
+    err = netmgr_alloc_string(pszParamName, &pszParam);
+    bail_on_error(err);
+    pszParamPtr = pszParam;
+    pszSectionName = strsep(&pszParam, SECTION_KEY_DELIM);
+    if (pszSectionName == NULL)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+    pszKeyName = pszParam;
+
+    err = nm_get_key_value(pszCfgFileName, pszSectionName, pszKeyName,
+                           &pszParamValue);
+    bail_on_error(err);
+
+    *ppszParamValue = pszParamValue;
+
+cleanup:
+    netmgr_free(pszParamPtr);
+    netmgr_free(pszCfgFileName);
+    return err;
+error:
+    if (ppszParamValue)
+    {
+        *ppszParamValue = NULL;
+    }
+    goto cleanup;
+}
+
+
+/*
+ * Service management APIs
+ */
+uint32_t
+nm_stop_network_service()
 {
     uint32_t err = 0;
     const char command[] = "systemctl stop systemd-networkd";
 
-    err = netmgr_run_command(command);
+    err = nm_run_command(command);
     bail_on_error(err);
 
 clean:
@@ -3763,12 +3920,12 @@ error:
 }
 
 uint32_t
-restart_network_service()
+nm_restart_network_service()
 {
     uint32_t err = 0;
     const char command[] = "systemctl restart systemd-networkd";
 
-    err = netmgr_run_command(command);
+    err = nm_run_command(command);
     bail_on_error(err);
 
 clean:
@@ -3779,12 +3936,12 @@ error:
 }
 
 uint32_t
-stop_dns_service()
+nm_stop_dns_service()
 {
     uint32_t err = 0;
     const char command[] = "systemctl stop systemd-resolved";
 
-    err = netmgr_run_command(command);
+    err = nm_run_command(command);
     bail_on_error(err);
 
 clean:
@@ -3795,12 +3952,12 @@ error:
 }
 
 uint32_t
-restart_dns_service()
+nm_restart_dns_service()
 {
     uint32_t err = 0;
     const char command[] = "systemctl restart systemd-resolved";
 
-    err = netmgr_run_command(command);
+    err = nm_run_command(command);
     bail_on_error(err);
 
 clean:

@@ -29,6 +29,56 @@ is_ipv6_addr(const char *pszIpAddr)
 }
 
 uint32_t
+flush_interface_ipaddr(
+    const char *pszInterfaceName
+)
+{
+    uint32_t err = 0;
+    int sockFd = -1;
+    struct ifreq ifr;
+    struct sockaddr_in sin;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+        (strlen(pszInterfaceName) > IFNAMSIZ))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
+
+    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockFd < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+    // TODO: Flush IPV6 Address
+
+    memset(&sin, 0, sizeof(struct sockaddr_in));
+    inet_aton("0.0.0.0", &sin.sin_addr);
+    sin.sin_family = AF_INET;
+    memcpy(&ifr.ifr_addr, &sin, sizeof(struct sockaddr_in));
+
+    err = ioctl(sockFd, SIOCSIFADDR, &ifr);
+    if (err != 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+cleanup:
+    if (sockFd > -1)
+    {
+        close(sockFd);
+    }
+    return err;
+error:
+    goto cleanup;
+}
+
+uint32_t
 get_prefix_from_netmask(
     struct sockaddr *pSockAddr,
     uint8_t *pPrefix

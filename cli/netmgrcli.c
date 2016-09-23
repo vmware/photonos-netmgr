@@ -1034,6 +1034,107 @@ error:
 }
 
 
+static struct option netInfoOptions[] =
+{
+    {"set",          no_argument,          0,    's'},
+    {"get",          no_argument,          0,    'g'},
+    {"interface",    required_argument,    0,    'i'},
+    {"paramname",    required_argument,    0,    'p'},
+    {"paramvalue",   required_argument,    0,     0 },
+    {0, 0, 0, 0}
+};
+
+static uint32_t
+cli_net_info(
+    int argc,
+    char **argv,
+    PNETMGR_CMD pCmd
+    )
+{
+    uint32_t err = 0;
+    int nOptionIndex = 0, nOption = 0;
+    CMD_OP op = OP_INVALID;
+
+    opterr = 0;
+    optind = 1;
+    while (1)
+    {
+        nOption = getopt_long(argc,
+                              argv,
+                              "sgi:p:",
+                              netInfoOptions,
+                              &nOptionIndex);
+        if (nOption == -1)
+            break;
+
+        switch(nOption)
+        {
+            case 's':
+                op = OP_SET;
+                break;
+            case 'g':
+                op = OP_GET;
+                break;
+            case 'i':
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("interface", optarg, pCmd);
+                }
+                else
+                {
+                    fprintf(stderr, "Invalid interface name.\n");
+                    err = EDOM;
+                }
+                break;
+            case 'p':
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("paramname", optarg, pCmd);
+                }
+                else
+                {
+                    fprintf(stderr, "Invalid parameter name.\n");
+                    err = EDOM;
+                }
+                break;
+            case 0:
+                /* --paramvalue option */
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("paramvalue", optarg, pCmd);
+                }
+                break;
+            case '?':
+                /* Option not handled here. Ignore. */
+                break;
+        }
+        bail_on_error(err);
+    }
+
+    if (op == OP_INVALID)
+    {
+        err = EDOM;
+        bail_on_error(err);
+    }
+
+    pCmd->id = CMD_NET_INFO;
+    pCmd->op = op;
+
+cleanup:
+    return err;
+
+error:
+    pCmd->op = OP_INVALID;
+    if(err == EDOM)
+    {
+        fprintf(stderr,
+                "Usage:\nnet_info --get\nnet_info --set "
+                "--interface <ifname> --paramname <param name> "
+                "--paramvalue <param value>\n");
+    }
+    goto cleanup;
+}
+
 
 /* Map command name to command parser function */
 typedef struct _NETMGRCLI_CMD_MAP
@@ -1083,13 +1184,18 @@ NETMGRCLI_CMD_MAP cmdMap[] =
     },
     {"if_iaid",
      cli_if_iaid,
-     "--set --iaid <IAID value>> --interface <interface name>",
+     "--set --iaid <IAID value> --interface <interface name>",
      "get or set interface IAID"
     },
     {"dns_domains",
      cli_dns_domains,
      "--set --del --add --domains <Domains list>",
      "get or set DNS domains list"
+    },
+    {"net_info",
+     cli_net_info,
+     "--set --interface <interface name> --paramname <param name> --paramvalue <value>"
+     "get or set network parameters"
     },
 };
 

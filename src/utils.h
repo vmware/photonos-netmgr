@@ -18,7 +18,7 @@
 #define F_CREATE_CFG_FILE              0x00000001
 
 uint32_t
-set_key_value(
+nm_set_key_value(
     const char *pszConfigFileName,
     const char *pszSection,
     const char *pszKey,
@@ -27,7 +27,7 @@ set_key_value(
 );
 
 uint32_t
-add_key_value(
+nm_add_key_value(
     const char *pszConfigFileName,
     const char *pszSection,
     const char *pszKey,
@@ -36,7 +36,7 @@ add_key_value(
 );
 
 uint32_t
-delete_key_value(
+nm_delete_key_value(
     const char *pszConfigFileName,
     const char *pszSection,
     const char *pszKey,
@@ -45,7 +45,7 @@ delete_key_value(
 );
 
 uint32_t
-get_key_value(
+nm_get_key_value(
     const char *pszConfigFileName,
     const char *pszSection,
     const char *pszKey,
@@ -53,7 +53,7 @@ get_key_value(
 );
 
 uint32_t
-netmgr_run_command(
+nm_run_command(
     const char *pszCommand
 );
 

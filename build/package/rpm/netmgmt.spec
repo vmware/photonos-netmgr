@@ -1,7 +1,7 @@
 Summary: Network Management Utilities
 Name:    netmgmt
 Version: 1.0.4
-Release: 5
+Release: 6
 Group:   Applications/System
 Vendor:  VMware, Inc.
 License: VMware
