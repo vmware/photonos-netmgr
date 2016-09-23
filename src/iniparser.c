@@ -44,7 +44,7 @@ ini_cfg_free_keyvalue(
 uint32_t
 ini_cfg_read(
     const char*  pszPath,
-    PCONFIG_INI* ppConfig 
+    PCONFIG_INI* ppConfig
     )
 {
     uint32_t err = 0;
@@ -365,7 +365,8 @@ ini_cfg_delete_sections(
     )
 {
     uint32_t err = 0;
-    PSECTION_INI pCursor = NULL;
+    PSECTION_INI *ppCursor = NULL;
+    PSECTION_INI pCandidate = NULL;
 
     if (!pConfig || !pszName || !*pszName)
     {
@@ -373,29 +374,23 @@ ini_cfg_delete_sections(
         bail_on_error(err);
     }
 
-    pCursor = pConfig->pSection; 
-    while (pCursor)
+    ppCursor = &pConfig->pSection;
+    while (*ppCursor)
     {
-        PSECTION_INI pCandidate = NULL;
-
-        if (!strcmp(pCursor->pszName, pszName))
+        if (!strcmp((*ppCursor)->pszName, pszName))
         {
-            pCandidate = pCursor;
-
-            if (pCursor == pConfig->pSection)
-            {
-                pConfig->pSection = pCursor->pNext;
-            }
+            pCandidate = *ppCursor;
+            *ppCursor = pCandidate->pNext;
+            break;
         }
 
-        pCursor = pCursor->pNext;
+        ppCursor = &(*ppCursor)->pNext;
+    }
+    if (pCandidate)
+    {
+        pCandidate->pNext = NULL;
 
-        if (pCandidate)
-        {
-            pCandidate->pNext = NULL;
-
-            ini_cfg_free_section(pCandidate);
-        }
+        ini_cfg_free_section(pCandidate);
     }
 
 error:
@@ -661,7 +656,7 @@ error:
 
     return err;
 }
-     
+
 uint32_t
 ini_cfg_delete_key_value(
     PSECTION_INI  pSection,
@@ -699,7 +694,7 @@ ini_cfg_delete_key_value(
 error:
     return err;
 }
-     
+
 uint32_t
 ini_cfg_save(
     const char*   pszPath,
