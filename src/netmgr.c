@@ -1193,6 +1193,15 @@ nm_get_ip_default_gateway(
 )
 {
     uint32_t err = 0;
+    static int msgSeq = 0;
+    int sockFd = -1, readLen, msgLen = 0, rtLen, pId;
+    struct nlmsghdr *nlHdr, *nlMsg;
+    struct rtmsg *rtMsg;
+    struct rtattr *rtAttr;
+    struct in_addr dst4 = {0}, gw4 = {0};
+#define BUFSIZE 8192
+    char ifName[IFNAMSIZ], szMsgBuf[BUFSIZE], *pszMsgBuf = szMsgBuf;
+    char szGateway[INET6_ADDRSTRLEN], *pszGateway = NULL;
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) || !ppszGateway)
     {
@@ -1200,16 +1209,109 @@ nm_get_ip_default_gateway(
         bail_on_error(err);
     }
 
-    //TODO: Implement
-    err = ENOENT;
+    if ((sockFd = socket(PF_NETLINK, SOCK_DGRAM, NETLINK_ROUTE)) < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    memset(pszMsgBuf, 0, BUFSIZE);
+    nlMsg = (struct nlmsghdr *)pszMsgBuf;
+    rtMsg = (struct rtmsg *)NLMSG_DATA(nlMsg);
+    nlMsg->nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
+    nlMsg->nlmsg_type = RTM_GETROUTE;
+    SET_FLAG(nlMsg->nlmsg_flags, (NLM_F_DUMP | NLM_F_REQUEST));
+    nlMsg->nlmsg_seq = msgSeq++;
+    pId = nlMsg->nlmsg_pid = getpid();
+
+    if (send(sockFd, nlMsg, nlMsg->nlmsg_len, 0) < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+    do {
+        if ((readLen = recv(sockFd, pszMsgBuf, (BUFSIZE - msgLen), 0)) < 0)
+        {
+            err = errno;
+            bail_on_error(err);
+        }
+        nlHdr = (struct nlmsghdr *)pszMsgBuf;
+        if ((NLMSG_OK(nlHdr, readLen) == 0) ||
+            (nlHdr->nlmsg_type == NLMSG_ERROR))
+        {
+            err = errno;
+            bail_on_error(err);
+        }
+        if (nlHdr->nlmsg_type == NLMSG_DONE)
+        {
+            break;
+        }
+        pszMsgBuf += readLen;
+        msgLen += readLen;
+        if (!TEST_FLAG(nlHdr->nlmsg_flags, NLM_F_MULTI))
+        {
+            break;
+        }
+    } while ((nlHdr->nlmsg_seq != msgSeq) || (nlHdr->nlmsg_pid != pId));
+
+    for (; NLMSG_OK(nlMsg, msgLen); nlMsg = NLMSG_NEXT(nlMsg, msgLen))
+    {
+        rtMsg = (struct rtmsg *)NLMSG_DATA(((struct nlmsghdr *)nlMsg));
+        // TODO: Figure out IPv6
+        if ((rtMsg->rtm_table != RT_TABLE_MAIN) ||
+            (rtMsg->rtm_family != AF_INET))
+        {
+            continue;
+        }
+        rtAttr = (struct rtattr *)RTM_RTA(rtMsg);
+        rtLen = RTM_PAYLOAD(nlMsg);
+        for (; RTA_OK(rtAttr, rtLen); rtAttr = RTA_NEXT(rtAttr, rtLen))
+        {
+            switch (rtAttr->rta_type)
+            {
+                case RTA_OIF:
+                    if_indextoname(*(int *)RTA_DATA(rtAttr), ifName);
+                    break;
+                case RTA_GATEWAY:
+                    gw4.s_addr = *(uint32_t *)RTA_DATA(rtAttr);
+                    break;
+                case RTA_DST:
+                    dst4.s_addr = *(uint32_t *)RTA_DATA(rtAttr);
+                    break;
+                default:
+                    break;
+            }
+        }
+        if ((dst4.s_addr == 0) && !strcmp(ifName, pszInterfaceName))
+        {
+            if (inet_ntop(AF_INET, &gw4, szGateway, INET6_ADDRSTRLEN) != NULL)
+            {
+                err = netmgr_alloc_string(szGateway, &pszGateway);
+            }
+            else
+            {
+                err = errno;
+            }
+            bail_on_error(err);
+            break;
+        }
+    }
+
+    *ppszGateway = pszGateway;
 
 cleanup:
+    if (sockFd > -1)
+    {
+        close(sockFd);
+    }
     return err;
+
 error:
     if (ppszGateway)
     {
         *ppszGateway = NULL;
     }
+    netmgr_free(pszGateway);
     goto cleanup;
 }
 

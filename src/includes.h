@@ -16,17 +16,17 @@
 
 #include <glib.h>
 #include <glib/gstdio.h>
-#include <sys/ioctl.h>
-#include <net/if.h>
 #include <arpa/inet.h>
 #include <ifaddrs.h>
+#include <net/if.h>
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
+#include <sys/ioctl.h>
 
 #include <constants.h>
 #include <netmgmtsys.h>
-
 #include <netmgr.h>
 #include <iniparser.h>
-
 #include "../common/prototypes.h"
 #include "../common/common_utils.h"
 #include "defines.h"
