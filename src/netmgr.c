@@ -2547,6 +2547,10 @@ nm_get_routes(
 
     err = ini_cfg_find_sections(pConfig, SECTION_ROUTE, &ppSections,
                                 &dwNumSections);
+    if (dwNumSections == 0)
+    {
+        err = ENOENT;
+    }
     bail_on_error(err);
 
     err = netmgr_alloc(dwNumSections * sizeof(NET_IP_ROUTE *),
@@ -2556,6 +2560,9 @@ nm_get_routes(
     for (i = 0; i < dwNumSections; i++)
     {
         err = netmgr_alloc(sizeof(NET_IP_ROUTE), (void **)&ppRoutes[i]);
+        bail_on_error(err);
+
+        err = netmgr_alloc_string(pszInterfaceName, &ppRoutes[i]->pszInterfaceName);
         bail_on_error(err);
 
         pKeyVal = ini_cfg_find_key(ppSections[i], KEY_DEST);

@@ -45,7 +45,7 @@ typedef struct _NET_LINK_INFO
     uint32_t mtu;
     NET_LINK_MODE mode;
     NET_LINK_STATE state;
-} NET_LINK_INFO;
+} NET_LINK_INFO, *PNET_LINK_INFO;
 
 
 /*
@@ -97,7 +97,7 @@ typedef struct _NET_IP_ROUTE
     NET_ROUTE_SCOPE scope;
     uint32_t metric;
     uint32_t table;
-} NET_IP_ROUTE;
+} NET_IP_ROUTE, *PNET_IP_ROUTE;
 
 
 /*
