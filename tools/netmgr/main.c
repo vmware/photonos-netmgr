@@ -238,7 +238,8 @@ cmd_ip6_address(PNETMGR_CMD pCmd)
     uint32_t err = 0, dhcpEnabled, autoconfEnabled;;
     char *pszIfName = NULL, *pszDhcp = NULL, *pszAutoconf = NULL;
     char *pszAddrList = NULL, *pszGateway = NULL, *pszNewGateway = NULL;
-    char *a1, *a2, **ppszAddrList = NULL;
+    char *a1, *a2;
+    NET_IP_ADDR **ppIpAddrList = NULL;
     size_t i, count;
 
     netmgrcli_find_cmdopt(pCmd, "interface", &pszIfName);
@@ -358,8 +359,8 @@ cmd_ip6_address(PNETMGR_CMD pCmd)
 
             // TODO: Implement function to get IPv6 addr from ioctls,
             // and query static IP addr if that fails.
-            err = nm_get_static_ip_addr(pszIfName, STATIC_IPV6, &count,
-                                        &ppszAddrList);
+            err = nm_get_ip_addr(pszIfName, DHCP_IPV6 | AUTO_IPV6 | STATIC_IPV6,
+                                 &count, &ppIpAddrList);
             if (err == ENOENT)
             {
                 err = 0;
@@ -384,7 +385,9 @@ cmd_ip6_address(PNETMGR_CMD pCmd)
             }
             for (i = 0; i < count; i++)
             {
-                fprintf(stdout, "IPv6 Address=%s\n", ppszAddrList[i]);
+                fprintf(stdout, "%s Address=%s\n",
+                        nm_ip_addr_type_to_string(ppIpAddrList[i]->type),
+                        ppIpAddrList[i]->pszIPAddrPrefix);
             }
             if (pszGateway != NULL)
             {
@@ -400,7 +403,19 @@ cmd_ip6_address(PNETMGR_CMD pCmd)
     }
 
 cleanup:
-    netmgr_list_free(count, (void **)ppszAddrList);
+    if (ppIpAddrList != NULL)
+    {
+        for (i = 0; i < count; i++)
+        {
+            if (ppIpAddrList[i] == NULL)
+            {
+                continue;
+            }
+            netmgr_free(ppIpAddrList[i]->pszInterfaceName);
+            netmgr_free(ppIpAddrList[i]->pszIPAddrPrefix);
+        }
+        netmgr_list_free(count, (void **)ppIpAddrList);
+    }
     netmgr_free(pszGateway);
     return err;
 

@@ -61,13 +61,14 @@ typedef enum _NET_IPV4_ADDR_MODE
 
 typedef enum _NET_ADDR_TYPE
 {
-    STATIC_IPV4  =  0x00000001,
-    STATIC_IPV6  =  0x00000002,
-    DHCP_IPV4    =  0x00000010,
-    DHCP_IPV6    =  0x00000020,
-    AUTO_IPV6    =  0x00000040,
+    STATIC_IPV4        =  0x00000001,
+    STATIC_IPV6        =  0x00000002,
+    DHCP_IPV4          =  0x00000010,
+    DHCP_IPV6          =  0x00000020,
+    AUTO_IPV6          =  0x00000040,
+    LINK_LOCAL_IPV6    =  0x00000080,
 } NET_ADDR_TYPE;
-//#define ALL_IP_ADDR = or of all the above enum values
+//TODO: #define ALL_IP_ADDR = or of all the above enum values
 
 typedef struct _NET_IP_ADDR
 {
@@ -122,6 +123,11 @@ typedef struct _NET_INTERFACE
 const char *
 nm_link_state_to_string(
     NET_LINK_STATE state
+);
+
+const char *
+nm_ip_addr_type_to_string(
+    NET_ADDR_TYPE addrType
 );
 
 const char *
@@ -203,26 +209,10 @@ nm_free_link_info(
     NET_LINK_INFO *pNetLinkInfo
 );
 
-uint32_t
-nm_get_interface_ipaddr(
-    const char *pszInterfaceName,
-    NET_ADDR_TYPE addrType,
-    size_t *pCount,
-    char ***pppszIpAddress
-);
-
 
 /*
  * IP Address configuration APIs
  */
-uint32_t
-nm_get_static_ip_addr(
-    const char *pszInterfaceName,
-    uint32_t addrTypes,
-    size_t *pCount,
-    char ***pppszIpAddrList
-);
-
 //TODO: Support address for virtual interface e.g. "eth1:0"
 uint32_t
 nm_set_ipv4_addr_gateway(
@@ -264,6 +254,14 @@ nm_get_ipv6_addr_mode(
     const char *pszInterfaceName,
     uint32_t *pDhcpEnabled,
     uint32_t *pAutoconfEnabled
+);
+
+uint32_t
+nm_get_ip_addr(
+    const char *pszInterfaceName,
+    uint32_t addrTypes,
+    size_t *pCount,
+    NET_IP_ADDR ***pppIpAddrList
 );
 
 uint32_t
