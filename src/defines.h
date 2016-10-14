@@ -50,8 +50,12 @@
 
 #define SECTION_KEY_DELIM              "_"
 
+
+#define RESOLV_CONF_FILENAME           "/etc/resolv.conf"
+#define NTP_CONF_FILENAME              "/etc/ntp.conf"
 #define STR_NAMESERVER                 "nameserver"
 #define STR_SEARCH                     "search"
+#define STR_SERVER                     "server"
 
 
 #define fDHCP_IPV4         0x00000001

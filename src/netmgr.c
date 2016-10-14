@@ -3471,7 +3471,9 @@ error:
 }
 
 static uint32_t
-nm_read_etc_resolv_conf(char **ppszFileBuf)
+nm_read_conf_file(
+    const char *pszFilename,
+    char **ppszFileBuf)
 {
     uint32_t err = 0;
     long len;
@@ -3484,7 +3486,7 @@ nm_read_etc_resolv_conf(char **ppszFileBuf)
         bail_on_error(err);
     }
 
-    fp = fopen("/etc/resolv.conf", "r");
+    fp = fopen(pszFilename, "r");
     if (fp == NULL)
     {
         err = errno;
@@ -3561,7 +3563,7 @@ nm_get_dns_servers(
 
     if (pszInterfaceName == NULL)
     {
-        err = nm_read_etc_resolv_conf(&pszFileBuf);
+        err = nm_read_conf_file(RESOLV_CONF_FILENAME, &pszFileBuf);
         bail_on_error(err);
 
         s1 = pszFileBuf;
@@ -3851,7 +3853,7 @@ nm_get_dns_domains(
 
     if (pszInterfaceName == NULL)
     {
-        err = nm_read_etc_resolv_conf(&pszFileBuf);
+        err = nm_read_conf_file(RESOLV_CONF_FILENAME, &pszFileBuf);
         bail_on_error(err);
 
         pszDnsDomainsValue = strstr(pszFileBuf, STR_SEARCH);
@@ -4165,6 +4167,124 @@ error:
 
 
 /*
+ * NTP configuration APIs
+ */
+uint32_t
+nm_set_ntp_servers(
+    size_t count,
+    const char **ppszNtpServers
+)
+{
+    uint32_t err = 0;
+#if 0
+    char *pszNtpServersValue = NULL;
+
+    err = nm_space_delimited_string_append(count, ppszNtpServers, NULL,
+                                           &pszNtpServersValue);
+    bail_on_error(err);
+
+    if (count == 0)
+    {
+        err = nm_set_key_value(pszCfgFileName, szSectionName, KEY_DNS,
+                               NULL, 0);
+    }
+    else
+    {
+        err = nm_set_key_value(pszCfgFileName, szSectionName, KEY_DNS,
+                                   pszDnsServersValue, 0);
+    }
+    bail_on_error(err);
+
+    err = nm_restart_ntp_service();
+    bail_on_error(err);
+
+error:
+    netmgr_free(pszNtpServersValue);
+#endif
+    return err;
+}
+
+uint32_t
+nm_add_ntp_servers(
+    size_t count,
+    const char **ppszNtpServers
+)
+{
+
+    return 0;
+}
+
+uint32_t
+nm_delete_ntp_servers(
+    size_t count,
+    const char **ppszNtpServers
+)
+{
+
+    return 0;
+}
+
+uint32_t
+nm_get_ntp_servers(
+    size_t *pCount,
+    char ***pppszNtpServers
+)
+{
+    uint32_t err = 0;
+    char *pszFileBuf = NULL;
+    char *pszNtpServersValue, **ppszNtpServersList = NULL;
+    size_t count = 0;
+
+    if ((pCount == NULL) || (pppszNtpServers == NULL))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = nm_read_conf_file(NTP_CONF_FILENAME, &pszFileBuf);
+    bail_on_error(err);
+
+
+    pszNtpServersValue = strstr(pszFileBuf, STR_SERVER);
+    if (pszNtpServersValue == NULL)
+    {
+        err = ENOENT;
+        bail_on_error(err);
+    }
+    pszNtpServersValue = strstr(pszNtpServersValue, " ");
+    if (pszNtpServersValue == NULL)
+    {
+        err = ENOENT;
+        bail_on_error(err);
+    }
+    pszNtpServersValue++;
+
+    err = nm_space_delimited_string_to_list(pszNtpServersValue, &count,
+                                            &ppszNtpServersList);
+    bail_on_error(err);
+
+    *pCount = count;
+    *pppszNtpServers = ppszNtpServersList;
+
+clean:
+    netmgr_free(pszFileBuf);
+    return err;
+
+error:
+    netmgr_list_free(count, (void **)ppszNtpServersList);
+    if (pCount != NULL)
+    {
+        *pCount = 0;
+    }
+    if (pppszNtpServers != NULL)
+    {
+        *pppszNtpServers = NULL;
+    }
+    goto clean;
+}
+
+
+/*
  * Misc APIs
  */
 uint32_t
@@ -4299,7 +4419,6 @@ nm_stop_network_service()
 
 clean:
     return err;
-
 error:
     goto clean;
 }
@@ -4315,7 +4434,6 @@ nm_restart_network_service()
 
 clean:
     return err;
-
 error:
     goto clean;
 }
@@ -4331,7 +4449,6 @@ nm_stop_dns_service()
 
 clean:
     return err;
-
 error:
     goto clean;
 }
@@ -4347,7 +4464,36 @@ nm_restart_dns_service()
 
 clean:
     return err;
+error:
+    goto clean;
+}
 
+uint32_t
+nm_stop_ntp_service()
+{
+    uint32_t err = 0;
+    const char command[] = "systemctl stop ntpd";
+
+    err = nm_run_command(command);
+    bail_on_error(err);
+
+clean:
+    return err;
+error:
+    goto clean;
+}
+
+uint32_t
+nm_restart_ntp_service()
+{
+    uint32_t err = 0;
+    const char command[] = "systemctl restart ntpd";
+
+    err = nm_run_command(command);
+    bail_on_error(err);
+
+clean:
+    return err;
 error:
     goto clean;
 }
