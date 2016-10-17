@@ -4177,7 +4177,7 @@ nm_set_ntp_servers(
 {
     uint32_t err = 0;
     size_t i;
-    char szBuf[MAX_LINE];
+    char *pszBuf = NULL;
 
     // TODO: This is quick code. Fix this to not use sed.
     err = nm_run_command("/usr/bin/cp -f /etc/ntp.conf /tmp/ntpnew.conf");
@@ -4188,9 +4188,12 @@ nm_set_ntp_servers(
 
     for (i = 0; i < count; i++)
     {
-        sprintf(szBuf, "/usr/bin/echo server %s >> /tmp/ntpnew.conf",
-                ppszNtpServers[i]);
-        err = nm_run_command(szBuf);
+        err = netmgr_alloc_string_printf(&pszBuf,
+                           "/usr/bin/echo server %s >> /tmp/ntpnew.conf",
+                           ppszNtpServers[i]);
+        bail_on_error(err);
+        err = nm_run_command(pszBuf);
+        netmgr_free(pszBuf);
         bail_on_error(err);
     }
 
@@ -4209,7 +4212,7 @@ nm_add_ntp_servers(
 {
     uint32_t err = 0;
     size_t i;
-    char szBuf[MAX_LINE];
+    char *pszBuf = NULL;
 
     // TODO: This is quick code. Fix this to not use run command.
     err = nm_run_command("/usr/bin/cp -f /etc/ntp.conf /tmp/ntpnew.conf");
@@ -4217,9 +4220,12 @@ nm_add_ntp_servers(
 
     for (i = 0; i < count; i++)
     {
-        sprintf(szBuf, "/usr/bin/echo server %s >> /tmp/ntpnew.conf",
-                ppszNtpServers[i]);
-        err = nm_run_command(szBuf);
+        err = netmgr_alloc_string_printf(&pszBuf,
+                           "/usr/bin/echo server %s >> /tmp/ntpnew.conf",
+                           ppszNtpServers[i]);
+        bail_on_error(err);
+        err = nm_run_command(pszBuf);
+        netmgr_free(pszBuf);
         bail_on_error(err);
     }
 
@@ -4238,7 +4244,7 @@ nm_delete_ntp_servers(
 {
     uint32_t err = 0;
     size_t i;
-    char szBuf[MAX_LINE];
+    char *pszBuf = NULL;
 
     // TODO: This is quick code. Fix this to not use sed.
     err = nm_run_command("/usr/bin/cp -f /etc/ntp.conf /tmp/ntpnew.conf");
@@ -4246,9 +4252,12 @@ nm_delete_ntp_servers(
 
     for (i = 0; i < count; i++)
     {
-        sprintf(szBuf, "/usr/bin/sed -i '/^server %s/d' /tmp/ntpnew.conf",
-                ppszNtpServers[i]);
-        err = nm_run_command(szBuf);
+        err = netmgr_alloc_string_printf(&pszBuf,
+                           "/usr/bin/sed -i '/^server %s/d' /tmp/ntpnew.conf",
+                           ppszNtpServers[i]);
+        bail_on_error(err);
+        err = nm_run_command(pszBuf);
+        netmgr_free(pszBuf);
         bail_on_error(err);
     }
 
