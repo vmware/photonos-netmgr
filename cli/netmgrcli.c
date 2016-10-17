@@ -1034,6 +1034,96 @@ error:
 }
 
 
+static struct option ntpServersOptions[] =
+{
+    {"set",          no_argument,          0,    's'},
+    {"add",          no_argument,          0,    'a'},
+    {"del",          no_argument,          0,    'd'},
+    {"get",          no_argument,          0,    'g'},
+    {"servers",      required_argument,    0,     0 },
+    {0, 0, 0, 0}
+};
+
+static uint32_t
+cli_ntp_servers(
+    int argc,
+    char **argv,
+    PNETMGR_CMD pCmd
+    )
+{
+    uint32_t err = 0, valid_servers = 0;
+    int nOptionIndex = 0, nOption = 0;
+    CMD_OP op = OP_INVALID;
+
+    opterr = 0;
+    optind = 1;
+    while (1)
+    {
+        nOption = getopt_long(argc,
+                              argv,
+                              "sadg",
+                              ntpServersOptions,
+                              &nOptionIndex);
+        if (nOption == -1)
+            break;
+
+        switch(nOption)
+        {
+            case 's':
+                op = OP_SET;
+                break;
+            case 'a':
+                op = OP_ADD;
+                break;
+            case 'd':
+                op = OP_DEL;
+                break;
+            case 'g':
+                op = OP_GET;
+                break;
+            case 0:
+                /* --servers option */
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("servers", optarg, pCmd);
+                    valid_servers = 1;
+                }
+                break;
+            case '?':
+                /* Option not handled here. Ignore. */
+                break;
+        }
+        bail_on_error(err);
+    }
+
+    if ((op == OP_INVALID) ||
+        (((op == OP_DEL) || (op == OP_ADD) || (op == OP_SET)) &&
+        (valid_servers == 0)))
+    {
+        err = EDOM;
+        bail_on_error(err);
+    }
+
+    pCmd->id = CMD_NTP_SERVERS;
+    pCmd->op = op;
+
+cleanup:
+    return err;
+
+error:
+    pCmd->op = OP_INVALID;
+    if(err == EDOM)
+    {
+        fprintf(stderr,
+                "Usage:\nntp_servers --get\nntp_servers --set "
+                 "--servers <server1,server2,...>\n"
+                 "ntp_servers --add --servers <server>\n"
+                 "ntp_servers --del --servers <server>\n");
+    }
+    goto cleanup;
+}
+
+
 static struct option netInfoOptions[] =
 {
     {"set",          no_argument,          0,    's'},
@@ -1177,6 +1267,11 @@ NETMGRCLI_CMD_MAP cmdMap[] =
      "--set --mode <dhcp|static> --servers <DNS servers list>",
      "get or set DNS mode, DNS servers list"
     },
+    {"dns_domains",
+     cli_dns_domains,
+     "--set --del --add --domains <Domains list>",
+     "get or set DNS domains list"
+    },
     {"dhcp_duid",
      cli_dhcp_duid,
      "--set --duid <DUID string> --interface <interface name>",
@@ -1187,9 +1282,9 @@ NETMGRCLI_CMD_MAP cmdMap[] =
      "--set --iaid <IAID value> --interface <interface name>",
      "get or set interface IAID"
     },
-    {"dns_domains",
-     cli_dns_domains,
-     "--set --del --add --domains <Domains list>",
+    {"ntp_servers",
+     cli_ntp_servers,
+     "--set --del --add --servers <NTP servers list>",
      "get or set DNS domains list"
     },
     {"net_info",

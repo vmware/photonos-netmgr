@@ -385,6 +385,30 @@ nm_get_duid(
 
 
 /*
+ * NTP configuration APIs
+ */
+uint32_t
+nm_set_ntp_servers(
+    size_t count,
+    const char **ppszNtpServers);
+
+uint32_t
+nm_add_ntp_servers(
+    size_t count,
+    const char **ppszNtpServers);
+
+uint32_t
+nm_delete_ntp_servers(
+    size_t count,
+    const char **ppszNtpServers);
+
+uint32_t
+nm_get_ntp_servers(
+    size_t *pCount,
+    char ***pppszNtpServers);
+
+
+/*
  * Misc APIs
  */
 uint32_t
@@ -429,6 +453,12 @@ nm_stop_dns_service();
 
 uint32_t
 nm_restart_dns_service();
+
+uint32_t
+nm_stop_ntp_service();
+
+uint32_t
+nm_restart_ntp_service();
 
 
 #endif /* __NETMGR_H__ */

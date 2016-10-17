@@ -805,6 +805,102 @@ error:
 }
 
 static uint32_t
+cmd_ntp_servers(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    size_t i = 0, count = 0;
+    char *pszNtpServers = NULL;
+    char *s1, *s2, *pszServers = NULL, **ppszNtpServersList = NULL;
+
+    switch (pCmd->op)
+    {
+        case OP_SET:
+        case OP_ADD:
+        case OP_DEL:
+            err = netmgrcli_find_cmdopt(pCmd, "servers", &pszNtpServers);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            if (pszNtpServers != NULL)
+            {
+                err = netmgr_alloc_string(pszNtpServers, &pszServers);
+                bail_on_error(err);
+                if (strlen(pszServers) > 0)
+                {
+                    s2 = pszServers;
+                    do {
+                        s1 = strsep(&s2, ",");
+                        if (strlen(s1) > 0)
+                        {
+                            count++;
+                        }
+                    } while (s2 != NULL);
+                }
+            }
+            if (count > 0)
+            {
+                err = netmgr_alloc((count * sizeof(char*)),
+                                   (void *)&ppszNtpServersList);
+                bail_on_error(err);
+                strcpy(pszServers, pszNtpServers);
+                s2 = pszServers;
+                do {
+                    s1 = strsep(&s2, ",");
+                    if (strlen(s1) > 0)
+                    {
+                        err = netmgr_alloc_string(s1,
+                                                  &(ppszNtpServersList[i++]));
+                        bail_on_error(err);
+                    }
+                } while (s2 != NULL);
+            }
+            if (pCmd->op == OP_SET)
+            {
+                err = nm_set_ntp_servers(count,
+                                         (const char **)ppszNtpServersList);
+            }
+            else if (pCmd->op == OP_ADD)
+            {
+                err = nm_add_ntp_servers(count,
+                                         (const char **)ppszNtpServersList);
+            }
+            else if (pCmd->op == OP_DEL)
+            {
+                err = nm_delete_ntp_servers(count,
+                                            (const char **)ppszNtpServersList);
+            }
+            break;
+
+        case OP_GET:
+            err = nm_get_ntp_servers(&count, &ppszNtpServersList);
+            bail_on_error(err);
+
+            fprintf(stdout, "NTPServers= ");
+            for (i = 0; i < count; i++)
+            {
+                fprintf(stdout, "%s ", ppszNtpServersList[i]);
+            }
+            fprintf(stdout, "\n");
+            break;
+
+        default:
+            err = EINVAL;
+    }
+    bail_on_error(err);
+
+cleanup:
+    netmgr_list_free(count, (void **)ppszNtpServersList);
+    netmgr_free(pszServers);
+    return err;
+
+error:
+    goto cleanup;
+}
+
+static uint32_t
 cmd_net_info(PNETMGR_CMD pCmd)
 {
     uint32_t err = 0;
@@ -874,6 +970,7 @@ NETMGR_CLI_HANDLER cmdHandler[] =
     { CMD_IF_IAID,             cmd_if_iaid         },
     { CMD_DNS_SERVERS,         cmd_dns_servers     },
     { CMD_DNS_DOMAINS,         cmd_dns_domains     },
+    { CMD_NTP_SERVERS,         cmd_ntp_servers     },
     { CMD_NET_INFO ,           cmd_net_info        },
 };
 
