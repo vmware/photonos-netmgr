@@ -343,3 +343,68 @@ error:
     goto clean;
 }
 
+uint32_t
+nm_acquire_write_lock(
+    uint32_t timeOut,
+    int *pLockId
+)
+{
+    uint32_t err;
+    int lockFd;
+    struct flock fLock = { F_WRLCK, SEEK_SET, 0, 0, getpid() };
+
+    if (!pLockId)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    lockFd = open(NM_LOCK_FILENAME, O_CREAT | O_WRONLY);
+    if (lockFd == -1)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    if (!fcntl(lockFd, F_SETLKW, &fLock))
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    *pLockId = lockFd;
+
+cleanup:
+    return err;
+error:
+    if (pLockId)
+    {
+        *pLockId = -1;
+    }
+    goto cleanup;
+}
+
+uint32_t
+nm_release_write_lock(
+    int lockId
+)
+{
+    uint32_t err = 0;
+    struct flock fLock = { F_UNLCK, SEEK_SET, 0, 0, getpid() };
+
+    if (lockId < 0)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if (!fcntl(lockId, F_SETLKW, &fLock))
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+    close(lockId);
+
+error:
+    return err;
+}

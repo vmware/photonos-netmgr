@@ -17,6 +17,7 @@
 
 
 #define MAX_LINE                       512
+#define NM_LOCK_FILENAME               "/run/lock/netmgr.lck"
 
 #define SYSTEMD_PATH                   "/etc/systemd/"
 #define SYSTEMD_NET_PATH               "/etc/systemd/network/"

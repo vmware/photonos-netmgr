@@ -57,4 +57,15 @@ nm_run_command(
     const char *pszCommand
 );
 
+uint32_t
+nm_acquire_write_lock(
+    uint32_t timeOut,
+    int *pLockId
+);
+
+uint32_t
+nm_release_write_lock(
+    int lockId
+);
+
 #endif /* __UTILS_H__ */

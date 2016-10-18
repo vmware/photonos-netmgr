@@ -229,6 +229,10 @@ nm_set_link_mac_addr(
 {
     uint32_t err = 0;
     char *pszCfgFileName = NULL;
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName))
     {
@@ -248,6 +252,7 @@ nm_set_link_mac_addr(
     bail_on_error(err);
 
 cleanup:
+    nm_release_write_lock(lockId);
     netmgr_free(pszCfgFileName);
     return err;
 
@@ -326,6 +331,10 @@ nm_set_link_mode(
     uint32_t err = 0;
     char *pszAutoCfgFileName = NULL, *pszManualCfgFileName = NULL;
     char *pszCurrentCfgFileName = NULL;
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) || (mode >= LINK_MODE_UNKNOWN))
     {
@@ -375,6 +384,7 @@ nm_set_link_mode(
     }
 
 cleanup:
+    nm_release_write_lock(lockId);
     netmgr_free(pszCurrentCfgFileName);
     netmgr_free(pszAutoCfgFileName);
     netmgr_free(pszManualCfgFileName);
@@ -437,6 +447,10 @@ nm_set_link_mtu(
     uint32_t err = 0;
     char *pszCfgFileName = NULL;
     char szValue[MAX_LINE] = "";
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName))
     {
@@ -464,6 +478,7 @@ nm_set_link_mtu(
     bail_on_error(err);
 
 cleanup:
+    nm_release_write_lock(lockId);
     netmgr_free(pszCfgFileName);
     return err;
 
@@ -530,6 +545,10 @@ nm_set_link_state(
     uint32_t err = 0;
     int sockFd = -1;
     struct ifreq ifr;
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
         (strlen(pszInterfaceName) > IFNAMSIZ) ||
@@ -586,6 +605,7 @@ nm_set_link_state(
     }
 
 cleanup:
+    nm_release_write_lock(lockId);
     if (sockFd > -1)
     {
         close(sockFd);
@@ -1949,6 +1969,10 @@ nm_set_ipv4_addr_gateway(
     uint32_t err = 0, currModeFlags = 0;
     uint8_t prefix = 0;
     char szIpAddr[INET6_ADDRSTRLEN];
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) || (mode >= IPV4_ADDR_MODE_MAX))
     {
@@ -2015,6 +2039,7 @@ nm_set_ipv4_addr_gateway(
     bail_on_error(err);
 
 cleanup:
+    nm_release_write_lock(lockId);
     return err;
 error:
     goto cleanup;
@@ -2161,6 +2186,10 @@ nm_add_static_ipv6_addr(
     uint32_t err = 0;
     uint8_t prefix = 0;
     char *pszCfgFileName = NULL, szIpAddr[INET6_ADDRSTRLEN];
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
         IS_NULL_OR_EMPTY(pszIPv6AddrPrefix) ||
@@ -2182,6 +2211,7 @@ nm_add_static_ipv6_addr(
     bail_on_error(err);
 
 cleanup:
+    nm_release_write_lock(lockId);
     netmgr_free(pszCfgFileName);
     return err;
 error:
@@ -2198,6 +2228,10 @@ nm_delete_static_ipv6_addr(
     uint32_t err = 0;
     uint8_t prefix = 0;
     char *pszCfgFileName = NULL, szIpAddr[INET6_ADDRSTRLEN];
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
         IS_NULL_OR_EMPTY(pszIPv6AddrPrefix) ||
@@ -2219,6 +2253,7 @@ nm_delete_static_ipv6_addr(
     bail_on_error(err);
 
 cleanup:
+    nm_release_write_lock(lockId);
     netmgr_free(pszCfgFileName);
     return err;
 error:
@@ -2233,6 +2268,10 @@ nm_set_ipv6_addr_mode(
 )
 {
     uint32_t err = 0, modeFlags;
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     err = nm_get_ip_dhcp_mode(pszInterfaceName, &modeFlags);
     bail_on_error(err);
@@ -2262,6 +2301,7 @@ nm_set_ipv6_addr_mode(
     bail_on_error(err);
 
 error:
+    nm_release_write_lock(lockId);
     return err;
 }
 
@@ -2542,6 +2582,10 @@ nm_set_ipv6_gateway(
 )
 {
     uint32_t err = 0;
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     if (!pszInterfaceName || (!IS_NULL_OR_EMPTY(pszIPv6Gateway) &&
         !is_ipv6_addr(pszIPv6Gateway)))
@@ -2569,6 +2613,7 @@ nm_set_ipv6_gateway(
     bail_on_error(err);
 
 error:
+    nm_release_write_lock(lockId);
     return err;
 }
 
@@ -2894,6 +2939,10 @@ nm_add_static_ip_route(
     uint8_t prefix = 255;
     char szDestAddr[INET6_ADDRSTRLEN+5];
     NET_IP_ROUTE route;
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     if (IS_NULL_OR_EMPTY(pRoute->pszInterfaceName) ||
         IS_NULL_OR_EMPTY(pRoute->pszDestNetwork) ||
@@ -2939,6 +2988,7 @@ nm_add_static_ip_route(
     bail_on_error(err);
 
 cleanup:
+    nm_release_write_lock(lockId);
     return err;
 error:
     goto cleanup;
@@ -2953,6 +3003,10 @@ nm_delete_static_ip_route(
     uint8_t prefix = 255;
     char szDestAddr[INET6_ADDRSTRLEN+5];
     NET_IP_ROUTE route;
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     if (IS_NULL_OR_EMPTY(pRoute->pszInterfaceName) ||
         IS_NULL_OR_EMPTY(pRoute->pszDestNetwork) ||
@@ -2987,6 +3041,7 @@ nm_delete_static_ip_route(
     bail_on_error(err);
 
 cleanup:
+    nm_release_write_lock(lockId);
     return err;
 error:
     goto cleanup;
@@ -3229,6 +3284,10 @@ nm_add_dns_server(
     char szSectionName[MAX_LINE];
     char *pszCurrentDnsServers = NULL;
     char *pszNewDnsServersValue = NULL;
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     if (IS_NULL_OR_EMPTY(pszDnsServer) || !(is_ipv4_addr(pszDnsServer) ||
         is_ipv6_addr(pszDnsServer)))
@@ -3281,6 +3340,7 @@ nm_add_dns_server(
     bail_on_error(err);
 
 cleanup:
+    nm_release_write_lock(lockId);
     netmgr_free(pszCurrentDnsServers);
     netmgr_free(pszNewDnsServersValue);
     netmgr_free(pszCfgFileName);
@@ -3301,6 +3361,10 @@ nm_delete_dns_server(
     char szSectionName[MAX_LINE];
     char *pszCurrentDnsServers = NULL, *pszMatch, *pszNext;
     char *pszNewDnsServersValue = NULL;
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     if (IS_NULL_OR_EMPTY(pszDnsServer) || !(is_ipv4_addr(pszDnsServer) ||
         is_ipv6_addr(pszDnsServer)))
@@ -3365,6 +3429,7 @@ nm_delete_dns_server(
     bail_on_error(err);
 
 cleanup:
+    nm_release_write_lock(lockId);
     netmgr_free(pszCurrentDnsServers);
     netmgr_free(pszCfgFileName);
     return err;
@@ -3388,6 +3453,10 @@ nm_set_dns_servers(
     char *pszDnsServersValue = NULL;
     DIR *dirFile = NULL;
     struct dirent *hFile;
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     if (pszInterfaceName != NULL)
     {
@@ -3461,6 +3530,7 @@ nm_set_dns_servers(
     bail_on_error(err);
 
 error:
+    nm_release_write_lock(lockId);
     if (dirFile != NULL)
     {
         closedir(dirFile);
@@ -3656,6 +3726,10 @@ nm_add_dns_domain(
     char szSectionName[MAX_LINE];
     char *pszCurrentDnsDomains = NULL;
     char *pszDnsDomainsValue = NULL;
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     if (pszDnsDomain == NULL)
     {
@@ -3697,6 +3771,7 @@ nm_add_dns_domain(
     bail_on_error(err);
 
 cleanup:
+    nm_release_write_lock(lockId);
     netmgr_free(pszCurrentDnsDomains);
     netmgr_free(pszDnsDomainsValue);
     netmgr_free(pszCfgFileName);
@@ -3719,6 +3794,10 @@ nm_delete_dns_domain(
     char *pszNewDnsDomainsList = NULL;
     char *pszMatch = NULL;
     char *pszNext = NULL;
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     if (pszDnsDomain == NULL)
     {
@@ -3773,6 +3852,7 @@ nm_delete_dns_domain(
     bail_on_error(err);
 
 cleanup:
+    nm_release_write_lock(lockId);
     netmgr_free(pszNewDnsDomainsList);
     netmgr_free(pszCfgFileName);
     return err;
@@ -3792,6 +3872,10 @@ nm_set_dns_domains(
     char *pszCfgFileName = NULL;
     char szSectionName[MAX_LINE];
     char *pszDnsDomainsValue = NULL;
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     if (pszInterfaceName != NULL)
     {
@@ -3827,6 +3911,7 @@ nm_set_dns_domains(
     bail_on_error(err);
 
 error:
+    nm_release_write_lock(lockId);
     netmgr_free(pszDnsDomainsValue);
     netmgr_free(pszCfgFileName);
     return err;
@@ -3938,6 +4023,10 @@ nm_set_iaid(
     uint32_t err = 0;
     char *pszCfgFileName = NULL;
     char szValue[MAX_LINE] = "";
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName))
     {
@@ -3965,6 +4054,7 @@ nm_set_iaid(
     bail_on_error(err);
 
 error:
+    nm_release_write_lock(lockId);
     netmgr_free(pszCfgFileName);
     return err;
 }
@@ -4042,6 +4132,10 @@ nm_set_duid(
     const char *duidType;
     uint16_t n1, n2;
     char szDuid[MAX_LINE];
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     if (pszInterfaceName != NULL)
     {
@@ -4093,6 +4187,7 @@ nm_set_duid(
     bail_on_error(err);
 
 error:
+    nm_release_write_lock(lockId);
     netmgr_free(pszCfgFileName);
     return err;
 }
@@ -4176,8 +4271,12 @@ nm_set_ntp_servers(
 )
 {
     uint32_t err = 0;
-    size_t i;
     char *pszBuf = NULL;
+    size_t i;
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     // TODO: This is quick code. Fix this to not use sed.
     err = nm_run_command("/usr/bin/cp -f /etc/ntp.conf /tmp/ntpnew.conf");
@@ -4201,6 +4300,7 @@ nm_set_ntp_servers(
     bail_on_error(err);
 
 error:
+    nm_release_write_lock(lockId);
     return err;
 }
 
@@ -4213,6 +4313,10 @@ nm_add_ntp_servers(
     uint32_t err = 0;
     size_t i;
     char *pszBuf = NULL;
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     // TODO: This is quick code. Fix this to not use run command.
     err = nm_run_command("/usr/bin/cp -f /etc/ntp.conf /tmp/ntpnew.conf");
@@ -4233,6 +4337,7 @@ nm_add_ntp_servers(
     bail_on_error(err);
 
 error:
+    nm_release_write_lock(lockId);
     return err;
 }
 
@@ -4245,6 +4350,10 @@ nm_delete_ntp_servers(
     uint32_t err = 0;
     size_t i;
     char *pszBuf = NULL;
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
 
     // TODO: This is quick code. Fix this to not use sed.
     err = nm_run_command("/usr/bin/cp -f /etc/ntp.conf /tmp/ntpnew.conf");
@@ -4265,6 +4374,7 @@ nm_delete_ntp_servers(
     bail_on_error(err);
 
 error:
+    nm_release_write_lock(lockId);
     return err;
 }
 
