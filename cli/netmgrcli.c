@@ -1124,6 +1124,89 @@ error:
 }
 
 
+static struct option fwRuleOptions[] =
+{
+    {"add",          no_argument,          0,    'a'},
+    {"del",          no_argument,          0,    'd'},
+    {"get",          no_argument,          0,    'g'},
+    {"rule",         required_argument,    0,    'r'},
+    {0, 0, 0, 0}
+};
+
+static uint32_t
+cli_fw_rule(
+    int argc,
+    char **argv,
+    PNETMGR_CMD pCmd
+    )
+{
+    uint32_t err = 0, valid_rule = 0;
+    int nOptionIndex = 0, nOption = 0;
+    CMD_OP op = OP_INVALID;
+
+    opterr = 0;
+    optind = 1;
+    while (1)
+    {
+        nOption = getopt_long(argc,
+                              argv,
+                              "adgr:",
+                              fwRuleOptions,
+                              &nOptionIndex);
+        if (nOption == -1)
+            break;
+
+        switch(nOption)
+        {
+            case 'a':
+                op = OP_ADD;
+                break;
+            case 'd':
+                op = OP_DEL;
+                break;
+            case 'g':
+                op = OP_GET;
+                break;
+            case 'r':
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("rule", optarg, pCmd);
+                    valid_rule = 1;
+                }
+                break;
+            case '?':
+                /* Option not handled here. Ignore. */
+                break;
+        }
+        bail_on_error(err);
+    }
+
+    if ((op == OP_INVALID) ||
+        (((op == OP_DEL) || (op == OP_ADD)) && (valid_rule == 0)))
+    {
+        err = EDOM;
+        bail_on_error(err);
+    }
+
+    pCmd->id = CMD_FW_RULE;
+    pCmd->op = op;
+
+cleanup:
+    return err;
+
+error:
+    pCmd->op = OP_INVALID;
+    if(err == EDOM)
+    {
+        fprintf(stderr,
+                "Usage:\nfw_rule --get\n"
+                 "fw_rule --add --rule <Firewall Rule>\n"
+                 "fw_rule --del --rule <Firewall Rule>\n");
+    }
+    goto cleanup;
+}
+
+
 static struct option netInfoOptions[] =
 {
     {"set",          no_argument,          0,    's'},
@@ -1285,6 +1368,11 @@ NETMGRCLI_CMD_MAP cmdMap[] =
     {"ntp_servers",
      cli_ntp_servers,
      "--set --del --add --servers <NTP servers list>",
+     "get or set DNS domains list"
+    },
+    {"fw_rule",
+     cli_fw_rule,
+     "--add --del --rule <Firewall Rule>",
      "get or set DNS domains list"
     },
     {"net_info",

@@ -19,6 +19,9 @@
 #define CLEAR_FLAG(v, f) (v) = ((v) & ~(f))
 #define TEST_FLAG(v, f) (((v) & (f)) != 0)
 
+#define IPV4       4
+#define IPV6       6
+
 
 /*
  * Interface configuration structs
@@ -111,6 +114,39 @@ typedef enum _NET_DNS_MODE
     DHCP_DNS,
     DNS_MODE_MAX,
 } NET_DNS_MODE;
+
+
+/*
+ * Firewall configuration structs
+ */
+typedef enum _NET_FW_RULE_TYPE
+{
+    FW_RAW = 0,
+    FW_POLICY,
+    FW_RULE_TYPE_MAX
+} NET_FW_RULE_TYPE;
+
+typedef struct _NET_FW_RULE
+{
+    uint8_t ipVersion;
+    NET_FW_RULE_TYPE type;
+    union
+    {
+        struct
+        {
+            char *pszTable;
+            char *pszChain;
+            char *pszIfName;
+            char *pszProto;
+            char *srcIp;
+            char *dstIp;
+            uint16_t srcPort;
+            uint16_t dstPort;
+            char *pszTarget;
+        };
+        char *pszRawFwRule;     // e.g. -A INPUT  -i lo -j ACCEPT
+    };
+} NET_FW_RULE, *PNET_FW_RULE;
 
 
 typedef struct _NET_INTERFACE
@@ -390,22 +426,60 @@ nm_get_duid(
 uint32_t
 nm_set_ntp_servers(
     size_t count,
-    const char **ppszNtpServers);
+    const char **ppszNtpServers
+);
 
 uint32_t
 nm_add_ntp_servers(
     size_t count,
-    const char **ppszNtpServers);
+    const char **ppszNtpServers
+);
 
 uint32_t
 nm_delete_ntp_servers(
     size_t count,
-    const char **ppszNtpServers);
+    const char **ppszNtpServers
+);
 
 uint32_t
 nm_get_ntp_servers(
     size_t *pCount,
-    char ***pppszNtpServers);
+    char ***pppszNtpServers
+);
+
+
+/*
+ * Firewall configuration APIs
+ */
+uint32_t
+nm_set_firewall_policy(
+    const char *pszTable,
+    const char *pszChain,
+    const char *pszPolicy
+);
+
+uint32_t
+nm_get_firewall_policy(
+    const char *pszTable,
+    const char *pszChain,
+    char **ppszPolicy
+);
+
+uint32_t
+nm_add_firewall_rule(
+    NET_FW_RULE *pNetFwRule
+);
+
+uint32_t
+nm_delete_firewall_rule(
+    NET_FW_RULE *pNetFwRule
+);
+
+uint32_t
+nm_get_firewall_rules(
+    size_t *pCount,
+    NET_FW_RULE ***pppNetFwRules
+);
 
 
 /*

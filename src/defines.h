@@ -22,6 +22,8 @@
 #define SYSTEMD_PATH                   "/etc/systemd/"
 #define SYSTEMD_NET_PATH               "/etc/systemd/network/"
 
+#define IPTABLES_COMMAND               "/usr/sbin/iptables"
+#define IP6TABLES_COMMAND              "/usr/sbin/ip6tables"
 #define ARPING_COMMAND                 "/sbin/arping"
 #define ARPING_DUP_ADDR_CHECK_CMDOPT   "-D -q -c 2"
 #define ARPING_UPDATE_NEIGHBOR_CMDOPT  "-A -c 3"
@@ -54,6 +56,7 @@
 
 #define RESOLV_CONF_FILENAME           "/etc/resolv.conf"
 #define NTP_CONF_FILENAME              "/etc/ntp.conf"
+#define FIREWALL_CONF_FILENAME         "/etc/systemd/scripts/iptables"
 #define STR_NAMESERVER                 "nameserver"
 #define STR_SEARCH                     "search"
 #define STR_SERVER                     "server"

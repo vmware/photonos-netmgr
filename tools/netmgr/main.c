@@ -901,6 +901,65 @@ error:
 }
 
 static uint32_t
+cmd_fw_rule(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    char *pszFwRule = NULL;
+    NET_FW_RULE netFwRule = {0};
+
+    switch (pCmd->op)
+    {
+        case OP_ADD:
+        case OP_DEL:
+            err = netmgrcli_find_cmdopt(pCmd, "rule", &pszFwRule);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+
+            netFwRule.ipVersion = IPV4;
+            netFwRule.type = FW_RAW;
+            netFwRule.pszRawFwRule = pszFwRule;
+            pszFwRule = NULL;
+
+            if (pCmd->op == OP_ADD)
+            {
+                err = nm_add_firewall_rule(&netFwRule);
+            }
+            else if (pCmd->op == OP_DEL)
+            {
+                err = nm_delete_firewall_rule(&netFwRule);
+            }
+            break;
+
+        case OP_GET:
+#if 0
+            err = nm_get_ntp_servers(&count, &ppszNtpServersList);
+            bail_on_error(err);
+
+            fprintf(stdout, "NTPServers= ");
+            for (i = 0; i < count; i++)
+            {
+                fprintf(stdout, "%s ", ppszNtpServersList[i]);
+            }
+            fprintf(stdout, "\n");
+            break;
+#endif
+        default:
+            err = EINVAL;
+    }
+    bail_on_error(err);
+
+cleanup:
+    return err;
+
+error:
+    goto cleanup;
+}
+
+static uint32_t
 cmd_net_info(PNETMGR_CMD pCmd)
 {
     uint32_t err = 0;
@@ -971,6 +1030,7 @@ NETMGR_CLI_HANDLER cmdHandler[] =
     { CMD_DNS_SERVERS,         cmd_dns_servers     },
     { CMD_DNS_DOMAINS,         cmd_dns_domains     },
     { CMD_NTP_SERVERS,         cmd_ntp_servers     },
+    { CMD_FW_RULE    ,         cmd_fw_rule         },
     { CMD_NET_INFO ,           cmd_net_info        },
 };
 

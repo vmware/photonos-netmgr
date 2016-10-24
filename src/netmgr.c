@@ -4447,6 +4447,130 @@ error:
 
 
 /*
+ * Firewall configuration APIs
+ */
+uint32_t
+nm_add_firewall_rule(
+    NET_FW_RULE *pNetFwRule
+)
+{
+    uint32_t err = 0;
+    char *pszFileBuf = NULL, *pszFwRule = NULL, *pszNewFileBuf = NULL;
+
+    if ((pNetFwRule == NULL) || (pNetFwRule->type >= FW_RULE_TYPE_MAX))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if (pNetFwRule->type == FW_RAW)
+    {
+        err = netmgr_alloc_string_printf(&pszFwRule, "iptables %s",
+                                         pNetFwRule->pszRawFwRule);
+        bail_on_error(err);
+    }
+    else
+    {
+        // TODO:
+    }
+
+    err = nm_read_conf_file(FIREWALL_CONF_FILENAME, &pszFileBuf);
+    bail_on_error(err);
+
+    if (strstr(pszFileBuf, pszFwRule) != NULL)
+    {
+        err = EEXIST;
+        bail_on_error(err);
+    }
+
+    err = netmgr_alloc_string_printf(&pszNewFileBuf, "%s\n%s\n", pszFileBuf,
+                                     pszFwRule);
+    bail_on_error(err);
+
+    err = nm_atomic_file_update(FIREWALL_CONF_FILENAME, pszNewFileBuf);
+    bail_on_error(err);
+
+clean:
+    netmgr_free(pszFwRule);
+    netmgr_free(pszFileBuf);
+    netmgr_free(pszNewFileBuf);
+    return err;
+
+error:
+    goto clean;
+}
+
+uint32_t
+nm_delete_firewall_rule(
+    NET_FW_RULE *pNetFwRule
+)
+{
+    uint32_t err = 0;
+    char *pszFileBuf = NULL, *pszFwRule = NULL, *pszNewFileBuf = NULL;
+    char *pszLine = NULL;
+
+    if ((pNetFwRule == NULL) || (pNetFwRule->type >= FW_RULE_TYPE_MAX))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if (pNetFwRule->type == FW_RAW)
+    {
+        err = netmgr_alloc_string_printf(&pszFwRule, "iptables %s",
+                                         pNetFwRule->pszRawFwRule);
+        bail_on_error(err);
+    }
+    else
+    {
+        // TODO:
+    }
+
+    err = nm_read_conf_file(FIREWALL_CONF_FILENAME, &pszFileBuf);
+    bail_on_error(err);
+
+    if (strstr(pszFileBuf, pszFwRule) == NULL)
+    {
+        err = ENOENT;
+        bail_on_error(err);
+    }
+
+    err = netmgr_alloc(strlen(pszFileBuf), (void **)&pszNewFileBuf);
+    bail_on_error(err);
+
+    pszLine = strtok(pszFileBuf, "\n");
+    while (pszLine != NULL)
+    {
+        if (strcmp(pszFwRule, pszLine) != 0)
+        {
+            sprintf(pszNewFileBuf, "%s%s\n", pszNewFileBuf, pszLine);
+        }
+        pszLine = strtok(NULL, "\n");
+    }
+
+    err = nm_atomic_file_update(FIREWALL_CONF_FILENAME, pszNewFileBuf);
+    bail_on_error(err);
+
+clean:
+    netmgr_free(pszFwRule);
+    netmgr_free(pszFileBuf);
+    netmgr_free(pszNewFileBuf);
+    return err;
+
+error:
+    goto clean;
+}
+
+uint32_t
+nm_get_firewall_rules(
+    size_t *pCount,
+    NET_FW_RULE ***pppNetFwRules
+)
+{
+    return 0;
+}
+
+/*
  * Misc APIs
  */
 uint32_t

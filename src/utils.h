@@ -53,6 +53,12 @@ nm_get_key_value(
 );
 
 uint32_t
+nm_atomic_file_update(
+    const char *pszFileName,
+    const char *pszFileBuf
+);
+
+uint32_t
 nm_run_command(
     const char *pszCommand
 );

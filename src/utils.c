@@ -309,6 +309,64 @@ error:
     return err;
 }
 
+
+uint32_t
+nm_atomic_file_update(
+    const char *pszFileName,
+    const char *pszFileBuf
+)
+{
+    uint32_t err = 0;
+    char *pszTmpFileName = NULL;
+    FILE *pFile = NULL;
+
+    if (!pszFileName || !*pszFileName || !pszFileBuf)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = netmgr_alloc_string_printf(&pszTmpFileName, "%s.new", pszFileName);
+    bail_on_error(err);
+
+    pFile = fopen(pszTmpFileName, "w+");
+    if (!pFile)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    if (fprintf(pFile, "%s", pszFileBuf) < 0)
+    {
+        err = EBADF;
+        bail_on_error(err);
+    }
+    fclose(pFile);
+    pFile = NULL;
+
+    if (chmod(pszTmpFileName, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH) != 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    if (rename(pszTmpFileName, pszFileName) < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+clean:
+    netmgr_free(pszTmpFileName);
+    if (pFile)
+    {
+        fclose(pFile);
+    }
+    return err;
+error:
+    goto clean;
+}
+
 uint32_t
 nm_run_command(
     const char *pszCommand

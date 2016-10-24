@@ -731,7 +731,7 @@ ini_cfg_save(
     {
         PKEYVALUE_INI pKeyValue = pSection->pKeyValue;
 
-        if(fprintf(fp, "\n[%s]\n", pSection->pszName) < 0)
+        if (fprintf(fp, "\n[%s]\n", pSection->pszName) < 0)
         {
             err = EBADF;
             bail_on_error(err);
