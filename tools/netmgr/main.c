@@ -918,7 +918,6 @@ cmd_fw_rule(PNETMGR_CMD pCmd)
             }
             bail_on_error(err);
 
-
             netFwRule.ipVersion = IPV4;
             netFwRule.type = FW_RAW;
             netFwRule.pszRawFwRule = pszFwRule;
