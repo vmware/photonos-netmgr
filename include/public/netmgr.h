@@ -71,6 +71,10 @@ typedef enum _NET_ADDR_TYPE
     AUTO_IPV6          =  0x00000040,
     LINK_LOCAL_IPV6    =  0x00000080,
 } NET_ADDR_TYPE;
+
+#define NET_ADDR_IPV4     STATIC_IPV4 | DHCP_IPV4
+#define NET_ADDR_IPV6     STATIC_IPV6 | DHCP_IPV6 | AUTO_IPV6
+
 //TODO: #define ALL_IP_ADDR = or of all the above enum values
 
 typedef struct _NET_IP_ADDR
