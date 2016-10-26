@@ -3606,6 +3606,79 @@ error:
     goto cleanup;
 }
 
+static uint32_t
+nm_string_to_line_array(
+    const char *pszStrBuf,
+    size_t *pLineCount,
+    char ***pppszLineBuf)
+{
+    uint32_t err = 0, len;
+    size_t i = 0, lineCount = 0;
+    char *p1, *p2, *pEnd, **ppszLineBuf = NULL;
+
+    if (!pszStrBuf || !*pszStrBuf || !pLineCount || !pppszLineBuf)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    p1 = (char *)pszStrBuf;
+    pEnd = strchr(pszStrBuf, '\0');
+    do
+    {
+        p1 = strchr(p1, '\n');
+        if (p1 == NULL)
+        {
+            break;
+        }
+        lineCount++;
+        p1++;
+    } while (p1 < pEnd);
+
+    if (lineCount == 0)
+    {
+        err = ENOENT;
+        bail_on_error(err);
+    }
+
+    err = netmgr_alloc(lineCount * sizeof(char **), (void **)&ppszLineBuf);
+    bail_on_error(err);
+
+    p1 = (char *)pszStrBuf;
+    do
+    {
+        p2 = strchr(p1, '\n');
+        if (p2 == NULL)
+        {
+            break;
+        }
+        len = p2 - p1 + 1;
+        err = netmgr_alloc(len + 1, (void **)&ppszLineBuf[i]);
+        bail_on_error(err);
+        memcpy(ppszLineBuf[i], p1, len);
+        i++;
+        p1 = p2 + 1;
+    } while (p1 < pEnd);
+
+    *pLineCount = lineCount;
+    *pppszLineBuf = ppszLineBuf;
+
+cleanup:
+    return err;
+
+error:
+    if (pLineCount)
+    {
+        *pLineCount = 0;
+    }
+    if (pppszLineBuf)
+    {
+        *pppszLineBuf = NULL;
+    }
+    netmgr_list_free(lineCount, (void **)ppszLineBuf);
+    goto cleanup;
+}
+
 uint32_t
 nm_get_dns_servers(
     const char *pszInterfaceName,
@@ -4455,7 +4528,9 @@ nm_add_firewall_rule(
 )
 {
     uint32_t err = 0;
-    char *pszFileBuf = NULL, *pszFwRule = NULL, *pszNewFileBuf = NULL;
+    size_t i, lineCount = 0;
+    char *pszFileBuf = NULL, *pszFwRule = NULL, **ppszLineBuf = NULL;
+    char *pszNewFileBuf = NULL;
 
     if ((pNetFwRule == NULL) || (pNetFwRule->type >= FW_RULE_TYPE_MAX))
     {
@@ -4483,9 +4558,22 @@ nm_add_firewall_rule(
         bail_on_error(err);
     }
 
-    err = netmgr_alloc_string_printf(&pszNewFileBuf, "%s\n%s\n", pszFileBuf,
-                                     pszFwRule);
+    err = nm_string_to_line_array(pszFileBuf, &lineCount, &ppszLineBuf);
     bail_on_error(err);
+
+    err = netmgr_alloc(strlen(pszFileBuf) + strlen(pszFwRule) + 4,
+                       (void **)&pszNewFileBuf);
+    bail_on_error(err);
+
+    /* Append rule to end of file before the 'End' comment */
+    for (i = 0; i < (lineCount - 1); i++)
+    {
+        strcat(pszNewFileBuf, ppszLineBuf[i]);
+    }
+
+    strcat(pszNewFileBuf, pszFwRule);
+    strcat(pszNewFileBuf, "\n\n");
+    strcat(pszNewFileBuf, ppszLineBuf[lineCount-1]);
 
     err = nm_atomic_file_update(FIREWALL_CONF_FILENAME, pszNewFileBuf);
     bail_on_error(err);
@@ -4494,6 +4582,7 @@ clean:
     netmgr_free(pszFwRule);
     netmgr_free(pszFileBuf);
     netmgr_free(pszNewFileBuf);
+    netmgr_list_free(lineCount, (void **)ppszLineBuf);
     return err;
 
 error:
@@ -4506,8 +4595,9 @@ nm_delete_firewall_rule(
 )
 {
     uint32_t err = 0;
-    char *pszFileBuf = NULL, *pszFwRule = NULL, *pszNewFileBuf = NULL;
-    char *pszLine = NULL;
+    size_t i, lineCount = 0;
+    char *pszFileBuf = NULL, *pszFwRule = NULL, **ppszLineBuf = NULL;
+    char *pszNewFileBuf = NULL;
 
     if ((pNetFwRule == NULL) || (pNetFwRule->type >= FW_RULE_TYPE_MAX))
     {
@@ -4538,14 +4628,32 @@ nm_delete_firewall_rule(
     err = netmgr_alloc(strlen(pszFileBuf), (void **)&pszNewFileBuf);
     bail_on_error(err);
 
-    pszLine = strtok(pszFileBuf, "\n");
-    while (pszLine != NULL)
+    err = nm_string_to_line_array(pszFileBuf, &lineCount, &ppszLineBuf);
+    bail_on_error(err);
+
+    /* Remove the matching rule from the file and the next empty line */
+    for (i = 0; i < lineCount; i++)
     {
-        if (strcmp(pszFwRule, pszLine) != 0)
+        if (strstr(ppszLineBuf[i], pszFwRule) != NULL)
         {
-            sprintf(pszNewFileBuf, "%s%s\n", pszNewFileBuf, pszLine);
+            netmgr_free(ppszLineBuf[i]);
+            ppszLineBuf[i] = NULL;
+            i++;
+            if ((i < (lineCount-1)) && !strcmp(ppszLineBuf[i], "\n"))
+            {
+                netmgr_free(ppszLineBuf[i]);
+                ppszLineBuf[i] = NULL;
+            }
+            break;
         }
-        pszLine = strtok(NULL, "\n");
+    }
+
+    for (i = 0; i < lineCount; i++)
+    {
+        if (ppszLineBuf[i] != NULL)
+        {
+            strcat(pszNewFileBuf, ppszLineBuf[i]);
+        }
     }
 
     err = nm_atomic_file_update(FIREWALL_CONF_FILENAME, pszNewFileBuf);
@@ -4555,6 +4663,7 @@ clean:
     netmgr_free(pszFwRule);
     netmgr_free(pszFileBuf);
     netmgr_free(pszNewFileBuf);
+    netmgr_list_free(lineCount, (void **)ppszLineBuf);
     return err;
 
 error:

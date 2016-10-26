@@ -309,7 +309,6 @@ error:
     return err;
 }
 
-
 uint32_t
 nm_atomic_file_update(
     const char *pszFileName,
