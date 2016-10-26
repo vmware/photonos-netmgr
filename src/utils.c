@@ -407,7 +407,7 @@ nm_acquire_write_lock(
     int *pLockId
 )
 {
-    uint32_t err;
+    uint32_t err = 0;
     int lockFd;
     struct flock fLock = { F_WRLCK, SEEK_SET, 0, 0, getpid() };
 
@@ -424,7 +424,9 @@ nm_acquire_write_lock(
         bail_on_error(err);
     }
 
-    if (!fcntl(lockFd, F_SETLKW, &fLock))
+    int val = fcntl(lockFd, F_SETLKW, &fLock);
+
+    if (val == -1)
     {
         err = errno;
         bail_on_error(err);
@@ -456,7 +458,9 @@ nm_release_write_lock(
         bail_on_error(err);
     }
 
-    if (!fcntl(lockId, F_SETLKW, &fLock))
+    int val = fcntl(lockId, F_SETLKW, &fLock);
+
+    if (val == -1)
     {
         err = errno;
         bail_on_error(err);
