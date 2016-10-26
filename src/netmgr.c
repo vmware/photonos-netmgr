@@ -221,14 +221,87 @@ nm_get_resolved_conf_filename(
 /*
  * Interface configuration APIs
  */
+
+static uint32_t
+nm_update_mac_address(
+    const char *pszInterfaceName,
+    const char *pszMacAddress
+)
+{
+    uint32_t err = 0;
+    int i = 0, sockFd = -1, addrLen = 0, octetValue = 0;
+    struct ifreq ifr;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockFd < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
+    ifr.ifr_hwaddr.sa_family = ARPHRD_ETHER;
+    addrLen = sscanf(pszMacAddress, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+                              &ifr.ifr_hwaddr.sa_data[0],
+                              &ifr.ifr_hwaddr.sa_data[1],
+                              &ifr.ifr_hwaddr.sa_data[2],
+                              &ifr.ifr_hwaddr.sa_data[3],
+                              &ifr.ifr_hwaddr.sa_data[4],
+                              &ifr.ifr_hwaddr.sa_data[5]);
+    if (addrLen != ETHER_ADDR_LEN)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    for (i = 0; i < ETHER_ADDR_LEN; i++)
+    {
+        octetValue = ifr.ifr_hwaddr.sa_data[i];
+        if (octetValue < 0 || octetValue > 255)
+        {
+            err = EINVAL;
+            bail_on_error(err);
+        }
+    }
+    err = nm_ifdown(pszInterfaceName);
+    bail_on_error(err);
+
+    err = ioctl(sockFd, SIOCSIFHWADDR, &ifr);
+    if (err != 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    err = nm_ifup(pszInterfaceName);
+    bail_on_error(err);
+
+cleanup:
+    if (sockFd > -1)
+    {
+        close(sockFd);
+    }
+    return err;
+
+error:
+    goto cleanup;
+}
+
 uint32_t
 nm_set_link_mac_addr(
     const char *pszInterfaceName,
     const char *pszMacAddress
 )
 {
-    uint32_t err = 0;
-    char *pszCfgFileName = NULL;
+    uint32_t err = 0, err1 = 0;
+    char *pszCfgFileName = NULL, *pszOldMacAddress = NULL;
     int lockId;
 
     err = nm_acquire_write_lock(0, &lockId);
@@ -243,16 +316,29 @@ nm_set_link_mac_addr(
     err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
-    err = nm_set_key_value(pszCfgFileName, SECTION_LINK, KEY_MAC_ADDRESS,
-                           pszMacAddress, 0);
+    err = nm_get_key_value(pszCfgFileName, SECTION_LINK, KEY_MAC_ADDRESS,
+                           &pszOldMacAddress);
+    if (err == ENOENT)
+    {
+        err = 0;
+    }
     bail_on_error(err);
 
-    // BUGBUG TODO: ifdown, modify mac addr using ioctl, ifup instead of this
-    err = nm_restart_network_service();
+    err = nm_update_mac_address(pszInterfaceName, pszMacAddress);
+    bail_on_error(err);
+
+    err = nm_set_key_value(pszCfgFileName, SECTION_LINK, KEY_MAC_ADDRESS,
+                           pszMacAddress, 0);
+    if (err && pszOldMacAddress)
+    {
+        err1 = nm_update_mac_address(pszInterfaceName, pszOldMacAddress);
+        bail_on_error(err1);
+    }
     bail_on_error(err);
 
 cleanup:
     nm_release_write_lock(lockId);
+    netmgr_free(pszOldMacAddress);
     netmgr_free(pszCfgFileName);
     return err;
 
@@ -438,14 +524,73 @@ error:
     goto cleanup;
 }
 
+static uint32_t
+nm_update_link_mtu(
+    const char *pszInterfaceName,
+    uint32_t mtu
+)
+{
+    uint32_t err = 0;
+    int sockFd = -1;
+    struct ifreq ifr;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockFd < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
+
+    if (mtu > 0)
+    {
+        ifr.ifr_mtu = mtu;
+    }
+    else
+    {
+        ifr.ifr_mtu = DEFAULT_MTU_VALUE;
+    }
+
+    err = nm_ifdown(pszInterfaceName);
+    bail_on_error(err);
+
+    err = ioctl(sockFd, SIOCSIFMTU, &ifr);
+    if (err != 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    err = nm_ifup(pszInterfaceName);
+    bail_on_error(err);
+
+cleanup:
+    if (sockFd > -1)
+    {
+        close(sockFd);
+    }
+    return err;
+
+error:
+    goto cleanup;
+
+}
+
 uint32_t
 nm_set_link_mtu(
     const char *pszInterfaceName,
     uint32_t mtu
 )
 {
-    uint32_t err = 0;
-    char *pszCfgFileName = NULL;
+    uint32_t err = 0, err1 = 0;
+    char *pszCfgFileName = NULL, *pszOldMtuVal = NULL;
     char szValue[MAX_LINE] = "";
     int lockId;
 
@@ -461,6 +606,16 @@ nm_set_link_mtu(
     err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
+    err = nm_get_key_value(pszCfgFileName, SECTION_LINK, KEY_MTU, &pszOldMtuVal);
+    if (err == ENOENT)
+    {
+        err = 0;
+    }
+    bail_on_error(err);
+
+    err = nm_update_link_mtu(pszInterfaceName, mtu);
+    bail_on_error(err);
+
     if (mtu > 0)
     {
         sprintf(szValue, "%u", mtu);
@@ -471,14 +626,16 @@ nm_set_link_mtu(
     }
 
     err = nm_set_key_value(pszCfgFileName, SECTION_LINK, KEY_MTU, szValue, 0);
-    bail_on_error(err);
-
-    // BUGBUG TODO: ifdown, modify mtu using ioctl, ifup instead of this
-    err = nm_restart_network_service();
+    if (err && pszOldMtuVal)
+    {
+        err1 = nm_set_key_value(pszCfgFileName, SECTION_LINK, KEY_MTU, pszOldMtuVal, 0);
+        bail_on_error(err1);
+    }
     bail_on_error(err);
 
 cleanup:
     nm_release_write_lock(lockId);
+    netmgr_free(pszOldMtuVal);
     netmgr_free(pszCfgFileName);
     return err;
 
@@ -833,7 +990,7 @@ nm_ifup(
     bail_on_error(err);
 
     err = nm_wait_for_ip(pszInterfaceName, DEFAULT_WAIT_FOR_IP_TIMEOUT,
-                         STATIC_IPV4);
+                         NET_ADDR_IPV4 | NET_ADDR_IPV6);
     bail_on_error(err);
 
     if (staticIp4Count && !ip4Count)
@@ -2348,7 +2505,7 @@ nm_get_ip_addr_type(
 )
 {
     uint32_t err = 0, prefix;
-    size_t i, count;
+    size_t i, count = 0;
     char ipAddr[INET6_ADDRSTRLEN], *p, **ppszIpAddrList = NULL;
     NET_ADDR_TYPE addrType = 0;
 
@@ -2369,7 +2526,7 @@ nm_get_ip_addr_type(
         }
         bail_on_error(err);
 
-        if (!strcmp(pszIpAddr, ppszIpAddrList[0]))
+        if (count && !strcmp(pszIpAddr, ppszIpAddrList[0]))
         {
             addrType = STATIC_IPV4;
         }
@@ -2441,9 +2598,9 @@ nm_get_ip_addr(
 )
 {
     uint32_t err = 0, modeFlags;
-    size_t i, ip4Count = 0, ip6Count = 0, staticIp6Count = 0, nCount = 0;
+    size_t i = 0, j = 0, ip4Count = 0, ip6Count = 0, nCount = 0;
     char **ppszIp4AddrList = NULL;
-    char **ppszIp6AddrList = NULL, **ppszStaticIp6AddrList = NULL;
+    char **ppszIp6AddrList = NULL;
     NET_IP_ADDR **ppIpAddrList = NULL;
 
     //TODO: If pszInterfaceName is NULL, enumerate all IPs
@@ -2525,18 +2682,18 @@ nm_get_ip_addr(
                                           DHCP_IPV4 : STATIC_IPV4;
     }
 
-    for (i = 0; i < ip6Count; i++)
+    for (j = 0; j < ip6Count; j++, i++)
     {
         err = netmgr_alloc(sizeof(NET_IP_ADDR), (void **)&ppIpAddrList[i]);
         bail_on_error(err);
         err = netmgr_alloc_string(pszInterfaceName,
                                   &ppIpAddrList[i]->pszInterfaceName);
         bail_on_error(err);
-        err = netmgr_alloc_string(ppszIp6AddrList[i],
+        err = netmgr_alloc_string(ppszIp6AddrList[j],
                                   &ppIpAddrList[i]->pszIPAddrPrefix);
         bail_on_error(err);
         err = nm_get_ip_addr_type(pszInterfaceName,
-                                  ppszIp6AddrList[i],
+                                  ppszIp6AddrList[j],
                                   &(ppIpAddrList[i]->type));
         bail_on_error(err);
     }
@@ -2547,7 +2704,6 @@ nm_get_ip_addr(
 cleanup:
     netmgr_list_free(ip4Count, (void **)ppszIp4AddrList);
     netmgr_list_free(ip6Count, (void **)ppszIp6AddrList);
-    netmgr_list_free(staticIp6Count, (void **)ppszStaticIp6AddrList);
     return err;
 
 error:
@@ -4002,6 +4158,7 @@ nm_get_dns_domains(
     char szSectionName[MAX_LINE];
     char *pszCfgFileName = NULL, *pszFileBuf = NULL;
     char *pszDnsDomainsValue = NULL, **ppszDnsDomainsList = NULL;
+    char *pszNewLine = NULL;
 
     if ((pCount == NULL) || (pppszDnsDomains == NULL))
     {
@@ -4027,6 +4184,12 @@ nm_get_dns_domains(
             bail_on_error(err);
         }
         pszDnsDomainsValue++;
+
+        pszNewLine = strstr(pszDnsDomainsValue, "\n");
+        if (pszNewLine != NULL)
+        {
+            *pszNewLine = '\0';
+        }
 
         err = nm_space_delimited_string_to_list(pszDnsDomainsValue, &count,
                                                 &ppszDnsDomainsList);
@@ -4771,14 +4934,559 @@ error:
 /*
  * Misc APIs
  */
+
+void
+nm_free_netlink_message(
+    NETLINK_MESSAGE *pNetLinkMsg
+)
+{
+    NETLINK_MESSAGE *pCurrent = NULL;
+    while (pNetLinkMsg)
+    {
+        pCurrent = pNetLinkMsg;
+        pNetLinkMsg = pNetLinkMsg->pNext;
+        netmgr_free(pCurrent->pMsg);
+        netmgr_free(pCurrent);
+    }
+}
+
+static uint32_t
+nm_fill_netlink_msg(
+    struct nlmsghdr *nlHdr,
+    PNET_NETLINK_MESSAGE *ppNetLinkMessageList
+)
+{
+    uint32_t err = 0;
+    struct ifinfomsg *pIfInfo = NULL;
+    struct ifaddrmsg *pIfAddr = NULL;
+    PNET_NETLINK_MESSAGE pNetLinkMsg = NULL;
+
+    if (!nlHdr || !ppNetLinkMessageList ||
+        (nlHdr->nlmsg_type == NLMSG_ERROR) || (nlHdr->nlmsg_type == NLMSG_DONE))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = netmgr_alloc(sizeof(NETLINK_MESSAGE), (void **)&pNetLinkMsg);
+    bail_on_error(err);
+
+    switch (nlHdr->nlmsg_type)
+    {
+        case RTM_NEWADDR:
+            pIfAddr = NLMSG_DATA(nlHdr);
+            pNetLinkMsg->netLinkMessageType = nlHdr->nlmsg_type;
+            pNetLinkMsg->msgLen = IFA_PAYLOAD(nlHdr);
+            err = netmgr_alloc(pNetLinkMsg->msgLen, (void **)&pNetLinkMsg->pMsg);
+            bail_on_error(err);
+            memcpy(pNetLinkMsg->pMsg, pIfAddr, pNetLinkMsg->msgLen);
+            pNetLinkMsg->pNext = *ppNetLinkMessageList;
+            *ppNetLinkMessageList = pNetLinkMsg;
+            break;
+
+        case RTM_NEWLINK:
+            pIfInfo = NLMSG_DATA(nlHdr);
+            pNetLinkMsg->netLinkMessageType = nlHdr->nlmsg_type;
+            pNetLinkMsg->msgLen = nlHdr->nlmsg_len -
+                                  NLMSG_LENGTH(sizeof(pIfInfo));
+            err = netmgr_alloc(pNetLinkMsg->msgLen, (void **)&pNetLinkMsg->pMsg);
+            bail_on_error(err);
+            memcpy(pNetLinkMsg->pMsg, NLMSG_DATA(nlHdr), pNetLinkMsg->msgLen);
+            pNetLinkMsg->pNext = *ppNetLinkMessageList;
+            *ppNetLinkMessageList = pNetLinkMsg;
+            break;
+
+        default:
+            goto error;
+    }
+
+cleanup:
+    return err;
+
+error:
+    if (pNetLinkMsg)
+    {
+        netmgr_free(pNetLinkMsg->pMsg);
+        netmgr_free(pNetLinkMsg);
+    }
+    goto cleanup;
+}
+
+static uint32_t
+nm_get_interface_ipaddr_type(
+    const char *pszInterfaceName,
+    uint32_t addrTypes,
+    size_t *pCount,
+    NET_IP_ADDR ***pppIpAddrList
+)
+{
+    uint32_t err = 0, modeFlags;
+    size_t i = 0, j = 0, ip4Count = 0, ip6Count = 0, staticIp6Count = 0, nCount = 0;
+    char **ppszIp4AddrList = NULL;
+    char **ppszIp6AddrList = NULL, **ppszStaticIp6AddrList = NULL;
+    NET_IP_ADDR **ppIpAddrList = NULL;
+
+    //TODO: If pszInterfaceName is NULL, enumerate all IPs
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+        (strlen(pszInterfaceName) > IFNAMSIZ) ||
+        !pCount || !pppIpAddrList || !addrTypes)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = nm_get_ip_dhcp_mode(pszInterfaceName, &modeFlags);
+    bail_on_error(err);
+
+    if (TEST_FLAG(modeFlags, fDHCP_IPV4) && TEST_FLAG(addrTypes, DHCP_IPV4))
+    {
+        err = nm_get_interface_ipaddr(pszInterfaceName, DHCP_IPV4, &ip4Count,
+                                      &ppszIp4AddrList);
+        if (err == ENOENT)
+        {
+            err = 0;
+        }
+        bail_on_error(err);
+    }
+    else if (TEST_FLAG(addrTypes, STATIC_IPV4))
+    {
+        err = nm_get_interface_ipaddr(pszInterfaceName, STATIC_IPV4, &ip4Count,
+                                      &ppszIp4AddrList);
+        if (err == ENOENT)
+        {
+            err = 0;
+        }
+        bail_on_error(err);
+    }
+    nCount = ip4Count;
+
+    if (TEST_FLAG(addrTypes, DHCP_IPV6) ||
+        TEST_FLAG(addrTypes, AUTO_IPV6) ||
+        TEST_FLAG(addrTypes, STATIC_IPV6))
+    {
+        err = nm_get_interface_ipaddr(pszInterfaceName,
+                                      DHCP_IPV6 | AUTO_IPV6 | STATIC_IPV6,
+                                      &ip6Count,
+                                      &ppszIp6AddrList);
+        if (err == ENOENT)
+        {
+            err = 0;
+        }
+        bail_on_error(err);
+    }
+    nCount += ip6Count;
+
+    if (nCount == 0)
+    {
+        err = ENOENT;
+        bail_on_error(err);
+    }
+
+    err = netmgr_alloc((nCount * sizeof(PNET_IP_ADDR)), (void *)&ppIpAddrList);
+    bail_on_error(err);
+
+    for (i = 0; i < ip4Count; i++)
+    {
+        err = netmgr_alloc(sizeof(NET_IP_ADDR), (void **)&ppIpAddrList[i]);
+        bail_on_error(err);
+        err = netmgr_alloc_string(pszInterfaceName,
+                                  &ppIpAddrList[i]->pszInterfaceName);
+        bail_on_error(err);
+        err = netmgr_alloc_string(ppszIp4AddrList[i],
+                                  &ppIpAddrList[i]->pszIPAddrPrefix);
+        bail_on_error(err);
+        ppIpAddrList[i]->type = TEST_FLAG(modeFlags, fDHCP_IPV4) ?
+                                          DHCP_IPV4 : STATIC_IPV4;
+    }
+
+    for (j = 0; j < ip6Count; j++, i++)
+    {
+        err = netmgr_alloc(sizeof(NET_IP_ADDR), (void **)&ppIpAddrList[i]);
+        bail_on_error(err);
+        err = netmgr_alloc_string(pszInterfaceName,
+                                  &ppIpAddrList[i]->pszInterfaceName);
+        bail_on_error(err);
+        err = netmgr_alloc_string(ppszIp6AddrList[j],
+                                  &ppIpAddrList[i]->pszIPAddrPrefix);
+        bail_on_error(err);
+        err = nm_get_ip_addr_type(pszInterfaceName,
+                                  ppszIp6AddrList[j],
+                                  &(ppIpAddrList[i]->type));
+        bail_on_error(err);
+    }
+
+    *pCount = nCount;
+    *pppIpAddrList = ppIpAddrList;
+
+cleanup:
+    netmgr_list_free(ip4Count, (void **)ppszIp4AddrList);
+    netmgr_list_free(ip6Count, (void **)ppszIp6AddrList);
+    netmgr_list_free(staticIp6Count, (void **)ppszStaticIp6AddrList);
+    return err;
+
+error:
+    if (pCount != NULL)
+    {
+        *pCount = 0;
+    }
+    if (pppIpAddrList != NULL)
+    {
+        *pppIpAddrList = NULL;
+    }
+    if (ppIpAddrList != NULL)
+    {
+        for (i = 0; i < nCount; i++)
+        {
+            if (ppIpAddrList[i] == NULL)
+            {
+                continue;
+            }
+            netmgr_free(ppIpAddrList[i]->pszInterfaceName);
+            netmgr_free(ppIpAddrList[i]->pszIPAddrPrefix);
+        }
+        netmgr_list_free(nCount, (void **)ppIpAddrList);
+    }
+    goto cleanup;
+}
+
+
+static uint32_t
+nm_open_netlink_socket(
+    uint32_t netLinkGroup,
+    int *pSockFd
+)
+{
+    uint32_t err = 0;
+    int sockFd = -1;
+    struct sockaddr_nl addr;
+
+    if (!pSockFd)
+    {
+        err = EINVAL;
+    }
+    bail_on_error(err);
+
+    sockFd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+    if (sockFd < 0)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+    fcntl(sockFd, F_SETFL, O_NONBLOCK);
+    memset((void *)&addr, 0, sizeof(addr));
+
+    addr.nl_family = AF_NETLINK;
+    addr.nl_pid = getpid();
+    addr.nl_groups = netLinkGroup;
+
+    if (bind(sockFd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    *pSockFd = sockFd;
+
+cleanup:
+    return err;
+error:
+    if (pSockFd)
+    {
+        *pSockFd = -1;
+    }
+    goto cleanup;
+}
+
+static uint32_t
+nm_validate_netlink_ipaddr(
+    const char *pszInterfaceName,
+    struct ifaddrmsg *pIfAddrMsg,
+    int ifAddrMsgLen,
+    uint32_t addrType)
+{
+    uint32_t err = 0, addrTypeGet = 0;
+    int matched = 0, ipAddrValid = 0;
+    size_t i = 0, ip4Count = 0, ip6Count = 0;
+    char szIpAddr[INET6_ADDRSTRLEN];
+    char **ppIp4AddrList = NULL, **ppIp6AddrList = NULL;
+    char *pszIpAddrPrefix = NULL;
+    struct rtattr *pRouteAttr = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) || !pIfAddrMsg ||!ifAddrMsgLen ||
+        !addrType)
+    {
+        err = EINVAL;
+    }
+    bail_on_error(err);
+
+    pRouteAttr = IFA_RTA(pIfAddrMsg);
+    for (;RTA_OK(pRouteAttr, ifAddrMsgLen);
+         pRouteAttr = RTA_NEXT(pRouteAttr, ifAddrMsgLen))
+    {
+        if (pRouteAttr->rta_type != IFA_LOCAL)
+        {
+            continue;
+        }
+        addrTypeGet = 0;
+
+        if (inet_ntop(pIfAddrMsg->ifa_family, RTA_DATA(pRouteAttr), szIpAddr,
+                      sizeof(szIpAddr)) == NULL)
+        {
+            err = errno;
+            bail_on_error(err);
+        }
+
+        err = netmgr_alloc_string_printf(&pszIpAddrPrefix, "%s/%u",
+                                         szIpAddr, pIfAddrMsg->ifa_prefixlen);
+        bail_on_error(err);
+
+        err = nm_get_ip_addr_type(pszInterfaceName,
+                                  szIpAddr,
+                                  &addrTypeGet);
+        bail_on_error(err);
+
+        if (TEST_FLAG(addrType, addrTypeGet) &&
+            TEST_FLAG(addrTypeGet, STATIC_IPV4))
+        {
+            err = nm_get_static_ip_addr(pszInterfaceName,
+                                        STATIC_IPV4,
+                                        &ip4Count,
+                                        &ppIp4AddrList);
+            bail_on_error(err);
+
+            if (strcmp(ppIp4AddrList[0], pszIpAddrPrefix) != 0)
+            {
+                err = EINVAL;
+                bail_on_error(err);
+            }
+            ipAddrValid = 1;
+            break;
+        }
+
+        if (TEST_FLAG(addrType, addrTypeGet) &&
+            TEST_FLAG(addrTypeGet, STATIC_IPV6))
+        {
+            err = nm_get_static_ip_addr(pszInterfaceName,
+                                        STATIC_IPV6,
+                                        &ip6Count,
+                                        &ppIp6AddrList);
+            bail_on_error(err);
+
+            for (i = 0; i < ip6Count; i++)
+            {
+                if (strcmp(ppIp6AddrList[i], pszIpAddrPrefix) == 0)
+                {
+                    matched = 1;
+                    break;
+                }
+            }
+            if (!matched)
+            {
+                err = EINVAL;
+                bail_on_error(err);
+            }
+            ipAddrValid = 1;
+            break;
+        }
+
+        if (TEST_FLAG(addrType, addrTypeGet))
+        {
+            ipAddrValid = 1;
+            break;
+        }
+
+        netmgr_list_free(ip4Count, (void **)ppIp4AddrList);
+        netmgr_list_free(ip6Count, (void **)ppIp6AddrList);
+        netmgr_free(pszIpAddrPrefix);
+    }
+
+    if (!ipAddrValid)
+    {
+        err = ENOMSG;
+    }
+
+cleanup:
+    netmgr_list_free(ip4Count, (void **)ppIp4AddrList);
+    netmgr_list_free(ip6Count, (void **)ppIp6AddrList);
+    netmgr_free(pszIpAddrPrefix);
+    return err;
+error:
+    goto cleanup;
+}
+
+static uint32_t
+nm_handle_netlink_event(
+    const int sockFd,
+    PNET_NETLINK_MESSAGE *ppNetLinkMsgList)
+{
+    uint32_t err = 0;
+    int readLen = 0;
+#define BUFSIZE 8192
+    char buf[BUFSIZE];
+    struct iovec iov = { buf, sizeof(buf) };
+    struct sockaddr_nl sa;
+    struct msghdr msg = { &sa, sizeof(sa), &iov, 1, NULL, 0, 0 };
+    struct nlmsghdr *nlHdr;
+    PNET_NETLINK_MESSAGE pNetLinkMsgList = NULL;
+
+    if (sockFd == -1)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    while (1)
+    {
+        readLen = 0;
+        memset(buf, 0, BUFSIZE);
+        readLen = recvmsg(sockFd, &msg, 0);
+
+        if (readLen < 0)
+        {
+            if (errno == EWOULDBLOCK || errno == EAGAIN)
+            {
+                err = 0;
+                break;
+            }
+            err = errno;
+            bail_on_error(err);
+        }
+
+        nlHdr = (struct nlmsghdr *)buf;
+
+        if ((NLMSG_OK(nlHdr, readLen) == 0) ||
+            (nlHdr->nlmsg_type == NLMSG_ERROR))
+        {
+            err = errno;
+            bail_on_error(err);
+        }
+        if (nlHdr->nlmsg_type == NLMSG_DONE)
+        {
+            break;
+        }
+
+        for (; NLMSG_OK(nlHdr, readLen); nlHdr = NLMSG_NEXT(nlHdr, readLen))
+        {
+            switch (nlHdr->nlmsg_type)
+            {
+                case RTM_NEWADDR:
+                case RTM_NEWLINK:
+                    err = nm_fill_netlink_msg(nlHdr, &pNetLinkMsgList);
+                    bail_on_error(err);
+                    break;
+
+                case NLMSG_ERROR:
+                    err = EINVAL;
+                    bail_on_error(err);
+
+                default:
+                    break;
+            }
+        }
+    }
+
+    *ppNetLinkMsgList = pNetLinkMsgList;
+
+cleanup:
+    return err;
+error:
+    if (ppNetLinkMsgList)
+    {
+        *ppNetLinkMsgList = NULL;
+    }
+    nm_free_netlink_message(pNetLinkMsgList);
+    goto cleanup;
+}
+
 uint32_t
 nm_wait_for_link_up(
     const char *pszInterfaceName,
     uint32_t timeout
 )
 {
-    //TODO: Implment..
-    return 0;
+    uint32_t err = 0;
+    int sockFd = -1, retval = -1, linkUp = 0;
+    fd_set readFd;
+    char ifName[IFNAMSIZ];
+    struct timeval tval;
+    struct ifinfomsg *pIfInfo = NULL;
+    PNET_NETLINK_MESSAGE pNetLinkMessageList = NULL;
+    PNET_NETLINK_MESSAGE pCurNetLinkMessageList = NULL;
+    NET_LINK_STATE linkState = LINK_STATE_UNKNOWN;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = nm_get_link_state(pszInterfaceName, &linkState);
+    bail_on_error(err);
+
+    if (linkState == LINK_UP)
+    {
+        goto cleanup;
+    }
+
+    err = nm_open_netlink_socket(RTMGRP_LINK, &sockFd);
+    bail_on_error(err);
+
+    tval.tv_sec = timeout;
+    tval.tv_usec = 0;
+
+    while (1)
+    {
+        FD_ZERO(&readFd);
+        FD_CLR(sockFd, &readFd);
+        FD_SET(sockFd, &readFd);
+
+        retval = select(sockFd+1, &readFd, NULL, NULL, &tval);
+        if (retval == -1)
+        {
+            err = errno;
+        }
+        else if (retval)
+        {
+            err = nm_handle_netlink_event(sockFd, &pNetLinkMessageList);
+        }
+        else
+        {
+            err = ETIME;
+        }
+        bail_on_error(err);
+
+        pCurNetLinkMessageList = pNetLinkMessageList;
+        while(pCurNetLinkMessageList)
+        {
+            if (pCurNetLinkMessageList->netLinkMessageType != RTM_NEWLINK)
+            {
+                pCurNetLinkMessageList = pCurNetLinkMessageList->pNext;
+            }
+            memset(ifName, 0 ,sizeof(ifName));
+            pIfInfo = pCurNetLinkMessageList->pMsg;
+            if_indextoname(pIfInfo->ifi_index, ifName);
+            if (!strcmp(pszInterfaceName, ifName) &&
+                        TEST_FLAG(pIfInfo->ifi_flags, IFF_UP))
+            {
+                linkUp = 1;
+                break;
+            }
+
+            pCurNetLinkMessageList = pCurNetLinkMessageList->pNext;
+        }
+
+        if (linkUp)
+        {
+            break;
+        }
+        nm_free_netlink_message(pNetLinkMessageList);
+    }
+
+cleanup:
+    nm_free_netlink_message(pNetLinkMessageList);
+    return err;
+error:
+    goto cleanup;
 }
 
 uint32_t
@@ -4788,9 +5496,204 @@ nm_wait_for_ip(
     NET_ADDR_TYPE addrTypes
 )
 {
-    //TODO: Implment this function, sleep(1) for now
-    sleep(1);
-    return 0;
+    uint32_t err = 0, netLinkGroups = 0, ip4Type = 0, ip6Type = 0;
+    int sockFd = -1, retval = -1, ipAddrValid = 0, matched = 0;
+    int ifAddrMsgLen = 0;
+    size_t i = 0, j = 0, addrCount = 0, ip4Count = 0, ip6Count = 0;
+    fd_set readFd;
+    struct timeval tval;
+    struct ifaddrmsg *pIfAddr = NULL;
+    char ifName[IFNAMSIZ];
+    char **ppIp4AddrList = NULL, **ppIp6AddrList = NULL;
+    PNET_NETLINK_MESSAGE pNetLinkMessageList = NULL;
+    PNET_NETLINK_MESSAGE pCurNetLinkMessageList = NULL;
+    NET_IP_ADDR **ppIpAddrList = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    /* addrTypes = 0 implies no action is needed */
+    if (!addrTypes)
+    {
+        goto cleanup;
+    }
+
+    err = nm_get_interface_ipaddr_type(pszInterfaceName,
+                                       addrTypes,
+                                       &addrCount,
+                                       &ppIpAddrList);
+    if (err == ENOENT)
+    {
+        err = 0;
+    }
+    bail_on_error(err);
+
+    for (i = 0; i < addrCount; i++)
+    {
+        if (TEST_FLAG(addrTypes, STATIC_IPV4) &&
+            TEST_FLAG(ppIpAddrList[i]->type, STATIC_IPV4))
+        {
+            err = nm_get_static_ip_addr(pszInterfaceName,
+                                        STATIC_IPV4,
+                                        &ip4Count,
+                                        &ppIp4AddrList);
+            bail_on_error(err);
+
+            if (strcmp(ppIp4AddrList[0],
+                       ppIpAddrList[i]->pszIPAddrPrefix) != 0)
+            {
+                err = EINVAL;
+                bail_on_error(err);
+            }
+            ipAddrValid = 1;
+            break;
+        }
+        if (TEST_FLAG(addrTypes, STATIC_IPV6) &&
+            TEST_FLAG(ppIpAddrList[i]->type, STATIC_IPV6))
+        {
+            err = nm_get_static_ip_addr(pszInterfaceName,
+                                        STATIC_IPV6,
+                                        &ip6Count,
+                                        &ppIp6AddrList);
+            bail_on_error(err);
+            for (j = 0; j < ip6Count; j++)
+            {
+                if (strcmp(ppIp6AddrList[j],
+                           ppIpAddrList[i]->pszIPAddrPrefix) == 0)
+                {
+                    matched = 1;
+                    break;
+                }
+            }
+            if (!matched)
+            {
+                err = EINVAL;
+                bail_on_error(err);
+            }
+            ipAddrValid = 1;
+            break;
+        }
+        if (TEST_FLAG(addrTypes, ppIpAddrList[i]->type))
+        {
+            ipAddrValid = 1;
+            break;
+        }
+    }
+
+    if (ipAddrValid)
+    {
+        goto cleanup;
+    }
+
+    if (TEST_FLAG(addrTypes, STATIC_IPV4) || TEST_FLAG(addrTypes, DHCP_IPV4))
+    {
+        ip4Type = 1;
+        netLinkGroups = RTMGRP_IPV4_IFADDR;
+    }
+
+    if (TEST_FLAG(addrTypes, STATIC_IPV6) || TEST_FLAG(addrTypes, DHCP_IPV6) ||
+        TEST_FLAG(addrTypes, AUTO_IPV6) || TEST_FLAG(addrTypes, LINK_LOCAL_IPV6))
+    {
+        ip6Type = 1;
+        netLinkGroups |= RTMGRP_IPV6_IFADDR;
+    }
+
+    err = nm_open_netlink_socket(netLinkGroups, &sockFd);
+    bail_on_error(err);
+
+    tval.tv_sec = timeout;
+    tval.tv_usec = 0;
+
+    while (1)
+    {
+        FD_ZERO(&readFd);
+        FD_CLR(sockFd, &readFd);
+        FD_SET(sockFd, &readFd);
+
+        retval = select(sockFd+1, &readFd, NULL, NULL, &tval);
+        if (retval == -1)
+        {
+            err = errno;
+        }
+        else if (retval)
+        {
+            err = nm_handle_netlink_event(sockFd, &pNetLinkMessageList);
+        }
+        else
+        {
+            err = ETIME;
+        }
+        bail_on_error(err);
+
+        pCurNetLinkMessageList = pNetLinkMessageList;
+        while(pCurNetLinkMessageList)
+        {
+            if (pCurNetLinkMessageList->netLinkMessageType != RTM_NEWADDR)
+            {
+                pCurNetLinkMessageList = pCurNetLinkMessageList->pNext;
+                continue;
+            }
+            memset(ifName, 0 ,sizeof(ifName));
+            pIfAddr = pCurNetLinkMessageList->pMsg;
+            ifAddrMsgLen = pCurNetLinkMessageList->msgLen;
+            if_indextoname(pIfAddr->ifa_index, ifName);
+
+            if ((strcmp(pszInterfaceName, ifName) != 0) ||
+                !((ip4Type && (pIfAddr->ifa_family == AF_INET)) ||
+                (ip6Type && (pIfAddr->ifa_family == AF_INET6))))
+            {
+                pCurNetLinkMessageList = pCurNetLinkMessageList->pNext;
+                continue;
+            }
+
+            err = nm_validate_netlink_ipaddr(pszInterfaceName,
+                                             pIfAddr,
+                                             ifAddrMsgLen,
+                                             addrTypes);
+            if (err == 0)
+            {
+                ipAddrValid = 1;
+                break;
+            }
+            if (err == ENOMSG)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            pCurNetLinkMessageList = pCurNetLinkMessageList->pNext;
+        }
+        if (ipAddrValid)
+        {
+            break;
+        }
+        nm_free_netlink_message(pNetLinkMessageList);
+    }
+
+cleanup:
+    nm_free_netlink_message(pNetLinkMessageList);
+    netmgr_list_free(ip4Count, (void **)ppIp4AddrList);
+    netmgr_list_free(ip6Count, (void **)ppIp6AddrList);
+    if (ppIpAddrList != NULL)
+    {
+        for (i = 0; i < addrCount; i++)
+        {
+            if (ppIpAddrList[i] == NULL)
+            {
+                continue;
+            }
+            netmgr_free(ppIpAddrList[i]->pszInterfaceName);
+            netmgr_free(ppIpAddrList[i]->pszIPAddrPrefix);
+        }
+        netmgr_list_free(addrCount, (void **)ppIpAddrList);
+    }
+
+    return err;
+error:
+    goto cleanup;
 }
 
 uint32_t
