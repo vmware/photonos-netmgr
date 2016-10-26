@@ -21,7 +21,6 @@ cmd_link_info(PNETMGR_CMD pCmd)
     char *pszIfname = NULL, *pszLinkMode = NULL, *pszLinkState = NULL;
     char *pszMacAddr = NULL, *pszMtu = NULL, *pszEnd = NULL;
     NET_LINK_MODE linkMode = LINK_MODE_UNKNOWN;
-    NET_LINK_STATE linkState = LINK_STATE_UNKNOWN;
     NET_LINK_INFO *pNetLinkInfo = NULL;
 
     switch (pCmd->op)
@@ -96,7 +95,7 @@ cmd_link_info(PNETMGR_CMD pCmd)
                 {
                     err = nm_ifdown(pszIfname);
                 }
-                if (linkState == LINK_STATE_UNKNOWN)
+                else
                 {
                     err = EDOM;
                 }

@@ -19,6 +19,8 @@
 #include <arpa/inet.h>
 #include <ifaddrs.h>
 #include <net/if.h>
+#include <net/if_arp.h>
+#include <net/ethernet.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <sys/ioctl.h>

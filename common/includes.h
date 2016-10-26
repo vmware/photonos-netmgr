@@ -20,8 +20,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
+#include <fcntl.h>
 
 #include "defines.h"
 #include "prototypes.h"

@@ -120,3 +120,213 @@ error:
     goto cleanup;
 }
 
+uint32_t
+open_netlink_socket(
+    uint32_t netLinkGroup,
+    int *pSockFd
+)
+{
+    uint32_t err = 0;
+    int sockFd = -1;
+    struct sockaddr_nl addr;
+
+    if (!pSockFd)
+    {
+        err = EINVAL;
+    }
+    bail_on_error(err);
+
+    sockFd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+    if (sockFd < 0)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    fcntl(sockFd, F_SETFL, O_NONBLOCK);
+    memset((void *)&addr, 0, sizeof(addr));
+
+    addr.nl_family = AF_NETLINK;
+    addr.nl_pid = getpid();
+    addr.nl_groups = netLinkGroup;
+
+    if (bind(sockFd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    *pSockFd = sockFd;
+
+cleanup:
+    return err;
+error:
+    if (pSockFd)
+    {
+        *pSockFd = -1;
+    }
+    goto cleanup;
+}
+
+static uint32_t
+fill_netlink_msg(
+    struct nlmsghdr *nlHdr,
+    PNET_NETLINK_MESSAGE *ppNetLinkMessageList
+)
+{
+    uint32_t err = 0;
+    struct ifinfomsg *pIfInfo = NULL;
+    struct ifaddrmsg *pIfAddr = NULL;
+    PNET_NETLINK_MESSAGE pNetLinkMsg = NULL;
+
+    if (!nlHdr || !ppNetLinkMessageList || (nlHdr->nlmsg_type == NLMSG_ERROR) ||
+        (nlHdr->nlmsg_type == NLMSG_DONE))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = netmgr_alloc(sizeof(NETLINK_MESSAGE), (void **)&pNetLinkMsg);
+    bail_on_error(err);
+
+    switch (nlHdr->nlmsg_type)
+    {
+        case RTM_NEWADDR:
+            pIfAddr = NLMSG_DATA(nlHdr);
+            pNetLinkMsg->msgType = nlHdr->nlmsg_type;
+            pNetLinkMsg->msgLen = IFA_PAYLOAD(nlHdr);
+            err = netmgr_alloc(pNetLinkMsg->msgLen, (void **)&pNetLinkMsg->pMsg);
+            bail_on_error(err);
+            memcpy(pNetLinkMsg->pMsg, pIfAddr, pNetLinkMsg->msgLen);
+            pNetLinkMsg->pNext = *ppNetLinkMessageList;
+            *ppNetLinkMessageList = pNetLinkMsg;
+            break;
+
+        case RTM_NEWLINK:
+            pIfInfo = NLMSG_DATA(nlHdr);
+            pNetLinkMsg->msgType = nlHdr->nlmsg_type;
+            pNetLinkMsg->msgLen = nlHdr->nlmsg_len -
+                                  NLMSG_LENGTH(sizeof(pIfInfo));
+            err = netmgr_alloc(pNetLinkMsg->msgLen, (void **)&pNetLinkMsg->pMsg);
+            bail_on_error(err);
+            memcpy(pNetLinkMsg->pMsg, NLMSG_DATA(nlHdr), pNetLinkMsg->msgLen);
+            pNetLinkMsg->pNext = *ppNetLinkMessageList;
+            *ppNetLinkMessageList = pNetLinkMsg;
+            break;
+
+        default:
+            goto error;
+    }
+
+cleanup:
+    return err;
+
+error:
+    if (pNetLinkMsg)
+    {
+        netmgr_free(pNetLinkMsg->pMsg);
+        netmgr_free(pNetLinkMsg);
+    }
+    goto cleanup;
+}
+
+uint32_t
+handle_netlink_event(
+    const int sockFd,
+    PNET_NETLINK_MESSAGE *ppNetLinkMsgList
+)
+{
+    uint32_t err = 0;
+    int readLen = 0;
+#define BUFSIZE 8192
+    char buf[BUFSIZE];
+    struct iovec iov = { buf, sizeof(buf) };
+    struct sockaddr_nl sa;
+    struct msghdr msg = { &sa, sizeof(sa), &iov, 1, NULL, 0, 0 };
+    struct nlmsghdr *nlHdr;
+    PNET_NETLINK_MESSAGE pNetLinkMsgList = NULL;
+
+    if (sockFd == -1)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    while (1)
+    {
+        readLen = 0;
+        memset(buf, 0, BUFSIZE);
+        readLen = recvmsg(sockFd, &msg, 0);
+
+        if (readLen < 0)
+        {
+            if ((errno == EWOULDBLOCK) || (errno == EAGAIN))
+            {
+                err = 0;
+                break;
+            }
+            err = errno;
+            bail_on_error(err);
+        }
+
+        nlHdr = (struct nlmsghdr *)buf;
+
+        if ((NLMSG_OK(nlHdr, readLen) == 0) ||
+            (nlHdr->nlmsg_type == NLMSG_ERROR))
+        {
+            err = errno;
+            bail_on_error(err);
+        }
+        if (nlHdr->nlmsg_type == NLMSG_DONE)
+        {
+            break;
+        }
+
+        for (; NLMSG_OK(nlHdr, readLen); nlHdr = NLMSG_NEXT(nlHdr, readLen))
+        {
+            switch (nlHdr->nlmsg_type)
+            {
+                case RTM_NEWADDR:
+                case RTM_NEWLINK:
+                    err = fill_netlink_msg(nlHdr, &pNetLinkMsgList);
+                    bail_on_error(err);
+                    break;
+
+                case NLMSG_ERROR:
+                    err = EINVAL;
+                    bail_on_error(err);
+
+                default:
+                    break;
+            }
+        }
+    }
+
+    *ppNetLinkMsgList = pNetLinkMsgList;
+
+cleanup:
+    return err;
+error:
+    if (ppNetLinkMsgList)
+    {
+        *ppNetLinkMsgList = NULL;
+    }
+    free_netlink_message_list(pNetLinkMsgList);
+    goto cleanup;
+}
+
+void
+free_netlink_message_list(
+    NETLINK_MESSAGE *pNetLinkMsg
+)
+{
+    NETLINK_MESSAGE *pCurrent = NULL;
+    while (pNetLinkMsg)
+    {
+        pCurrent = pNetLinkMsg;
+        pNetLinkMsg = pNetLinkMsg->pNext;
+        netmgr_free(pCurrent->pMsg);
+        netmgr_free(pCurrent);
+    }
+}
+
