@@ -221,14 +221,78 @@ nm_get_resolved_conf_filename(
 /*
  * Interface configuration APIs
  */
+
+static uint32_t
+nm_update_mac_address(
+    const char *pszInterfaceName,
+    const char *pszMacAddress
+)
+{
+    uint32_t err = 0;
+    int sockFd = -1, addrLen = 0;
+    struct ifreq ifr;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockFd < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
+    ifr.ifr_hwaddr.sa_family = ARPHRD_ETHER;
+    addrLen = sscanf(pszMacAddress, "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx",
+                                    &ifr.ifr_hwaddr.sa_data[0],
+                                    &ifr.ifr_hwaddr.sa_data[1],
+                                    &ifr.ifr_hwaddr.sa_data[2],
+                                    &ifr.ifr_hwaddr.sa_data[3],
+                                    &ifr.ifr_hwaddr.sa_data[4],
+                                    &ifr.ifr_hwaddr.sa_data[5]);
+    if (addrLen != ETHER_ADDR_LEN)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = nm_ifdown(pszInterfaceName);
+    bail_on_error(err);
+
+    err = ioctl(sockFd, SIOCSIFHWADDR, &ifr);
+    if (err != 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    err = nm_ifup(pszInterfaceName);
+    bail_on_error(err);
+
+cleanup:
+    if (sockFd > -1)
+    {
+        close(sockFd);
+    }
+    return err;
+
+error:
+    goto cleanup;
+}
+
 uint32_t
 nm_set_link_mac_addr(
     const char *pszInterfaceName,
     const char *pszMacAddress
 )
 {
-    uint32_t err = 0;
-    char *pszCfgFileName = NULL;
+    uint32_t err = 0, err1 = 0;
+    char *pszCfgFileName = NULL, *pszOldMacAddress = NULL;
     int lockId;
 
     err = nm_acquire_write_lock(0, &lockId);
@@ -243,16 +307,24 @@ nm_set_link_mac_addr(
     err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
-    err = nm_set_key_value(pszCfgFileName, SECTION_LINK, KEY_MAC_ADDRESS,
-                           pszMacAddress, 0);
+    err = nm_get_link_mac_addr(pszInterfaceName, &pszOldMacAddress);
     bail_on_error(err);
 
-    // BUGBUG TODO: ifdown, modify mac addr using ioctl, ifup instead of this
-    err = nm_restart_network_service();
+    err = nm_update_mac_address(pszInterfaceName, pszMacAddress);
+    bail_on_error(err);
+
+    err = nm_set_key_value(pszCfgFileName, SECTION_LINK, KEY_MAC_ADDRESS,
+                           pszMacAddress, 0);
+    if (err && pszOldMacAddress)
+    {
+        err1 = nm_update_mac_address(pszInterfaceName, pszOldMacAddress);
+        bail_on_error(err1);
+    }
     bail_on_error(err);
 
 cleanup:
     nm_release_write_lock(lockId);
+    netmgr_free(pszOldMacAddress);
     netmgr_free(pszCfgFileName);
     return err;
 
@@ -438,13 +510,73 @@ error:
     goto cleanup;
 }
 
+static uint32_t
+nm_update_link_mtu(
+    const char *pszInterfaceName,
+    uint32_t mtu
+)
+{
+    uint32_t err = 0;
+    int sockFd = -1;
+    struct ifreq ifr;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockFd < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
+
+    if (mtu > 0)
+    {
+        ifr.ifr_mtu = mtu;
+    }
+    else
+    {
+        ifr.ifr_mtu = DEFAULT_MTU_VALUE;
+    }
+
+    err = nm_ifdown(pszInterfaceName);
+    bail_on_error(err);
+
+    err = ioctl(sockFd, SIOCSIFMTU, &ifr);
+    if (err != 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    err = nm_ifup(pszInterfaceName);
+    bail_on_error(err);
+
+cleanup:
+    if (sockFd > -1)
+    {
+        close(sockFd);
+    }
+    return err;
+
+error:
+    goto cleanup;
+
+}
+
 uint32_t
 nm_set_link_mtu(
     const char *pszInterfaceName,
     uint32_t mtu
 )
 {
-    uint32_t err = 0;
+    uint32_t err = 0, err1 = 0, oldMtuVal = 0;
     char *pszCfgFileName = NULL;
     char szValue[MAX_LINE] = "";
     int lockId;
@@ -461,6 +593,12 @@ nm_set_link_mtu(
     err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
+    err = nm_get_link_mtu(pszInterfaceName, &oldMtuVal);
+    bail_on_error(err);
+
+    err = nm_update_link_mtu(pszInterfaceName, mtu);
+    bail_on_error(err);
+
     if (mtu > 0)
     {
         sprintf(szValue, "%u", mtu);
@@ -471,10 +609,11 @@ nm_set_link_mtu(
     }
 
     err = nm_set_key_value(pszCfgFileName, SECTION_LINK, KEY_MTU, szValue, 0);
-    bail_on_error(err);
-
-    // BUGBUG TODO: ifdown, modify mtu using ioctl, ifup instead of this
-    err = nm_restart_network_service();
+    if (err)
+    {
+        err1 = nm_update_link_mtu(pszInterfaceName, oldMtuVal);
+        bail_on_error(err1);
+    }
     bail_on_error(err);
 
 cleanup:
@@ -833,7 +972,7 @@ nm_ifup(
     bail_on_error(err);
 
     err = nm_wait_for_ip(pszInterfaceName, DEFAULT_WAIT_FOR_IP_TIMEOUT,
-                         STATIC_IPV4);
+                         NET_ADDR_IPV4 | NET_ADDR_IPV6);
     bail_on_error(err);
 
     if (staticIp4Count && !ip4Count)
@@ -2348,7 +2487,7 @@ nm_get_ip_addr_type(
 )
 {
     uint32_t err = 0, prefix;
-    size_t i, count;
+    size_t i, count = 0;
     char ipAddr[INET6_ADDRSTRLEN], *p, **ppszIpAddrList = NULL;
     NET_ADDR_TYPE addrType = 0;
 
@@ -2369,7 +2508,7 @@ nm_get_ip_addr_type(
         }
         bail_on_error(err);
 
-        if (!strcmp(pszIpAddr, ppszIpAddrList[0]))
+        if (count && !strcmp(pszIpAddr, ppszIpAddrList[0]))
         {
             addrType = STATIC_IPV4;
         }
@@ -2441,9 +2580,9 @@ nm_get_ip_addr(
 )
 {
     uint32_t err = 0, modeFlags;
-    size_t i, ip4Count = 0, ip6Count = 0, staticIp6Count = 0, nCount = 0;
+    size_t i = 0, j = 0, ip4Count = 0, ip6Count = 0, nCount = 0;
     char **ppszIp4AddrList = NULL;
-    char **ppszIp6AddrList = NULL, **ppszStaticIp6AddrList = NULL;
+    char **ppszIp6AddrList = NULL;
     NET_IP_ADDR **ppIpAddrList = NULL;
 
     //TODO: If pszInterfaceName is NULL, enumerate all IPs
@@ -2525,18 +2664,18 @@ nm_get_ip_addr(
                                           DHCP_IPV4 : STATIC_IPV4;
     }
 
-    for (i = 0; i < ip6Count; i++)
+    for (j = 0; j < ip6Count; j++, i++)
     {
         err = netmgr_alloc(sizeof(NET_IP_ADDR), (void **)&ppIpAddrList[i]);
         bail_on_error(err);
         err = netmgr_alloc_string(pszInterfaceName,
                                   &ppIpAddrList[i]->pszInterfaceName);
         bail_on_error(err);
-        err = netmgr_alloc_string(ppszIp6AddrList[i],
+        err = netmgr_alloc_string(ppszIp6AddrList[j],
                                   &ppIpAddrList[i]->pszIPAddrPrefix);
         bail_on_error(err);
         err = nm_get_ip_addr_type(pszInterfaceName,
-                                  ppszIp6AddrList[i],
+                                  ppszIp6AddrList[j],
                                   &(ppIpAddrList[i]->type));
         bail_on_error(err);
     }
@@ -2547,7 +2686,6 @@ nm_get_ip_addr(
 cleanup:
     netmgr_list_free(ip4Count, (void **)ppszIp4AddrList);
     netmgr_list_free(ip6Count, (void **)ppszIp6AddrList);
-    netmgr_list_free(staticIp6Count, (void **)ppszStaticIp6AddrList);
     return err;
 
 error:
@@ -4002,6 +4140,7 @@ nm_get_dns_domains(
     char szSectionName[MAX_LINE];
     char *pszCfgFileName = NULL, *pszFileBuf = NULL;
     char *pszDnsDomainsValue = NULL, **ppszDnsDomainsList = NULL;
+    char *pszNewLine = NULL;
 
     if ((pCount == NULL) || (pppszDnsDomains == NULL))
     {
@@ -4027,6 +4166,12 @@ nm_get_dns_domains(
             bail_on_error(err);
         }
         pszDnsDomainsValue++;
+
+        pszNewLine = strstr(pszDnsDomainsValue, "\n");
+        if (pszNewLine != NULL)
+        {
+            *pszNewLine = '\0';
+        }
 
         err = nm_space_delimited_string_to_list(pszDnsDomainsValue, &count,
                                                 &ppszDnsDomainsList);
@@ -4777,8 +4922,156 @@ nm_wait_for_link_up(
     uint32_t timeout
 )
 {
-    //TODO: Implment..
-    return 0;
+    uint32_t err = 0;
+    int sockFd = -1, retval = -1, linkUp = 0;
+    fd_set readFd;
+    char ifName[IFNAMSIZ];
+    struct timeval tval;
+    struct ifinfomsg *pIfInfo = NULL;
+    PNET_NETLINK_MESSAGE pNetLinkMessageList = NULL;
+    PNET_NETLINK_MESSAGE pCurNetLinkMessageList = NULL;
+    NET_LINK_STATE linkState = LINK_STATE_UNKNOWN;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = nm_get_link_state(pszInterfaceName, &linkState);
+    bail_on_error(err);
+
+    if (linkState == LINK_UP)
+    {
+        goto cleanup;
+    }
+
+    err = open_netlink_socket(RTMGRP_LINK, &sockFd);
+    bail_on_error(err);
+
+    tval.tv_sec = timeout;
+    tval.tv_usec = 0;
+
+    while (1)
+    {
+        FD_ZERO(&readFd);
+        FD_CLR(sockFd, &readFd);
+        FD_SET(sockFd, &readFd);
+
+        retval = select(sockFd+1, &readFd, NULL, NULL, &tval);
+        if (retval == -1)
+        {
+            err = errno;
+        }
+        else if (retval)
+        {
+            err = handle_netlink_event(sockFd, &pNetLinkMessageList);
+        }
+        else
+        {
+            err = ETIME;
+        }
+        bail_on_error(err);
+
+        pCurNetLinkMessageList = pNetLinkMessageList;
+        while(pCurNetLinkMessageList)
+        {
+            if (pCurNetLinkMessageList->netLinkMessageType != RTM_NEWLINK)
+            {
+                pCurNetLinkMessageList = pCurNetLinkMessageList->pNext;
+            }
+            memset(ifName, 0 ,sizeof(ifName));
+            pIfInfo = pCurNetLinkMessageList->pMsg;
+            if_indextoname(pIfInfo->ifi_index, ifName);
+            if (!strcmp(pszInterfaceName, ifName) &&
+                        TEST_FLAG(pIfInfo->ifi_flags, IFF_UP))
+            {
+                linkUp = 1;
+                break;
+            }
+
+            pCurNetLinkMessageList = pCurNetLinkMessageList->pNext;
+        }
+
+        if (linkUp)
+        {
+            break;
+        }
+        free_netlink_message(pNetLinkMessageList);
+    }
+
+cleanup:
+    free_netlink_message(pNetLinkMessageList);
+    return err;
+error:
+    goto cleanup;
+}
+
+static uint32_t
+nm_validate_netlink_ipaddr(
+    const char *pszInterfaceName,
+    struct ifaddrmsg *pIfAddrMsg,
+    int ifAddrMsgLen,
+    uint32_t addrType)
+{
+    uint32_t err = 0, addrTypeGet = 0;
+    int ipAddrValid = 0;
+    char szIpAddr[INET6_ADDRSTRLEN];
+    char *pszIpAddrPrefix = NULL;
+    struct rtattr *pRouteAttr = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) || !pIfAddrMsg ||!ifAddrMsgLen ||
+        !addrType)
+    {
+        err = EINVAL;
+    }
+    bail_on_error(err);
+
+    pRouteAttr = IFA_RTA(pIfAddrMsg);
+    for (;RTA_OK(pRouteAttr, ifAddrMsgLen);
+         pRouteAttr = RTA_NEXT(pRouteAttr, ifAddrMsgLen))
+    {
+        if (pRouteAttr->rta_type != IFA_LOCAL)
+        {
+            continue;
+        }
+        addrTypeGet = 0;
+
+        if (inet_ntop(pIfAddrMsg->ifa_family, RTA_DATA(pRouteAttr), szIpAddr,
+                      sizeof(szIpAddr)) == NULL)
+        {
+            err = errno;
+            bail_on_error(err);
+        }
+
+        err = netmgr_alloc_string_printf(&pszIpAddrPrefix, "%s/%u",
+                                         szIpAddr, pIfAddrMsg->ifa_prefixlen);
+        bail_on_error(err);
+
+        err = nm_get_ip_addr_type(pszInterfaceName,
+                                  szIpAddr,
+                                  &addrTypeGet);
+        bail_on_error(err);
+
+        if (TEST_FLAG(addrType, addrTypeGet))
+        {
+            ipAddrValid = 1;
+            break;
+        }
+
+        netmgr_free(pszIpAddrPrefix);
+    }
+
+    if (!ipAddrValid)
+    {
+        err = ENOMSG;
+    }
+
+cleanup:
+    netmgr_free(pszIpAddrPrefix);
+    return err;
+error:
+    goto cleanup;
 }
 
 uint32_t
@@ -4788,9 +5081,144 @@ nm_wait_for_ip(
     NET_ADDR_TYPE addrTypes
 )
 {
-    //TODO: Implment this function, sleep(1) for now
-    sleep(1);
-    return 0;
+    uint32_t err = 0, netLinkGroups = 0, ip4Type = 0, ip6Type = 0;
+    int sockFd = -1, retval = -1, ipAddrValid = 0;
+    int ifAddrMsgLen = 0;
+    size_t i = 0, ipCount = 0;
+    fd_set readFd;
+    struct timeval tval;
+    struct ifaddrmsg *pIfAddr = NULL;
+    char ifName[IFNAMSIZ];
+    char **ppszIpAddrList = NULL;
+    NET_ADDR_TYPE ipAddrType = 0;
+    PNET_NETLINK_MESSAGE pNetLinkMessageList = NULL;
+    PNET_NETLINK_MESSAGE pCurNetLinkMessageList = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    /* addrTypes = 0 implies no action is needed */
+    if (!addrTypes)
+    {
+        goto cleanup;
+    }
+
+    err = nm_get_interface_ipaddr(pszInterfaceName,
+                                  addrTypes,
+                                  &ipCount,
+                                  &ppszIpAddrList);
+    if (err == ENOENT)
+    {
+        err = 0;
+    }
+    bail_on_error(err);
+
+    for (i = 0; i < ipCount; i++)
+    {
+        err = nm_get_ip_addr_type(pszInterfaceName,
+                                  ppszIpAddrList[i],
+                                  &ipAddrType);
+        if (TEST_FLAG(addrTypes, ipAddrType))
+        {
+            goto cleanup;
+        }
+    }
+
+    if (TEST_FLAG(addrTypes, STATIC_IPV4) || TEST_FLAG(addrTypes, DHCP_IPV4))
+    {
+        ip4Type = 1;
+        netLinkGroups = RTMGRP_IPV4_IFADDR;
+    }
+
+    if (TEST_FLAG(addrTypes, STATIC_IPV6) || TEST_FLAG(addrTypes, DHCP_IPV6) ||
+        TEST_FLAG(addrTypes, AUTO_IPV6) || TEST_FLAG(addrTypes, LINK_LOCAL_IPV6))
+    {
+        ip6Type = 1;
+        netLinkGroups |= RTMGRP_IPV6_IFADDR;
+    }
+
+    err = open_netlink_socket(netLinkGroups, &sockFd);
+    bail_on_error(err);
+
+    tval.tv_sec = timeout;
+    tval.tv_usec = 0;
+
+    while (1)
+    {
+        FD_ZERO(&readFd);
+        FD_CLR(sockFd, &readFd);
+        FD_SET(sockFd, &readFd);
+
+        retval = select(sockFd+1, &readFd, NULL, NULL, &tval);
+        if (retval == -1)
+        {
+            err = errno;
+        }
+        else if (retval)
+        {
+            err = handle_netlink_event(sockFd, &pNetLinkMessageList);
+        }
+        else
+        {
+            err = ETIME;
+        }
+        bail_on_error(err);
+
+        pCurNetLinkMessageList = pNetLinkMessageList;
+        while(pCurNetLinkMessageList)
+        {
+            if (pCurNetLinkMessageList->netLinkMessageType != RTM_NEWADDR)
+            {
+                pCurNetLinkMessageList = pCurNetLinkMessageList->pNext;
+                continue;
+            }
+            memset(ifName, 0 ,sizeof(ifName));
+            pIfAddr = pCurNetLinkMessageList->pMsg;
+            ifAddrMsgLen = pCurNetLinkMessageList->msgLen;
+            if_indextoname(pIfAddr->ifa_index, ifName);
+
+            if ((strcmp(pszInterfaceName, ifName) != 0) ||
+                !((ip4Type && (pIfAddr->ifa_family == AF_INET)) ||
+                (ip6Type && (pIfAddr->ifa_family == AF_INET6))))
+            {
+                pCurNetLinkMessageList = pCurNetLinkMessageList->pNext;
+                continue;
+            }
+
+            err = nm_validate_netlink_ipaddr(pszInterfaceName,
+                                             pIfAddr,
+                                             ifAddrMsgLen,
+                                             addrTypes);
+            if (err == 0)
+            {
+                ipAddrValid = 1;
+                break;
+            }
+            if (err == ENOMSG)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            pCurNetLinkMessageList = pCurNetLinkMessageList->pNext;
+        }
+        if (ipAddrValid)
+        {
+            break;
+        }
+        free_netlink_message(pNetLinkMessageList);
+    }
+
+cleanup:
+    free_netlink_message(pNetLinkMessageList);
+    netmgr_list_free(ipCount, (void **)ppszIpAddrList);
+    return err;
+
+error:
+    goto cleanup;
 }
 
 uint32_t

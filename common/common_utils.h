@@ -15,6 +15,14 @@
 #ifndef __COMMON_UTILS_H__
 #define __COMMON_UTILS_H__
 
+typedef struct _NETLINK_MESSAGE
+{
+    struct _NETLINK_MESSAGE *pNext;
+    uint16_t netLinkMessageType;
+    void * pMsg;
+    int msgLen;
+} NETLINK_MESSAGE, *PNET_NETLINK_MESSAGE;
+
 uint32_t
 is_ipv4_addr(const char *pszIpAddr);
 
@@ -30,6 +38,23 @@ uint32_t
 get_prefix_from_netmask(
     struct sockaddr *sin,
     uint8_t *prefix
+);
+
+void
+free_netlink_message(
+    NETLINK_MESSAGE *pNetLinkMsg
+);
+
+uint32_t
+open_netlink_socket(
+    uint32_t netLinkGroup,
+    int *pSockFd
+);
+
+uint32_t
+handle_netlink_event(
+    const int sockFd,
+    PNET_NETLINK_MESSAGE *ppNetLinkMsgList
 );
 
 #endif /* __COMMON_UTILS_H__ */
