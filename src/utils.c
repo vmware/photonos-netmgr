@@ -343,7 +343,8 @@ nm_atomic_file_update(
     fclose(pFile);
     pFile = NULL;
 
-    if (chmod(pszTmpFileName, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH) != 0)
+    if (chmod(pszTmpFileName, S_IRUSR|S_IWUSR|S_IXUSR|
+                              S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH) != 0)
     {
         err = errno;
         bail_on_error(err);

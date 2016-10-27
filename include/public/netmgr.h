@@ -534,6 +534,9 @@ nm_stop_ntp_service();
 uint32_t
 nm_restart_ntp_service();
 
+uint32_t
+nm_reload_firewall_config();
+
 
 #endif /* __NETMGR_H__ */
 

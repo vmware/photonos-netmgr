@@ -905,7 +905,8 @@ cmd_fw_rule(PNETMGR_CMD pCmd)
 {
     uint32_t err = 0;
     char *pszFwRule = NULL;
-    NET_FW_RULE netFwRule = {0};
+    size_t i, ruleCount = 0;
+    NET_FW_RULE netFwRule = {0}, **netFwRules = NULL;
 
     switch (pCmd->op)
     {
@@ -934,24 +935,28 @@ cmd_fw_rule(PNETMGR_CMD pCmd)
             break;
 
         case OP_GET:
-#if 0
-            err = nm_get_ntp_servers(&count, &ppszNtpServersList);
+            err = nm_get_firewall_rules(&ruleCount, &netFwRules);
             bail_on_error(err);
 
-            fprintf(stdout, "NTPServers= ");
-            for (i = 0; i < count; i++)
+            fprintf(stdout, "Firewall rules:\n");
+            for (i = 0; i < ruleCount; i++)
             {
-                fprintf(stdout, "%s ", ppszNtpServersList[i]);
+                fprintf(stdout, "%s\n", netFwRules[i]->pszRawFwRule);
             }
-            fprintf(stdout, "\n");
             break;
-#endif
+
         default:
             err = EINVAL;
     }
     bail_on_error(err);
 
 cleanup:
+    for (i = 0; i < ruleCount; i++)
+    {
+        netmgr_free(netFwRules[i]->pszRawFwRule);
+        netmgr_free(netFwRules[i]);
+    }
+    netmgr_free(netFwRules);
     return err;
 
 error:

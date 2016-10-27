@@ -4578,6 +4578,9 @@ nm_add_firewall_rule(
     err = nm_atomic_file_update(FIREWALL_CONF_FILENAME, pszNewFileBuf);
     bail_on_error(err);
 
+    err = nm_reload_firewall_config();
+    bail_on_error(err);
+
 clean:
     netmgr_free(pszFwRule);
     netmgr_free(pszFileBuf);
@@ -4597,7 +4600,7 @@ nm_delete_firewall_rule(
     uint32_t err = 0;
     size_t i, lineCount = 0;
     char *pszFileBuf = NULL, *pszFwRule = NULL, **ppszLineBuf = NULL;
-    char *pszNewFileBuf = NULL;
+    char *p, *pszNewFileBuf = NULL;
 
     if ((pNetFwRule == NULL) || (pNetFwRule->type >= FW_RULE_TYPE_MAX))
     {
@@ -4619,7 +4622,8 @@ nm_delete_firewall_rule(
     err = nm_read_conf_file(FIREWALL_CONF_FILENAME, &pszFileBuf);
     bail_on_error(err);
 
-    if (strstr(pszFileBuf, pszFwRule) == NULL)
+    if (strcmp(pszFwRule, "iptables *") &&
+        (strstr(pszFileBuf, pszFwRule) == NULL))
     {
         err = ENOENT;
         bail_on_error(err);
@@ -4631,18 +4635,25 @@ nm_delete_firewall_rule(
     err = nm_string_to_line_array(pszFileBuf, &lineCount, &ppszLineBuf);
     bail_on_error(err);
 
-    /* Remove the matching rule from the file and the next empty line */
+    /* Remove the matching rule from the file and the next empty line.
+       If rule is '*' delete all rules.  */
     for (i = 0; i < lineCount; i++)
     {
-        if (strstr(ppszLineBuf[i], pszFwRule) != NULL)
+        if ((!strcmp(pszFwRule, "iptables *") &&
+            ((p = strstr(ppszLineBuf[i], "iptables")) == ppszLineBuf[i])) ||
+            (strstr(ppszLineBuf[i], pszFwRule) != NULL))
         {
             netmgr_free(ppszLineBuf[i]);
             ppszLineBuf[i] = NULL;
-            i++;
-            if ((i < (lineCount-1)) && !strcmp(ppszLineBuf[i], "\n"))
+            if (((i+1) < (lineCount-1)) && !strcmp(ppszLineBuf[i+1], "\n"))
             {
+                i++;
                 netmgr_free(ppszLineBuf[i]);
                 ppszLineBuf[i] = NULL;
+            }
+            if (!strcmp(pszFwRule, "iptables *"))
+            {
+                continue;
             }
             break;
         }
@@ -4657,6 +4668,9 @@ nm_delete_firewall_rule(
     }
 
     err = nm_atomic_file_update(FIREWALL_CONF_FILENAME, pszNewFileBuf);
+    bail_on_error(err);
+
+    err = nm_reload_firewall_config();
     bail_on_error(err);
 
 clean:
@@ -4676,8 +4690,83 @@ nm_get_firewall_rules(
     NET_FW_RULE ***pppNetFwRules
 )
 {
-    return 0;
+    uint32_t err = 0;
+    size_t i, j = 0, lineCount = 0, ruleCount = 0;
+    char *p, *pszFileBuf = NULL, **ppszLineBuf = NULL;
+    NET_FW_RULE **ppNetFwRules = NULL;
+
+    if (!pCount || !pppNetFwRules)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = nm_read_conf_file(FIREWALL_CONF_FILENAME, &pszFileBuf);
+    bail_on_error(err);
+
+    err = nm_string_to_line_array(pszFileBuf, &lineCount, &ppszLineBuf);
+    bail_on_error(err);
+
+    for (i = 0; i < lineCount; i++)
+    {
+        /* If line begins with iptables, add the rule */
+        p = strstr(ppszLineBuf[i], "iptables");
+        if ((p != NULL) && (p == ppszLineBuf[i]))
+        {
+            ruleCount++;
+        }
+    }
+
+    err = netmgr_alloc(ruleCount * sizeof(NET_FW_RULE *),
+                       (void **)&ppNetFwRules);
+    bail_on_error(err);
+
+    for (i = 0; i < lineCount; i++)
+    {
+        p = strstr(ppszLineBuf[i], "iptables");
+        if ((p != NULL) && (p == ppszLineBuf[i]))
+        {
+            err = netmgr_alloc(sizeof(NET_FW_RULE),
+                               (void **)&ppNetFwRules[j]);
+            bail_on_error(err);
+            ppNetFwRules[j]->type = FW_RAW;
+            err = netmgr_alloc_string_len(ppszLineBuf[i],
+                                          strlen(ppszLineBuf[i])-1,
+                                          &ppNetFwRules[j]->pszRawFwRule);
+            bail_on_error(err);
+            j++;
+        }
+    }
+
+    *pCount = ruleCount;
+    *pppNetFwRules = ppNetFwRules;
+
+clean:
+    netmgr_free(pszFileBuf);
+    netmgr_list_free(lineCount, (void **)ppszLineBuf);
+    return err;
+
+error:
+    if (pCount)
+    {
+        *pCount = 0;
+    }
+    if (pppNetFwRules)
+    {
+        *pppNetFwRules = NULL;
+    }
+    for (i = 0; i < ruleCount; i++)
+    {
+        if (ppNetFwRules[i] != NULL)
+        {
+            netmgr_free(ppNetFwRules[i]->pszRawFwRule);
+            netmgr_free(ppNetFwRules[i]);
+        }
+    }
+    netmgr_free(ppNetFwRules);
+    goto clean;
 }
+
 
 /*
  * Misc APIs
@@ -4893,3 +4982,16 @@ error:
     goto clean;
 }
 
+uint32_t
+nm_reload_firewall_config()
+{
+    uint32_t err = 0;
+
+    err = nm_run_command(FIREWALL_CONF_FILENAME);
+    bail_on_error(err);
+
+clean:
+    return err;
+error:
+    goto clean;
+}
