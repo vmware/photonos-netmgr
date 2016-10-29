@@ -5033,7 +5033,8 @@ nm_validate_netlink_ipaddr(
     for (;RTA_OK(pRouteAttr, ifAddrMsgLen);
          pRouteAttr = RTA_NEXT(pRouteAttr, ifAddrMsgLen))
     {
-        if (pRouteAttr->rta_type != IFA_LOCAL)
+        if (pRouteAttr->rta_type != IFA_LOCAL &&
+            pRouteAttr->rta_type != IFA_ADDRESS)
         {
             continue;
         }
