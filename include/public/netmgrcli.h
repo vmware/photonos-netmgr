@@ -31,6 +31,7 @@ typedef enum _CMD_ID
     CMD_DNS_DOMAINS,
     CMD_NTP_SERVERS,
     CMD_FW_RULE,
+    CMD_HOSTNAME,
     CMD_NET_INFO,
     CMD_MAX
 } CMD_ID;

@@ -963,6 +963,45 @@ error:
 }
 
 static uint32_t
+cmd_hostname(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    char *pszHostname = NULL;
+
+    switch (pCmd->op)
+    {
+        case OP_SET:
+            err = netmgrcli_find_cmdopt(pCmd, "hostname", &pszHostname);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            err = nm_set_hostname(pszHostname);
+            bail_on_error(err);
+            break;
+
+        case OP_GET:
+            err = nm_get_hostname(&pszHostname);
+            bail_on_error(err);
+
+            fprintf(stdout, "Hostname: %s\n", pszHostname);
+            break;
+
+        default:
+            err = EINVAL;
+            bail_on_error(err);
+    }
+
+cleanup:
+    netmgr_free(pszHostname);
+    return err;
+error:
+    goto cleanup;
+}
+
+static uint32_t
 cmd_net_info(PNETMGR_CMD pCmd)
 {
     uint32_t err = 0;
@@ -1033,8 +1072,9 @@ NETMGR_CLI_HANDLER cmdHandler[] =
     { CMD_DNS_SERVERS,         cmd_dns_servers     },
     { CMD_DNS_DOMAINS,         cmd_dns_domains     },
     { CMD_NTP_SERVERS,         cmd_ntp_servers     },
-    { CMD_FW_RULE    ,         cmd_fw_rule         },
-    { CMD_NET_INFO ,           cmd_net_info        },
+    { CMD_FW_RULE,             cmd_fw_rule         },
+    { CMD_HOSTNAME,            cmd_hostname        },
+    { CMD_NET_INFO,            cmd_net_info        },
 };
 
 void

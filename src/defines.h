@@ -56,6 +56,7 @@
 
 #define RESOLV_CONF_FILENAME           "/etc/resolv.conf"
 #define NTP_CONF_FILENAME              "/etc/ntp.conf"
+#define HOSTNAME_CONF_FILENAME         "/etc/hostname"
 #define FIREWALL_CONF_FILENAME         "/etc/systemd/scripts/iptables"
 #define STR_NAMESERVER                 "nameserver"
 #define STR_SEARCH                     "search"

@@ -1207,6 +1207,83 @@ error:
 }
 
 
+static struct option hostnameOptions[] =
+{
+    {"set",          no_argument,          0,    's'},
+    {"get",          no_argument,          0,    'g'},
+    {"name",         required_argument,    0,    'n'},
+    {0, 0, 0, 0}
+};
+
+static uint32_t
+cli_hostname(
+    int argc,
+    char **argv,
+    PNETMGR_CMD pCmd
+    )
+{
+    uint32_t err = 0, valid_hostname = 0;
+    int nOptionIndex = 0, nOption = 0;
+    CMD_OP op = OP_INVALID;
+
+    opterr = 0;
+    optind = 1;
+    while (1)
+    {
+        nOption = getopt_long(argc,
+                              argv,
+                              "sgn:",
+                              hostnameOptions,
+                              &nOptionIndex);
+        if (nOption == -1)
+            break;
+
+        switch(nOption)
+        {
+            case 's':
+                op = OP_SET;
+                break;
+            case 'g':
+                op = OP_GET;
+                break;
+            case 'n':
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("hostname", optarg, pCmd);
+                    valid_hostname = 1;
+                }
+                break;
+            case '?':
+                /* Option not handled here. Ignore. */
+                break;
+        }
+        bail_on_error(err);
+    }
+
+    if ((op == OP_INVALID) || ((op == OP_SET) && (valid_hostname == 0)))
+    {
+        err = EDOM;
+        bail_on_error(err);
+    }
+
+    pCmd->id = CMD_HOSTNAME;
+    pCmd->op = op;
+
+cleanup:
+    return err;
+
+error:
+    pCmd->op = OP_INVALID;
+    if(err == EDOM)
+    {
+        fprintf(stderr,
+                "Usage:\nhostname --get\n"
+                "hostname --set --name <Hostname>\n");
+    }
+    goto cleanup;
+}
+
+
 static struct option netInfoOptions[] =
 {
     {"set",          no_argument,          0,    's'},
@@ -1374,6 +1451,11 @@ NETMGRCLI_CMD_MAP cmdMap[] =
      cli_fw_rule,
      "--add --del --rule <Firewall Rule>",
      "get or set DNS domains list"
+    },
+    {"hostname",
+     cli_hostname,
+     "--set --name <Hostname>",
+     "get or set hostname"
     },
     {"net_info",
      cli_net_info,

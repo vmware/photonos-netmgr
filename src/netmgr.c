@@ -4914,6 +4914,71 @@ error:
  * Misc APIs
  */
 uint32_t
+nm_set_hostname(
+    const char *pszHostname
+)
+{
+    uint32_t err = 0;
+    char *pszCmd = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszHostname))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = netmgr_alloc_string_printf(&pszCmd,
+                                     "hostnamectl set-hostname %s",
+                                     pszHostname);
+    bail_on_error(err);
+
+    err = nm_run_command(pszCmd);
+    bail_on_error(err);
+
+clean:
+    netmgr_free(pszCmd);
+    return err;
+error:
+    goto clean;
+}
+
+uint32_t
+nm_get_hostname(
+    char **ppszHostname
+)
+{
+    uint32_t err = 0;
+    char *pszHostname = NULL, *pszNewline = NULL;
+
+    if (!ppszHostname)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = nm_read_conf_file(HOSTNAME_CONF_FILENAME, &pszHostname);
+    bail_on_error(err);
+
+    pszNewline = strchr(pszHostname, '\n');
+    if (pszNewline != NULL)
+    {
+        *pszNewline = '\0';
+    }
+
+    *ppszHostname = pszHostname;
+
+clean:
+    return err;
+error:
+    if (ppszHostname)
+    {
+        ppszHostname = NULL;
+    }
+    netmgr_free(pszHostname);
+    goto clean;
+}
+
+uint32_t
 nm_wait_for_link_up(
     const char *pszInterfaceName,
     uint32_t timeout

@@ -490,6 +490,16 @@ nm_get_firewall_rules(
  * Misc APIs
  */
 uint32_t
+nm_set_hostname(
+    const char *pszHostname
+);
+
+uint32_t
+nm_get_hostname(
+    char **ppszHostname
+);
+
+uint32_t
 nm_wait_for_link_up(
     const char *pszInterfaceName,
     uint32_t timeout
