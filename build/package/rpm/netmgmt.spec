@@ -1,7 +1,7 @@
 Summary: Network Management Utilities
 Name:    netmgmt
-Version: 1.0.4
-Release: 6
+Version: 1.0.5
+Release: 1
 Group:   Applications/System
 Vendor:  VMware, Inc.
 License: VMware
@@ -26,7 +26,6 @@ Requires: netmgmt = %{version}-%{release}
 
 %description cli-devel
 header files and libraries for netmgmt cli
-
 
 %build
 cd build
@@ -64,4 +63,5 @@ cd build && make install DESTDIR=$RPM_BUILD_ROOT
 # %doc ChangeLog README COPYING
 
 %changelog
-
+*   Wed Nov 02 2016 Vinay Kulkarni <kulkarniv@vmware.com> 1.0.5-1
+-   netmgr version 1.0.5

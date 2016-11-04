@@ -29,11 +29,13 @@
 #define ARPING_UPDATE_NEIGHBOR_CMDOPT  "-A -c 3"
 
 #define SECTION_RESOLVE                "Resolve"
+#define SECTION_MATCH                  "Match"
 #define SECTION_NETWORK                "Network"
 #define SECTION_DHCP                   "DHCP"
 #define SECTION_ROUTE                  "Route"
 #define SECTION_LINK                   "Link"
 
+#define KEY_NAME                       "Name"
 #define KEY_ADDRESS                    "Address"
 #define KEY_GATEWAY                    "Gateway"
 #define KEY_DEST                       "Destination"
