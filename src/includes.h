@@ -25,6 +25,7 @@
 #include <linux/rtnetlink.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
+#include <regex.h>
 
 #include <constants.h>
 #include <netmgmtsys.h>
