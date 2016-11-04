@@ -113,6 +113,13 @@ error:
 }
 
 static uint32_t
+nm_get_resolved_conf_filename(
+    char **ppszFilename)
+{
+    return nm_alloc_conf_filename(ppszFilename, SYSTEMD_PATH, "resolved.conf");
+}
+
+static uint32_t
 nm_get_networkd_conf_filename(
     char **ppszFilename)
 {
@@ -158,63 +165,142 @@ error:
 }
 
 static uint32_t
-nm_get_network_conf_filename(
-    const char *pszIfname,
-    char **ppszFilename)
+nm_regex_match_ifname(
+    const char *pszIfName,
+    const char *pszMatchName)
 {
     uint32_t err = 0;
-    char *pszCfgFileName = NULL, *pszStr = NULL;
+    regex_t rx;
+    regmatch_t rm;
+    size_t patternLen, ifNameLen, n;
+    char *p, *q, *pszPattern = NULL;
 
-    if (!ppszFilename)
+    if (IS_NULL_OR_EMPTY(pszIfName) || IS_NULL_OR_EMPTY(pszMatchName))
     {
         err = EINVAL;
         bail_on_error(err);
     }
 
-    err = nm_get_network_manual_conf_filename(pszIfname, &pszCfgFileName);
+    ifNameLen = strlen(pszIfName);
+    patternLen = strlen(pszMatchName);
+    for (p = strchr(pszMatchName, '*'), n = 0; p; p = strchr(++p, '*'), n++);
+
+    err = netmgr_alloc(patternLen + n + 1, (void **)&pszPattern);
     bail_on_error(err);
 
-    if (access(pszCfgFileName, R_OK|W_OK) == 0)
+    for (p = (char *)pszMatchName, q = pszPattern; *p; p++, q++)
     {
-        *ppszFilename = pszCfgFileName;
-        goto cleanup;
+        if (*p == '*')
+        {
+            *q++ = '.';
+        }
+        *q = *p;
     }
 
-    pszStr = strstr(pszCfgFileName, ".manual");
-    if (pszStr == NULL)
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-    *pszStr = '\0';
+    err = regcomp(&rx, pszPattern, 0);
+    bail_on_error(err);
 
-    if (access(pszCfgFileName, R_OK|W_OK) == 0)
+    err = regexec(&rx, pszIfName, 1, &rm, 0);
+    bail_on_error(err);
+    if ((rm.rm_eo - rm.rm_so) < ifNameLen)
     {
-        *ppszFilename = pszCfgFileName;
-        goto cleanup;
-    }
-    else
-    {
-        err = errno;
+        err = ENOENT;
         bail_on_error(err);
     }
 
 cleanup:
+    netmgr_free(pszPattern);
+    regfree(&rx);
     return err;
 error:
-    if(ppszFilename)
-    {
-        *ppszFilename = NULL;
-    }
-    netmgr_free(pszCfgFileName);
     goto cleanup;
 }
 
 static uint32_t
-nm_get_resolved_conf_filename(
+nm_get_network_conf_filename(
+    const char *pszIfName,
     char **ppszFilename)
 {
-    return nm_alloc_conf_filename(ppszFilename, SYSTEMD_PATH, "resolved.conf");
+    uint32_t err = 0;
+    size_t matchLen, maxMatchLen = 0;
+    struct dirent *hFile;
+    DIR *dirFile = NULL;
+    char *p, *pszFileName = NULL, *pszMatchName = NULL, *pszCfgFileName = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszIfName) || !ppszFilename)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    dirFile = opendir(SYSTEMD_NET_PATH);
+    if (dirFile != NULL)
+    {
+        errno = 0;
+        while ((hFile = readdir(dirFile)) != NULL)
+        {
+            if (!strcmp(hFile->d_name, ".")) continue;
+            if (!strcmp(hFile->d_name, "..")) continue;
+            if (hFile->d_name[0] == '.') continue;
+            if ((((p = strstr(hFile->d_name, ".network")) != NULL) &&
+                 (strlen(p) == strlen(".network"))) ||
+                (((p = strstr(hFile->d_name, ".network.manual")) != NULL) &&
+                 (strlen(p) == strlen(".network.manual"))))
+            {
+                err = nm_alloc_conf_filename(&pszFileName,
+                                             SYSTEMD_NET_PATH,
+                                             hFile->d_name);
+                bail_on_error(err);
+                err = nm_get_key_value(pszFileName,
+                                       SECTION_MATCH,
+                                       KEY_NAME,
+                                       &pszMatchName);
+                bail_on_error(err);
+
+                if (!strcmp(pszIfName, pszMatchName))
+                {
+                    pszCfgFileName = pszFileName;
+                    pszFileName = NULL;
+                    break;
+                }
+
+                if (nm_regex_match_ifname(pszIfName, pszMatchName) == 0)
+                {
+                    matchLen = strlen(pszMatchName);
+                    if (matchLen > maxMatchLen)
+                    {
+                        maxMatchLen = matchLen;
+                        netmgr_free(pszCfgFileName);
+                        pszCfgFileName = pszFileName;
+                        pszFileName = NULL;
+                    }
+                }
+
+                netmgr_free(pszMatchName);
+                pszMatchName = NULL;
+                netmgr_free(pszFileName);
+                pszFileName = NULL;
+            }
+        }
+    }
+
+    *ppszFilename = pszCfgFileName;
+
+cleanup:
+    if (dirFile != NULL)
+    {
+        closedir(dirFile);
+    }
+    netmgr_free(pszMatchName);
+    netmgr_free(pszFileName);
+    return err;
+
+error:
+    if (ppszFilename)
+    {
+        *ppszFilename = NULL;
+    }
+    goto cleanup;
 }
 
 
