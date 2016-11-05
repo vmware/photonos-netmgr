@@ -36,17 +36,16 @@ nm_set_key_value(
         bail_on_error(err);
     }
 
-    if ((flags & F_CREATE_CFG_FILE) && access(pszConfigFileName, R_OK|W_OK) < 0)
+    if (TEST_FLAG(flags, F_CREATE_CFG_FILE))
     {
-        /* 'touch' the file */
-        if ((fp = fopen(pszConfigFileName, "w")) != NULL)
+        /* 'touch' the file if it does't exist */
+        if ((fp = fopen(pszConfigFileName, "a+")) != NULL)
         {
             fclose(fp);
         }
         else
         {
-            /* TODO: Better error reporting */
-            err = EINVAL;
+            err = errno;
             bail_on_error(err);
         }
     }
@@ -417,7 +416,7 @@ nm_acquire_write_lock(
         bail_on_error(err);
     }
 
-    lockFd = open(NM_LOCK_FILENAME, O_CREAT | O_WRONLY);
+    lockFd = open(NM_LOCK_FILENAME, O_CREAT | O_WRONLY, S_IRWXU);
     if (lockFd == -1)
     {
         err = errno;

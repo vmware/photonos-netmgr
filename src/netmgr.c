@@ -1647,7 +1647,9 @@ nm_get_ip_default_gateway(
         err = errno;
         bail_on_error(err);
     }
-    do {
+
+    do
+    {
         if ((readLen = recv(sockFd, pszMsgBuf, (BUFSIZE - msgLen), 0)) < 0)
         {
             err = errno;

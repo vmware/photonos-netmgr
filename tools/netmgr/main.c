@@ -319,6 +319,7 @@ cmd_ip6_address(PNETMGR_CMD pCmd)
                 bail_on_error(err);
                 pszGateway = NULL;
             }
+            /* fall through */
 
         case OP_SET:
             err = netmgrcli_find_cmdopt(pCmd, "dhcp", &pszDhcp);
@@ -456,6 +457,7 @@ cmd_ip_route(PNETMGR_CMD pCmd)
                 // TODO: scope = default
             }
             bail_on_error(err);
+            /* fall through */
 
         case OP_DEL:
             netmgrcli_find_cmdopt(pCmd, "destination", &ipRoute.pszDestNetwork);
@@ -592,6 +594,7 @@ cmd_dns_servers(PNETMGR_CMD pCmd)
             {
                 dnsMode = STATIC_DNS;
             }
+            /* fall through */
         case OP_ADD:
         case OP_DEL:
             err = netmgrcli_find_cmdopt(pCmd, "servers", &pszDnsServers);
