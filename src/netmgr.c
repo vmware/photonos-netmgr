@@ -165,6 +165,72 @@ error:
 }
 
 static uint32_t
+nm_read_conf_file(
+    const char *pszFilename,
+    char **ppszFileBuf)
+{
+    uint32_t err = 0;
+    long len;
+    FILE *fp = NULL;
+    char *pszFileBuf = NULL;
+
+    if (!ppszFileBuf)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    fp = fopen(pszFilename, "r");
+    if (fp == NULL)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+    if (fseek(fp, 0, SEEK_END) != 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+    len = ftell(fp);
+    if (len == -1)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+    if (fseek(fp, 0, SEEK_SET) != 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    err = netmgr_alloc((len + 1), (void *)&pszFileBuf);
+    bail_on_error(err);
+
+    if (fread(pszFileBuf, len, 1, fp) == 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    *ppszFileBuf = pszFileBuf;
+
+cleanup:
+    if (fp != NULL)
+    {
+        fclose(fp);
+    }
+    return err;
+
+error:
+    if (ppszFileBuf != NULL)
+    {
+        *ppszFileBuf = NULL;
+    }
+    netmgr_free(pszFileBuf);
+    goto cleanup;
+}
+
+static uint32_t
 nm_regex_match_ifname(
     const char *pszIfName,
     const char *pszMatchName)
@@ -301,6 +367,79 @@ error:
     {
         *ppszFilename = NULL;
     }
+    goto cleanup;
+}
+
+static uint32_t
+nm_string_to_line_array(
+    const char *pszStrBuf,
+    size_t *pLineCount,
+    char ***pppszLineBuf)
+{
+    uint32_t err = 0, len;
+    size_t i = 0, lineCount = 0;
+    char *p1, *p2, *pEnd, **ppszLineBuf = NULL;
+
+    if (!pszStrBuf || !*pszStrBuf || !pLineCount || !pppszLineBuf)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    p1 = (char *)pszStrBuf;
+    pEnd = strchr(pszStrBuf, '\0');
+    do
+    {
+        p1 = strchr(p1, '\n');
+        if (p1 == NULL)
+        {
+            break;
+        }
+        lineCount++;
+        p1++;
+    } while (p1 < pEnd);
+
+    if (lineCount == 0)
+    {
+        err = ENOENT;
+        bail_on_error(err);
+    }
+
+    err = netmgr_alloc(lineCount * sizeof(char **), (void **)&ppszLineBuf);
+    bail_on_error(err);
+
+    p1 = (char *)pszStrBuf;
+    do
+    {
+        p2 = strchr(p1, '\n');
+        if (p2 == NULL)
+        {
+            break;
+        }
+        len = p2 - p1 + 1;
+        err = netmgr_alloc(len + 1, (void **)&ppszLineBuf[i]);
+        bail_on_error(err);
+        memcpy(ppszLineBuf[i], p1, len);
+        i++;
+        p1 = p2 + 1;
+    } while (p1 < pEnd);
+
+    *pLineCount = lineCount;
+    *pppszLineBuf = ppszLineBuf;
+
+cleanup:
+    return err;
+
+error:
+    if (pLineCount)
+    {
+        *pLineCount = 0;
+    }
+    if (pppszLineBuf)
+    {
+        *pppszLineBuf = NULL;
+    }
+    netmgr_list_free(lineCount, (void **)ppszLineBuf);
     goto cleanup;
 }
 
@@ -1329,6 +1468,7 @@ nm_free_link_info(
     }
 }
 
+#include <mcheck.h>
 
 /*
  * IP Address configuration APIs
@@ -1354,6 +1494,8 @@ nm_get_static_ip_addr(
         bail_on_error(err);
     }
 
+mcheck_check_all();
+
     err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
@@ -1366,7 +1508,6 @@ nm_get_static_ip_addr(
 
     if (dwNumSections > 1)
     {
-        /* TODO: Log error */
         err = EINVAL;
         bail_on_error(err);
     }
@@ -1431,7 +1572,6 @@ nm_get_static_ip_addr(
         err = ENOENT;
         bail_on_error(err);
     }
-    /* TODO: Implement get for DHCPv4, DHCPv6 and AutoV6 */
 
     *pCount = i;
     *pppszIpAddrList = ppszIpAddrList;
@@ -1736,19 +1876,184 @@ error:
 }
 
 static uint32_t
+nm_set_sysctl_persistent_value(
+    const char *pszSysctlKey,
+    const char *pszValue
+)
+{
+    uint32_t err = 0, found = 0;
+    size_t len, i, lineCount = 0;
+    char *pszFileBuf = NULL, *pszNewFileBuf = NULL;
+    char *pszKeyValue = NULL, **ppszLineBuf = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszSysctlKey) || IS_NULL_OR_EMPTY(pszValue))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = nm_read_conf_file(SYSCTL_CONF_FILENAME, &pszFileBuf);
+    bail_on_error(err);
+
+    err = nm_string_to_line_array(pszFileBuf, &lineCount, &ppszLineBuf);
+    bail_on_error(err);
+
+    len = strlen(pszSysctlKey) + strlen(pszValue) + 4;
+
+    err = netmgr_alloc_string_printf(&pszKeyValue, "%s=%s\n", pszSysctlKey,
+                                     pszValue);
+    bail_on_error(err);
+
+    err = netmgr_alloc(strlen(pszFileBuf) + len, (void **)&pszNewFileBuf);
+    bail_on_error(err);
+
+    for (i = 0; i < lineCount; i++)
+    {
+        if (!strncmp(ppszLineBuf[i], pszSysctlKey, strlen(pszSysctlKey)))
+        {
+            netmgr_free(ppszLineBuf[i]);
+            ppszLineBuf[i] = pszKeyValue;
+            pszKeyValue = NULL;
+            found = 1;
+        }
+        strcat(pszNewFileBuf, ppszLineBuf[i]);
+    }
+
+    if (!found)
+    {
+        if (pszNewFileBuf[strlen(pszNewFileBuf)-1] != '\n')
+        {
+            strcat(pszNewFileBuf, "\n");
+        }
+        strcat(pszNewFileBuf, pszKeyValue);
+    }
+
+    err = nm_atomic_file_update(SYSCTL_CONF_FILENAME, pszNewFileBuf);
+    bail_on_error(err);
+
+cleanup:
+    netmgr_list_free(lineCount, (void **)ppszLineBuf);
+    netmgr_free(pszNewFileBuf);
+    netmgr_free(pszFileBuf);
+    netmgr_free(pszKeyValue);
+    return err;
+error:
+    goto cleanup;
+}
+
+static uint32_t
+nm_set_sysctl_procfs_value(
+    const char *pszProcfsPath,
+    const char *pszValue
+)
+{
+    uint32_t err = 0;
+    FILE *pFile = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszProcfsPath) || IS_NULL_OR_EMPTY(pszValue))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    pFile = fopen(pszProcfsPath, "w");
+    if (fputs(pszValue, pFile) == EOF)
+    {
+        err = ferror(pFile);
+        bail_on_error(err);
+    }
+
+cleanup:
+    fclose(pFile);
+    return err;
+error:
+    goto cleanup;
+}
+
+static uint32_t
+nm_get_sysctl_procfs_value(
+    const char *pszProcfsPath,
+    char **ppszValue
+)
+{
+    uint32_t err = 0;
+    FILE *pFile = NULL;
+    size_t len = 0;
+    ssize_t lLen = 0;
+    char *p, *pszLine = NULL, *pszValue = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszProcfsPath) || !ppszValue)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    pFile = fopen(pszProcfsPath, "r");
+    lLen = getline(&pszLine, &len, pFile);
+    if (lLen < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+    err = netmgr_alloc_string(pszLine, &pszValue);
+    bail_on_error(err);
+    p = strrchr(pszValue, '\n');
+    if (p != NULL)
+    {
+        *p = '\0';
+    }
+    *ppszValue = pszValue;
+
+cleanup:
+    fclose(pFile);
+    return err;
+error:
+    netmgr_free(pszValue);
+    if (ppszValue)
+    {
+        *ppszValue = NULL;
+    }
+    goto cleanup;
+}
+
+static uint32_t
+nm_get_ipv6_enable(
+    const char *pszInterfaceName,
+    uint32_t *pEnabled);
+
+static uint32_t
 nm_set_ip_dhcp_mode(
     const char *pszInterfaceName,
     uint32_t dhcpModeFlags
 )
 {
     uint32_t err = 0;
-    char *pszCfgFileName = NULL, szDhcpValue[] = "ipv4";
+    char *pszCfgFileName = NULL;
+    char *pszProcfsAutov6Path = NULL;
+    char *pszSysctlAutov6Key = NULL;
+    char szAutov6Value[] = "0";
+    char szDhcpValue[] = "no";
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName))
     {
         err = EINVAL;
         bail_on_error(err);
     }
+
+    if (TEST_FLAG(dhcpModeFlags, fAUTO_IPV6))
+    {
+        sprintf(szAutov6Value, "1");
+    }
+
+    err = netmgr_alloc_string_printf(&pszProcfsAutov6Path,
+                                     "/proc/sys/net/ipv6/conf/%s/autoconf",
+                                     pszInterfaceName);
+    bail_on_error(err);
+
+    err = netmgr_alloc_string_printf(&pszSysctlAutov6Key,
+                                     "net.ipv6.conf.%s.autoconf",
+                                     pszInterfaceName);
+    bail_on_error(err);
 
     err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
@@ -1765,23 +2070,20 @@ nm_set_ip_dhcp_mode(
     {
         strcpy(szDhcpValue, "ipv4");
     }
-    else if (dhcpModeFlags == 0)
-    {
-        strcpy(szDhcpValue, "no");
-    }
-    else
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
 
     err = nm_set_key_value(pszCfgFileName, SECTION_NETWORK, KEY_DHCP,
                            szDhcpValue, 0);
     bail_on_error(err);
 
-    /* TODO: set IPv6 autoconf setting */
+    err = nm_set_sysctl_procfs_value(pszProcfsAutov6Path, szAutov6Value);
+    bail_on_error(err);
+
+    err = nm_set_sysctl_persistent_value(pszSysctlAutov6Key, szAutov6Value);
+    bail_on_error(err);
 
 cleanup:
+    netmgr_free(pszProcfsAutov6Path);
+    netmgr_free(pszSysctlAutov6Key);
     netmgr_free(pszCfgFileName);
     return err;
 error:
@@ -1794,9 +2096,11 @@ nm_get_ip_dhcp_mode(
     uint32_t *pDhcpModeFlags
 )
 {
-    uint32_t err = 0, mode = 0;
+    uint32_t err = 0, mode = 0, v6enabled = 0;
     char *pszCfgFileName = NULL;
     char *pszDhcpValue = NULL;
+    char *pszProcfsAutov6Path = NULL;
+    char *pszAutov6Value = NULL;
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) || !pDhcpModeFlags)
     {
@@ -1832,14 +2136,35 @@ nm_get_ip_dhcp_mode(
     }
     bail_on_error(err);
 
-    /* TODO: query IPv6 autoconf setting */
+    err = nm_get_ipv6_enable(pszInterfaceName, &v6enabled);
+    bail_on_error(err);
 
-    *pDhcpModeFlags = mode;
-cleanup:
-    if (pszDhcpValue != NULL)
+    if (!v6enabled)
     {
-        netmgr_free(pszDhcpValue);
+        CLEAR_FLAG(mode, fDHCP_IPV6);
+        goto done;
     }
+
+    err = netmgr_alloc_string_printf(&pszProcfsAutov6Path,
+                                     "/proc/sys/net/ipv6/conf/%s/autoconf",
+                                     pszInterfaceName);
+    bail_on_error(err);
+
+    err = nm_get_sysctl_procfs_value(pszProcfsAutov6Path, &pszAutov6Value);
+    bail_on_error(err);
+
+    if (!strcmp(pszAutov6Value, "1"))
+    {
+        mode |= fAUTO_IPV6;
+    }
+
+done:
+    *pDhcpModeFlags = mode;
+
+cleanup:
+    netmgr_free(pszDhcpValue);
+    netmgr_free(pszAutov6Value);
+    netmgr_free(pszProcfsAutov6Path);
     netmgr_free(pszCfgFileName);
     return err;
 error:
@@ -2001,7 +2326,6 @@ nm_get_static_ip_gateway(
 
     if (dwNumSections > 1)
     {
-        /* TODO: Log error */
         err = EINVAL;
         bail_on_error(err);
     }
@@ -2317,8 +2641,7 @@ nm_get_ipv4_addr_gateway(
     }
     else
     {
-        //TODO: Get IP addresss from interface via ioctl. If that fails
-        // get it as below from file.
+        /* Get IP addresss from interface via API. If that fails, read file */
         err = nm_get_interface_ipaddr(pszInterfaceName, STATIC_IPV4, &ipCount,
                                       &ppszIpAddrList);
         if (err == ENOENT)
@@ -2401,6 +2724,94 @@ error:
     goto cleanup;
 }
 
+static uint32_t
+nm_set_ipv6_enable(
+    const char *pszInterfaceName,
+    uint32_t enabled)
+{
+    uint32_t err = 0;
+    char *pszSysctlDisablev6Key = NULL;
+    char *pszProcfsDisablev6Path = NULL;
+    char szDisablev6Value[] = "0";
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if (!enabled)
+    {
+        sprintf(szDisablev6Value, "1");
+    }
+
+    err = netmgr_alloc_string_printf(&pszProcfsDisablev6Path,
+                                     "/proc/sys/net/ipv6/conf/%s/disable_ipv6",
+                                     pszInterfaceName);
+    bail_on_error(err);
+
+    err = netmgr_alloc_string_printf(&pszSysctlDisablev6Key,
+                                     "net.ipv6.conf.%s.disable_ipv6",
+                                     pszInterfaceName);
+    bail_on_error(err);
+
+    err = nm_set_sysctl_procfs_value(pszProcfsDisablev6Path, szDisablev6Value);
+    bail_on_error(err);
+
+    err = nm_set_sysctl_persistent_value(pszSysctlDisablev6Key,
+                                         szDisablev6Value);
+    bail_on_error(err);
+
+cleanup:
+    netmgr_free(pszProcfsDisablev6Path);
+    netmgr_free(pszSysctlDisablev6Key);
+    return err;
+error:
+    goto cleanup;
+}
+
+static uint32_t
+nm_get_ipv6_enable(
+    const char *pszInterfaceName,
+    uint32_t *pEnabled)
+{
+    uint32_t err = 0, enabled = 0;
+    char *pszDisableIpv6 = NULL;
+    char *pszProcfsDisablev6Path = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) || !pEnabled)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = netmgr_alloc_string_printf(&pszProcfsDisablev6Path,
+                                     "/proc/sys/net/ipv6/conf/%s/disable_ipv6",
+                                     pszInterfaceName);
+    bail_on_error(err);
+
+    err = nm_get_sysctl_procfs_value(pszProcfsDisablev6Path, &pszDisableIpv6);
+    bail_on_error(err);
+
+    if (!strcmp(pszDisableIpv6, "0"))
+    {
+        enabled = 1;
+    }
+
+    *pEnabled = enabled;
+
+cleanup:
+    netmgr_free(pszProcfsDisablev6Path);
+    netmgr_free(pszDisableIpv6);
+    return err;
+error:
+    if (pEnabled)
+    {
+        *pEnabled = 0;
+    }
+    goto cleanup;
+}
+
 uint32_t
 nm_add_static_ipv6_addr(
     const char *pszInterfaceName,
@@ -2408,7 +2819,7 @@ nm_add_static_ipv6_addr(
 )
 {
     int n = 0;
-    uint32_t err = 0;
+    uint32_t err = 0, v6enabled = 0;
     uint8_t prefix = 0;
     char *pszCfgFileName = NULL, szIpAddr[INET6_ADDRSTRLEN];
     int lockId;
@@ -2432,6 +2843,15 @@ nm_add_static_ipv6_addr(
                            pszIPv6AddrPrefix, 0);
     bail_on_error(err);
 
+    err = nm_get_ipv6_enable(pszInterfaceName, &v6enabled);
+    bail_on_error(err);
+
+    if (!v6enabled)
+    {
+        err = nm_set_ipv6_enable(pszInterfaceName, 1);
+        bail_on_error(err);
+    }
+
     err = nm_restart_network_service();
     bail_on_error(err);
 
@@ -2449,11 +2869,11 @@ nm_delete_static_ipv6_addr(
     const char *pszIPv6AddrPrefix
 )
 {
-    int n;
-    uint32_t err = 0;
+    uint32_t err = 0, autov6, dhcpv6, v6enabled;
     uint8_t prefix = 0;
-    char *pszCfgFileName = NULL, szIpAddr[INET6_ADDRSTRLEN];
-    int lockId;
+    char *pszCfgFileName = NULL, szIpAddr[INET6_ADDRSTRLEN], **ppszIp = NULL;
+    int n, lockId;
+    size_t c = 0;
 
     err = nm_acquire_write_lock(0, &lockId);
     bail_on_error(err);
@@ -2474,11 +2894,37 @@ nm_delete_static_ipv6_addr(
                               pszIPv6AddrPrefix, 0);
     bail_on_error(err);
 
+    /* Disable IPv6 if no autov6, no dhcpv6, and no staticv6 configured */
+    err = nm_get_ipv6_addr_mode(pszInterfaceName, &autov6, &dhcpv6);
+    bail_on_error(err);
+
+    if (!autov6 && !dhcpv6)
+    {
+        err = nm_get_static_ip_addr(pszInterfaceName, STATIC_IPV6, &c, &ppszIp);
+        if (err == ENOENT)
+        {
+            err = 0;
+        }
+        bail_on_error(err);
+        if (c == 0)
+        {
+            err = nm_get_ipv6_enable(pszInterfaceName, &v6enabled);
+            bail_on_error(err);
+
+            if (v6enabled)
+            {
+                err = nm_set_ipv6_enable(pszInterfaceName, 0);
+                bail_on_error(err);
+            }
+        }
+    }
+
     err = nm_restart_network_service();
     bail_on_error(err);
 
 cleanup:
     nm_release_write_lock(lockId);
+    netmgr_list_free(c, (void **)ppszIp);
     netmgr_free(pszCfgFileName);
     return err;
 error:
@@ -2492,7 +2938,9 @@ nm_set_ipv6_addr_mode(
     uint32_t enableAutoconf
 )
 {
-    uint32_t err = 0, modeFlags;
+    uint32_t err = 0, modeFlags, v6enabled;
+    char **ppszIp = NULL;
+    size_t c = 0;
     int lockId;
 
     err = nm_acquire_write_lock(0, &lockId);
@@ -2522,10 +2970,41 @@ nm_set_ipv6_addr_mode(
     err = nm_set_ip_dhcp_mode(pszInterfaceName, modeFlags);
     bail_on_error(err);
 
+    /* Disable IPv6 if no autov6, no dhcpv6, and no staticv6 configured */
+    err = nm_get_ipv6_enable(pszInterfaceName, &v6enabled);
+    bail_on_error(err);
+
+    if (!enableDhcp && !enableAutoconf)
+    {
+        err = nm_get_static_ip_addr(pszInterfaceName, STATIC_IPV6, &c, &ppszIp);
+        if (err == ENOENT)
+        {
+            err = 0;
+        }
+        bail_on_error(err);
+        if (c == 0)
+        {
+            if (v6enabled)
+            {
+                err = nm_set_ipv6_enable(pszInterfaceName, 0);
+                bail_on_error(err);
+            }
+        }
+    }
+    else
+    {
+        if (!v6enabled)
+        {
+            err = nm_set_ipv6_enable(pszInterfaceName, 1);
+            bail_on_error(err);
+        }
+    }
+
     err = nm_restart_network_service();
     bail_on_error(err);
 
 error:
+    netmgr_list_free(c, (void **)ppszIp);
     nm_release_write_lock(lockId);
     return err;
 }
@@ -3762,145 +4241,6 @@ error:
     netmgr_free(pszDnsServersValue);
     netmgr_free(pszCfgFileName);
     return err;
-}
-
-static uint32_t
-nm_read_conf_file(
-    const char *pszFilename,
-    char **ppszFileBuf)
-{
-    uint32_t err = 0;
-    long len;
-    FILE *fp = NULL;
-    char *pszFileBuf = NULL;
-
-    if (!ppszFileBuf)
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    fp = fopen(pszFilename, "r");
-    if (fp == NULL)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-    if (fseek(fp, 0, SEEK_END) != 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-    len = ftell(fp);
-    if (len == -1)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-    if (fseek(fp, 0, SEEK_SET) != 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-
-    err = netmgr_alloc((len + 1), (void *)&pszFileBuf);
-    bail_on_error(err);
-
-    if (fread(pszFileBuf, len, 1, fp) == 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-
-    *ppszFileBuf = pszFileBuf;
-
-cleanup:
-    if (fp != NULL)
-    {
-        fclose(fp);
-    }
-    return err;
-
-error:
-    if (ppszFileBuf != NULL)
-    {
-        *ppszFileBuf = NULL;
-    }
-    netmgr_free(pszFileBuf);
-    goto cleanup;
-}
-
-static uint32_t
-nm_string_to_line_array(
-    const char *pszStrBuf,
-    size_t *pLineCount,
-    char ***pppszLineBuf)
-{
-    uint32_t err = 0, len;
-    size_t i = 0, lineCount = 0;
-    char *p1, *p2, *pEnd, **ppszLineBuf = NULL;
-
-    if (!pszStrBuf || !*pszStrBuf || !pLineCount || !pppszLineBuf)
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    p1 = (char *)pszStrBuf;
-    pEnd = strchr(pszStrBuf, '\0');
-    do
-    {
-        p1 = strchr(p1, '\n');
-        if (p1 == NULL)
-        {
-            break;
-        }
-        lineCount++;
-        p1++;
-    } while (p1 < pEnd);
-
-    if (lineCount == 0)
-    {
-        err = ENOENT;
-        bail_on_error(err);
-    }
-
-    err = netmgr_alloc(lineCount * sizeof(char **), (void **)&ppszLineBuf);
-    bail_on_error(err);
-
-    p1 = (char *)pszStrBuf;
-    do
-    {
-        p2 = strchr(p1, '\n');
-        if (p2 == NULL)
-        {
-            break;
-        }
-        len = p2 - p1 + 1;
-        err = netmgr_alloc(len + 1, (void **)&ppszLineBuf[i]);
-        bail_on_error(err);
-        memcpy(ppszLineBuf[i], p1, len);
-        i++;
-        p1 = p2 + 1;
-    } while (p1 < pEnd);
-
-    *pLineCount = lineCount;
-    *pppszLineBuf = ppszLineBuf;
-
-cleanup:
-    return err;
-
-error:
-    if (pLineCount)
-    {
-        *pLineCount = 0;
-    }
-    if (pppszLineBuf)
-    {
-        *pppszLineBuf = NULL;
-    }
-    netmgr_list_free(lineCount, (void **)ppszLineBuf);
-    goto cleanup;
 }
 
 uint32_t
