@@ -127,7 +127,7 @@ open_netlink_socket(
 )
 {
     uint32_t err = 0;
-    int sockFd = -1;
+    int sockFd = -1, reuseAddr = 1;
     struct sockaddr_nl addr;
 
     if (!pSockFd)
@@ -140,6 +140,12 @@ open_netlink_socket(
     if (sockFd < 0)
     {
         err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if (setsockopt(sockFd, SOL_SOCKET, SO_REUSEADDR, &reuseAddr, sizeof(int)))
+    {
+        err = errno;
         bail_on_error(err);
     }
 

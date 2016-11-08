@@ -5157,6 +5157,10 @@ nm_wait_for_link_up(
     }
 
 cleanup:
+    if (sockFd > -1)
+    {
+        close(sockFd);
+    }
     free_netlink_message_list(pNetLinkMsgList);
     return err;
 error:
@@ -5376,6 +5380,10 @@ nm_wait_for_ip(
     }
 
 cleanup:
+    if (sockFd > -1)
+    {
+        close(sockFd);
+    }
     free_netlink_message_list(pNetLinkMsgList);
     netmgr_list_free(ipCount, (void **)ppszIpAddrList);
     return err;
