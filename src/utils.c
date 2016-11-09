@@ -407,7 +407,7 @@ nm_acquire_write_lock(
 )
 {
     uint32_t err = 0;
-    int lockFd;
+    int lockFd = -1;
     struct flock fLock = { F_WRLCK, SEEK_SET, 0, 0, getpid() };
 
     if (!pLockId)
@@ -434,6 +434,10 @@ nm_acquire_write_lock(
 cleanup:
     return err;
 error:
+    if (lockFd > -1)
+    {
+        close(lockFd);
+    }
     if (pLockId)
     {
         *pLockId = -1;

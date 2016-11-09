@@ -947,7 +947,7 @@ ini_cfg_parse_key_value(
         pszCursor++;
     }
     pszValueMarker = pszCursor;
-    if (!pszValueMarker)
+    if (!pszValueMarker || !*pszValueMarker)
     {
         err = EBADMSG;
         bail_on_error(err);
