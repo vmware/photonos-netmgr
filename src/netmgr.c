@@ -134,7 +134,7 @@ nm_get_network_auto_conf_filename(
     uint32_t err = 0;
     char fname[IFNAMSIZ+strlen("10-.network")+1];
 
-    if ((pszIfname == NULL) || (strlen(pszIfname) > IFNAMSIZ) || !ppszFilename)
+    if ((pszIfname == NULL) || (strlen(pszIfname) >= IFNAMSIZ) || !ppszFilename)
     {
         err = EINVAL;
         bail_on_error(err);
@@ -153,7 +153,7 @@ nm_get_network_manual_conf_filename(
     uint32_t err = 0;
     char fname[IFNAMSIZ+strlen("10-.network.manual")+1];
 
-    if ((pszIfname == NULL) || (strlen(pszIfname) > IFNAMSIZ) || !ppszFilename)
+    if ((pszIfname == NULL) || (strlen(pszIfname) >= IFNAMSIZ) || !ppszFilename)
     {
         err = EINVAL;
         bail_on_error(err);
@@ -326,6 +326,7 @@ nm_get_network_conf_filename(
 
                 if (!strcmp(pszIfName, pszMatchName))
                 {
+                    netmgr_free(pszCfgFileName);
                     pszCfgFileName = pszFileName;
                     pszFileName = NULL;
                     break;
@@ -367,6 +368,7 @@ error:
     {
         *ppszFilename = NULL;
     }
+    netmgr_free(pszCfgFileName);
     goto cleanup;
 }
 
@@ -457,7 +459,8 @@ nm_update_mac_address(
     int sockFd = -1, addrLen = 0;
     struct ifreq ifr;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+        (strlen(pszInterfaceName) >= IFNAMSIZ))
     {
         err = EINVAL;
         bail_on_error(err);
@@ -471,7 +474,7 @@ nm_update_mac_address(
     }
 
     memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
+    strncpy(ifr.ifr_name, pszInterfaceName, strlen(pszInterfaceName));
     ifr.ifr_hwaddr.sa_family = ARPHRD_ETHER;
     addrLen = sscanf(pszMacAddress, "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx",
                                     &ifr.ifr_hwaddr.sa_data[0],
@@ -569,14 +572,14 @@ nm_get_link_mac_addr(
     struct ifreq ifr;
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) > IFNAMSIZ) || !ppszMacAddress)
+        (strlen(pszInterfaceName) >= IFNAMSIZ) || !ppszMacAddress)
     {
         err = EINVAL;
         bail_on_error(err);
     }
 
     memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
+    strncpy(ifr.ifr_name, pszInterfaceName, strlen(pszInterfaceName));
 
     sockFd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockFd < 0)
@@ -701,7 +704,7 @@ nm_get_link_mode(
     char *pszCfgFileName = NULL;
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) > IFNAMSIZ) || !pLinkMode)
+        (strlen(pszInterfaceName) >= IFNAMSIZ) || !pLinkMode)
     {
         err = EINVAL;
         bail_on_error(err);
@@ -745,7 +748,8 @@ nm_update_link_mtu(
     int sockFd = -1;
     struct ifreq ifr;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+        (strlen(pszInterfaceName) >= IFNAMSIZ))
     {
         err = EINVAL;
         bail_on_error(err);
@@ -759,7 +763,7 @@ nm_update_link_mtu(
     }
 
     memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
+    strncpy(ifr.ifr_name, pszInterfaceName, strlen(pszInterfaceName));
 
     if (mtu > 0)
     {
@@ -859,14 +863,14 @@ nm_get_link_mtu(
     struct ifreq ifr;
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) > IFNAMSIZ) || !pMtu)
+        (strlen(pszInterfaceName) >= IFNAMSIZ) || !pMtu)
     {
         err = EINVAL;
         bail_on_error(err);
     }
 
     memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
+    strncpy(ifr.ifr_name, pszInterfaceName, strlen(pszInterfaceName));
 
     sockFd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockFd < 0)
@@ -913,7 +917,7 @@ nm_set_link_state(
     bail_on_error(err);
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) > IFNAMSIZ) ||
+        (strlen(pszInterfaceName) >= IFNAMSIZ) ||
         (linkState >= LINK_STATE_UNKNOWN))
     {
         err = EINVAL;
@@ -921,7 +925,7 @@ nm_set_link_state(
     }
 
     memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
+    strncpy(ifr.ifr_name, pszInterfaceName, strlen(pszInterfaceName));
 
     sockFd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockFd < 0)
@@ -988,14 +992,14 @@ nm_get_link_state(
     struct ifreq ifr;
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) > IFNAMSIZ) || !pLinkState)
+        (strlen(pszInterfaceName) >= IFNAMSIZ) || !pLinkState)
     {
         err = EINVAL;
         bail_on_error(err);
     }
 
     memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
+    strncpy(ifr.ifr_name, pszInterfaceName, strlen(pszInterfaceName));
 
     sockFd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockFd < 0)
@@ -1039,7 +1043,7 @@ nm_do_arping(
     char *pszArpingCmd = NULL;
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) > IFNAMSIZ) ||
+        (strlen(pszInterfaceName) >= IFNAMSIZ) ||
         IS_NULL_OR_EMPTY(pszCommandOptions) ||
         IS_NULL_OR_EMPTY(pszDestIPv4Addr))
     {
@@ -1108,7 +1112,7 @@ nm_ifup(
     char **ppszStaticIpv4AddrList = NULL;
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) > IFNAMSIZ))
+        (strlen(pszInterfaceName) >= IFNAMSIZ))
     {
         err = EINVAL;
         bail_on_error(err);
@@ -1223,7 +1227,7 @@ nm_ifdown(
     uint32_t err = 0;
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) > IFNAMSIZ))
+        (strlen(pszInterfaceName) >= IFNAMSIZ))
     {
         err = EINVAL;
         bail_on_error(err);
@@ -1357,7 +1361,7 @@ nm_get_interface_info(
     NET_LINK_INFO *pLinkInfo = NULL;
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) || !ppLinkInfo ||
-        (strlen(pszInterfaceName) > IFNAMSIZ))
+        (strlen(pszInterfaceName) >= IFNAMSIZ))
     {
         err =  EINVAL;
         bail_on_error(err);
@@ -1393,10 +1397,10 @@ cleanup:
     return err;
 
 error:
+    netmgr_free(pszMacAddress);
     if (pLinkInfo)
     {
         netmgr_free(pLinkInfo->pszInterfaceName);
-        netmgr_free(pLinkInfo->pszMacAddress);
         netmgr_free(pLinkInfo);
     }
     goto cleanup;
@@ -1440,6 +1444,7 @@ nm_get_link_info(
     *ppLinkInfo = pLinkInfo;
 
 cleanup:
+    nm_free_interface_list(pInterfaceList);
     return err;
 
 error:
@@ -1448,7 +1453,6 @@ error:
         *ppLinkInfo = NULL;
     }
     nm_free_link_info(pLinkInfo);
-    nm_free_interface_list(pInterfaceList);
     goto cleanup;
 }
 
@@ -1620,7 +1624,7 @@ nm_get_interface_ipaddr(
     const char *pszIpAddr = NULL;
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) > IFNAMSIZ) || !pCount || !pppszIpAddress)
+        (strlen(pszInterfaceName) >= IFNAMSIZ) || !pCount || !pppszIpAddress)
     {
         err = EINVAL;
         bail_on_error(err);
@@ -1699,10 +1703,6 @@ nm_get_interface_ipaddr(
                     pszIpAddr = inet_ntop(af, (void *)&sockIpv6->sin6_addr,
                                           szIpAddr, INET6_ADDRSTRLEN);
                     break;
-                 default:
-                    err = EINVAL;
-                    bail_on_error(err);
-                    break;
             }
 
             if (pszIpAddr == NULL)
@@ -1755,8 +1755,8 @@ nm_get_ip_default_gateway(
     struct rtattr *rtAttr;
     struct in_addr dst4 = {0}, gw4 = {0};
 #define BUFSIZE 8192
-    char ifName[IFNAMSIZ], szMsgBuf[BUFSIZE], *pszMsgBuf = szMsgBuf;
-    char szGateway[INET6_ADDRSTRLEN], *pszGateway = NULL;
+    char *pszMsgBuf, szIfName[IFNAMSIZ] = {0}, szMsgBuf[BUFSIZE] = {0};
+    char *pszGateway = NULL, szGateway[INET6_ADDRSTRLEN] = {0};
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) || !ppszGateway)
     {
@@ -1769,8 +1769,8 @@ nm_get_ip_default_gateway(
         err = errno;
         bail_on_error(err);
     }
-
-    memset(pszMsgBuf, 0, BUFSIZE);
+    
+    pszMsgBuf = szMsgBuf;
     nlMsg = (struct nlmsghdr *)pszMsgBuf;
     rtMsg = (struct rtmsg *)NLMSG_DATA(nlMsg);
     nlMsg->nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
@@ -1827,7 +1827,7 @@ nm_get_ip_default_gateway(
             switch (rtAttr->rta_type)
             {
                 case RTA_OIF:
-                    if_indextoname(*(int *)RTA_DATA(rtAttr), ifName);
+                    if_indextoname(*(int *)RTA_DATA(rtAttr), szIfName);
                     break;
                 case RTA_GATEWAY:
                     gw4.s_addr = *(uint32_t *)RTA_DATA(rtAttr);
@@ -1839,7 +1839,7 @@ nm_get_ip_default_gateway(
                     break;
             }
         }
-        if ((dst4.s_addr == 0) && !strcmp(ifName, pszInterfaceName))
+        if ((dst4.s_addr == 0) && !strcmp(szIfName, pszInterfaceName))
         {
             if (inet_ntop(AF_INET, &gw4, szGateway, INET6_ADDRSTRLEN) != NULL)
             {
@@ -3170,7 +3170,7 @@ nm_get_ip_addr(
 
     //TODO: If pszInterfaceName is NULL, enumerate all IPs
     if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) > IFNAMSIZ) ||
+        (strlen(pszInterfaceName) >= IFNAMSIZ) ||
         !pCount || !pppIpAddrList || !addrTypes)
     {
         err = EINVAL;
@@ -3863,7 +3863,7 @@ error:
     {
         netmgr_free(pszNewString);
     }
-    if (ppszNewString == NULL)
+    if (ppszNewString != NULL)
     {
         *ppszNewString = NULL;
     }
@@ -4315,7 +4315,7 @@ nm_get_dns_servers(
                 err = netmgr_alloc_string(szServer, &(ppszDnsServersList[i++]));
                 bail_on_error(err);
                 s1++;
-            } while (s1 != NULL);
+            }
         }
     }
     else
@@ -4508,7 +4508,7 @@ nm_delete_dns_domain(
 
 cleanup:
     nm_release_write_lock(lockId);
-    netmgr_free(pszNewDnsDomainsList);
+    netmgr_free(pszCurrentDnsDomains);
     netmgr_free(pszCfgFileName);
     return err;
 
@@ -5084,7 +5084,7 @@ nm_get_ntp_servers(
             err = netmgr_alloc_string(szServer, &(ppszNtpServersList[i++]));
             bail_on_error(err);
             s1++;
-        } while (s1 != NULL);
+        }
     }
 
     *pCount = count;

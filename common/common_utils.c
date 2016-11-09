@@ -39,14 +39,14 @@ flush_interface_ipaddr(
     struct sockaddr_in sin;
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) > IFNAMSIZ))
+        (strlen(pszInterfaceName) >= IFNAMSIZ))
     {
         err = EINVAL;
         bail_on_error(err);
     }
 
     memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, pszInterfaceName, sizeof(ifr.ifr_name));
+    strncpy(ifr.ifr_name, pszInterfaceName, strlen(pszInterfaceName));
 
     sockFd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockFd < 0)
@@ -148,10 +148,14 @@ open_netlink_socket(
         err = errno;
         bail_on_error(err);
     }
+    
+    if (fcntl(sockFd, F_SETFL, O_NONBLOCK) == -1)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
 
-    fcntl(sockFd, F_SETFL, O_NONBLOCK);
     memset((void *)&addr, 0, sizeof(addr));
-
     addr.nl_family = AF_NETLINK;
     addr.nl_pid = getpid();
     addr.nl_groups = netLinkGroup;
@@ -167,6 +171,10 @@ open_netlink_socket(
 cleanup:
     return err;
 error:
+    if (sockFd > -1)
+    {
+        close(sockFd);
+    }
     if (pSockFd)
     {
         *pSockFd = -1;

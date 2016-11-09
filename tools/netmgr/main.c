@@ -21,7 +21,7 @@ cmd_link_info(PNETMGR_CMD pCmd)
     char *pszIfname = NULL, *pszLinkMode = NULL, *pszLinkState = NULL;
     char *pszMacAddr = NULL, *pszMtu = NULL, *pszEnd = NULL;
     NET_LINK_MODE linkMode = LINK_MODE_UNKNOWN;
-    NET_LINK_INFO *pNetLinkInfo = NULL;
+    NET_LINK_INFO *pNetLinkInfo = NULL, *pCurNetLinkInfo = NULL;
 
     switch (pCmd->op)
     {
@@ -115,18 +115,19 @@ cmd_link_info(PNETMGR_CMD pCmd)
             err = nm_get_link_info(pszIfname, &pNetLinkInfo);
             bail_on_error(err);
 
+            pCurNetLinkInfo = pNetLinkInfo;
             fprintf(stdout, "%-10s\t%-17s\t%-10s\t%-10s\t%-10s\n", "Name",
                     "MacAddress", "Mode", "MTU", "State");
-            while (pNetLinkInfo)
+            while (pCurNetLinkInfo)
             {
-                fprintf(stdout, "%-10s\t", pNetLinkInfo->pszInterfaceName);
-                fprintf(stdout, "%-17s\t", pNetLinkInfo->pszMacAddress);
+                fprintf(stdout, "%-10s\t", pCurNetLinkInfo->pszInterfaceName);
+                fprintf(stdout, "%-17s\t", pCurNetLinkInfo->pszMacAddress);
                 fprintf(stdout, "%-10s\t",
-                        nm_link_mode_to_string(pNetLinkInfo->mode));
-                fprintf(stdout, "%-10u\t", pNetLinkInfo->mtu);
+                        nm_link_mode_to_string(pCurNetLinkInfo->mode));
+                fprintf(stdout, "%-10u\t", pCurNetLinkInfo->mtu);
                 fprintf(stdout, "%-25s\n",
-                        nm_link_state_to_string(pNetLinkInfo->state));
-                pNetLinkInfo = pNetLinkInfo->pNext;
+                        nm_link_state_to_string(pCurNetLinkInfo->state));
+                pCurNetLinkInfo = pCurNetLinkInfo->pNext;
             }
             break;
 
@@ -620,6 +621,11 @@ cmd_dns_servers(PNETMGR_CMD pCmd)
                     } while (s2 != NULL);
                 }
             }
+            if (!count && (pCmd->op != OP_SET))
+            {
+                err = EDOM;
+                bail_on_error(err);
+            }
             if (count > 0)
             {
                 err = netmgr_alloc((count * sizeof(char*)),
@@ -735,6 +741,11 @@ cmd_dns_domains(PNETMGR_CMD pCmd)
                         }
                     } while (s2 != NULL);
                 }
+            }
+            if (!count && (pCmd->op != OP_SET))
+            {
+                err = EDOM;
+                bail_on_error(err);
             }
             if (count > 0)
             {
