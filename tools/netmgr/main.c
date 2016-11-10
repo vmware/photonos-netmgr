@@ -1016,6 +1016,148 @@ error:
 }
 
 static uint32_t
+cmd_wait_for_link(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    long int ltimeout = 0;
+    char *pszIfname = NULL, *pszTimeOut = NULL, *pszEnd = NULL;
+
+    err = netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
+    bail_on_error(err);
+
+    err = netmgrcli_find_cmdopt(pCmd, "timeout", &pszTimeOut);
+    bail_on_error(err);
+
+    if ((ltimeout = strtol(pszTimeOut, &pszEnd, 10)) < 0)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = nm_wait_for_link_up(pszIfname, (uint32_t)ltimeout);
+    bail_on_error(err);
+
+cleanup:
+    return err;
+
+error:
+    goto cleanup;
+}
+
+typedef struct _NM_CLI_ADDR_STR_TYPE
+{
+    char *pszIpAddrType;
+    NET_ADDR_TYPE ipAddrType;
+} NM_CLI_ADDR_STR_TYPE, *PNM_CLI_ADDR_STR_TYPE;
+
+NM_CLI_ADDR_STR_TYPE addrStrToTypeMap[] =
+{
+    { "ipv4",               NET_ADDR_IPV4       },
+    { "ipv6",               NET_ADDR_IPV6       },
+    { "static_ipv4",        STATIC_IPV4         },
+    { "static_ipv6",        STATIC_IPV6         },
+    { "dhcp_ipv4",          DHCP_IPV4           },
+    { "dhcp_ipv6",          DHCP_IPV6           },
+    { "auto_ipv6",          AUTO_IPV6           },
+    { "link_local_ipv6",    LINK_LOCAL_IPV6     },
+};
+
+static uint32_t
+get_ip_addrtype(
+    const char *pszAddrType,
+    NET_ADDR_TYPE *pIpAddrType)
+{
+    uint32_t err = 0;
+    NET_ADDR_TYPE addrType = 0;
+    size_t i = 0, addrTypeCount = 0;
+
+    if (IS_NULL_OR_EMPTY(pszAddrType) || !pIpAddrType)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    addrTypeCount = sizeof(addrStrToTypeMap)/sizeof(NM_CLI_ADDR_STR_TYPE);
+    for (i = 0; i < addrTypeCount; i++)
+    {
+        if (!strcmp(pszAddrType, addrStrToTypeMap[i].pszIpAddrType))
+        {
+            addrType = addrStrToTypeMap[i].ipAddrType;
+            break;
+        }
+    }
+
+    if (!addrType)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    *pIpAddrType = addrType;
+
+cleanup:
+    return err;
+
+error:
+    if (pIpAddrType)
+    {
+        *pIpAddrType = 0;
+    }
+    goto cleanup;
+}
+
+static uint32_t
+cmd_wait_for_ip(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    long int ltimeout = 0;
+    char *pszIfname = NULL, *pszTimeOut = NULL, *pszEnd = NULL;
+    char *pszAddrTypes = NULL, *pszIpAddrTypes = NULL;
+    char *s1 = NULL, *s2 = NULL;
+    NET_ADDR_TYPE ipAddrTypes = 0, addrType = 0;
+
+    err = netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
+    bail_on_error(err);
+
+    err = netmgrcli_find_cmdopt(pCmd, "timeout", &pszTimeOut);
+    bail_on_error(err);
+
+    if ((ltimeout = strtol(pszTimeOut, &pszEnd, 10)) < 0)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = netmgrcli_find_cmdopt(pCmd, "addrtype", &pszAddrTypes);
+    bail_on_error(err);
+
+    err = netmgr_alloc_string(pszAddrTypes, &pszIpAddrTypes);
+    bail_on_error(err);
+
+    s2 = pszIpAddrTypes;
+    do {
+        s1 = strsep(&s2, ",");
+        if (strlen(s1) > 0)
+        {
+            addrType = 0;
+            err = get_ip_addrtype(s1, &addrType);
+            bail_on_error(err);
+            ipAddrTypes |= addrType;
+        }
+    } while (s2 != NULL);
+
+    err = nm_wait_for_ip(pszIfname, (uint32_t)ltimeout, ipAddrTypes);
+    bail_on_error(err);
+
+cleanup:
+    netmgr_free(pszIpAddrTypes);
+    return err;
+
+error:
+    goto cleanup;
+}
+
+static uint32_t
 cmd_net_info(PNETMGR_CMD pCmd)
 {
     uint32_t err = 0;
@@ -1069,35 +1211,6 @@ error:
     goto cleanup;
 }
 
-static uint32_t
-cmd_wait_for_link(PNETMGR_CMD pCmd)
-{
-    uint32_t err = 0;
-    long int ltimeout = 0;
-    char *pszIfname = NULL, *pszTimeOut = NULL, *pszEnd = NULL;
-
-    err = netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
-    bail_on_error(err);
-
-    err = netmgrcli_find_cmdopt(pCmd, "timeout", &pszTimeOut);
-    bail_on_error(err);
-
-    if ((ltimeout = strtol(pszTimeOut, &pszEnd, 10)) < 0)
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    err = nm_wait_for_link_up(pszIfname, (uint32_t)ltimeout);
-    bail_on_error(err);
-
-cleanup:
-    return err;
-
-error:
-    goto cleanup;
-}
-
 typedef struct _NETMGR_CLI_HANDLER
 {
     CMD_ID id;
@@ -1117,8 +1230,9 @@ NETMGR_CLI_HANDLER cmdHandler[] =
     { CMD_NTP_SERVERS,         cmd_ntp_servers     },
     { CMD_FW_RULE,             cmd_fw_rule         },
     { CMD_HOSTNAME,            cmd_hostname        },
-    { CMD_NET_INFO,            cmd_net_info        },
     { CMD_WAIT_FOR_LINK,       cmd_wait_for_link   },
+    { CMD_WAIT_FOR_IP,         cmd_wait_for_ip     },
+    { CMD_NET_INFO,            cmd_net_info        },
 };
 
 void

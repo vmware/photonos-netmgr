@@ -1284,6 +1284,189 @@ error:
 }
 
 
+static struct option waitLinkOptions[] =
+{
+    {"interface",    required_argument,    0,    'i'},
+    {"timeout",      required_argument,    0,    't'},
+    {0, 0, 0, 0}
+};
+
+static uint32_t
+cli_wait_for_link(
+    int argc,
+    char **argv,
+    PNETMGR_CMD pCmd
+    )
+{
+    uint32_t err = 0, validIfname = 0, validTimeout = 0;
+    int nOptionIndex = 0, nOption = 0;
+
+    opterr = 0;
+    optind = 1;
+    while (1)
+    {
+        nOption = getopt_long(argc,
+                              argv,
+                              "i:t:",
+                              waitLinkOptions,
+                              &nOptionIndex);
+        if (nOption == -1)
+            break;
+
+        switch(nOption)
+        {
+            case 'i':
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("interface", optarg, pCmd);
+                    validIfname = 1;
+                }
+                else
+                {
+                    fprintf(stderr, "Invalid interface name.\n");
+                    err = EDOM;
+                }
+                break;
+            case 't':
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("timeout", optarg, pCmd);
+                    validTimeout = 1;
+                }
+                else
+                {
+                    fprintf(stderr, "Invalid timeout value.\n");
+                    err = EDOM;
+                }
+                break;
+            case '?':
+                /* Option not handled here. Ignore. */
+                break;
+        }
+        bail_on_error(err);
+    }
+
+    if (!validIfname || !validTimeout)
+    {
+        err = EDOM;
+        bail_on_error(err);
+    }
+
+    pCmd->id = CMD_WAIT_FOR_LINK;
+
+cleanup:
+    return err;
+
+error:
+    if(err == EDOM)
+    {
+        fprintf(stderr,
+                "Usage:\nwait_for_link "
+                "--interface <ifname> --timeout <timeout>\n");
+    }
+    goto cleanup;
+}
+
+
+static struct option waitIpOptions[] =
+{
+    {"interface",    required_argument,    0,    'i'},
+    {"timeout",      required_argument,    0,    't'},
+    {"addrtype",     required_argument,    0,    'a'},
+    {0, 0, 0, 0}
+};
+
+static uint32_t
+cli_wait_for_ip(
+    int argc,
+    char **argv,
+    PNETMGR_CMD pCmd
+    )
+{
+    uint32_t err = 0, validIfname = 0, validTimeout = 0, validAddrType = 0;
+    int nOptionIndex = 0, nOption = 0;
+
+    opterr = 0;
+    optind = 1;
+    while (1)
+    {
+        nOption = getopt_long(argc,
+                              argv,
+                              "i:t:a:",
+                              waitIpOptions,
+                              &nOptionIndex);
+        if (nOption == -1)
+            break;
+
+        switch(nOption)
+        {
+            case 'i':
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("interface", optarg, pCmd);
+                    validIfname = 1;
+                }
+                else
+                {
+                    fprintf(stderr, "Invalid interface name.\n");
+                    err = EDOM;
+                }
+                break;
+            case 't':
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("timeout", optarg, pCmd);
+                    validTimeout = 1;
+                }
+                else
+                {
+                    fprintf(stderr, "Invalid timeout value.\n");
+                    err = EDOM;
+                }
+                break;
+            case 'a':
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("addrtype", optarg, pCmd);
+                    validAddrType = 1;
+                }
+                else
+                {
+                    fprintf(stderr, "Invalid addrtype.\n");
+                    err = EDOM;
+                }
+                break;
+            case '?':
+                /* Option not handled here. Ignore. */
+                break;
+        }
+        bail_on_error(err);
+    }
+
+    if (!validIfname || !validTimeout || !validAddrType)
+    {
+        err = EDOM;
+        bail_on_error(err);
+    }
+
+    pCmd->id = CMD_WAIT_FOR_IP;
+
+cleanup:
+    return err;
+
+error:
+    if(err == EDOM)
+    {
+        fprintf(stderr,
+                "Usage:\nwait_for_ip "
+                "--interface <ifname> --timeout <timeout> "
+                "--addrtype <ipv4,ipv6,static_ipv4,static_ipv6,"
+                "dhcp_ipv4,dhcp_ipv6,auto_ipv6,link_local_ipv6>\n");
+    }
+    goto cleanup;
+}
+
+
 static struct option netInfoOptions[] =
 {
     {"set",          no_argument,          0,    's'},
@@ -1386,90 +1569,6 @@ error:
 }
 
 
-static struct option waitLinkOptions[] =
-{
-    {"interface",    required_argument,    0,    'i'},
-    {"timeout",      required_argument,    0,    't'},
-    {0, 0, 0, 0}
-};
-
-static uint32_t
-cli_wait_for_link(
-    int argc,
-    char **argv,
-    PNETMGR_CMD pCmd
-    )
-{
-    uint32_t err = 0, validIfname = 0, validTimeout = 0;
-    int nOptionIndex = 0, nOption = 0;
-
-    opterr = 0;
-    optind = 1;
-    while (1)
-    {
-        nOption = getopt_long(argc,
-                              argv,
-                              "i:t:",
-                              waitLinkOptions,
-                              &nOptionIndex);
-        if (nOption == -1)
-            break;
-
-        switch(nOption)
-        {
-            case 'i':
-                if (strlen(optarg) > 0)
-                {
-                    err = netmgrcli_alloc_keyvalue("interface", optarg, pCmd);
-                    validIfname = 1;
-                }
-                else
-                {
-                    fprintf(stderr, "Invalid interface name.\n");
-                    err = EDOM;
-                }
-                break;
-            case 't':
-                if (strlen(optarg) > 0)
-                {
-                    err = netmgrcli_alloc_keyvalue("timeout", optarg, pCmd);
-                    validTimeout = 1;
-                }
-                else
-                {
-                    fprintf(stderr, "Invalid parameter name.\n");
-                    err = EDOM;
-                }
-                break;
-            case '?':
-                /* Option not handled here. Ignore. */
-                break;
-        }
-        bail_on_error(err);
-    }
-
-    if (!validIfname || !validTimeout)
-    {
-        err = EDOM;
-        bail_on_error(err);
-    }
-
-    pCmd->id = CMD_WAIT_FOR_LINK;
-
-cleanup:
-    return err;
-
-error:
-    if(err == EDOM)
-    {
-        fprintf(stderr,
-                "Usage:\nwait_for_link "
-                "--interface <ifname> --timeout <timeout>\n");
-    }
-    goto cleanup;
-}
-
-
 /* Map command name to command parser function */
 typedef struct _NETMGRCLI_CMD_MAP
 {
@@ -1541,15 +1640,21 @@ NETMGRCLI_CMD_MAP cmdMap[] =
      "--set --name <Hostname>",
      "get or set hostname"
     },
-    {"net_info",
-     cli_net_info,
-     "--set --interface <interface name> --paramname <param name> --paramvalue <value>",
-     "get or set network parameters"
-    },
     {"wait_for_link",
      cli_wait_for_link,
      "--interface <interface name> --timeout <timeout>",
      "waits until timeout for the interface to up"
+    },
+    {"wait_for_ip",
+     cli_wait_for_ip,
+     "--interface <interface name> --timeout <timeout> --addrtype <ipv4,ipv6,"
+     "static_ipv4,static_ipv6,dhcp_ipv4,dhcp_ipv6,auto_ipv6,link_local_ipv6>",
+     "waits until timeout for the interface to get a valid IP address"
+    },
+    {"net_info",
+     cli_net_info,
+     "--set --interface <interface name> --paramname <param name> --paramvalue <value>",
+     "get or set network parameters"
     },
 };
 
