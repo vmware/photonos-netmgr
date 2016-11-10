@@ -33,6 +33,7 @@ typedef enum _CMD_ID
     CMD_FW_RULE,
     CMD_HOSTNAME,
     CMD_NET_INFO,
+    CMD_WAIT_LINK,
     CMD_MAX
 } CMD_ID;
 
