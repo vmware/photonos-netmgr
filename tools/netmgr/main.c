@@ -1069,6 +1069,35 @@ error:
     goto cleanup;
 }
 
+static uint32_t
+cmd_wait_for_link(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    long int ltimeout = 0;
+    char *pszIfname = NULL, *pszTimeOut = NULL, *pszEnd = NULL;
+
+    err = netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
+    bail_on_error(err);
+
+    err = netmgrcli_find_cmdopt(pCmd, "timeout", &pszTimeOut);
+    bail_on_error(err);
+
+    if ((ltimeout = strtol(pszTimeOut, &pszEnd, 10)) < 0)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = nm_wait_for_link_up(pszIfname, (uint32_t)ltimeout);
+    bail_on_error(err);
+
+cleanup:
+    return err;
+
+error:
+    goto cleanup;
+}
+
 typedef struct _NETMGR_CLI_HANDLER
 {
     CMD_ID id;
@@ -1089,6 +1118,7 @@ NETMGR_CLI_HANDLER cmdHandler[] =
     { CMD_FW_RULE,             cmd_fw_rule         },
     { CMD_HOSTNAME,            cmd_hostname        },
     { CMD_NET_INFO,            cmd_net_info        },
+    { CMD_WAIT_FOR_LINK,       cmd_wait_for_link   },
 };
 
 void
