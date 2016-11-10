@@ -1098,6 +1098,126 @@ error:
     goto cleanup;
 }
 
+typedef struct _NETMGR_CLI_ADDR_CONVERT
+{
+    char *pszIpAddrType;
+    NET_ADDR_TYPE ipAddrType;
+} NETMGR_CLI_ADDR_CONVERT, *PNETMGR_CLI_ADDR_CONVERT;
+
+NETMGR_CLI_ADDR_CONVERT addrConvert[] =
+{
+    { "ipv4",               NET_ADDR_IPV4       },
+    { "ipv6",               NET_ADDR_IPV6       },
+    { "static_ipv4",        STATIC_IPV4         },
+    { "static_ipv6",        STATIC_IPV6         },
+    { "dhcp_ipv4",          DHCP_IPV4           },
+    { "dhcp_ipv6",          DHCP_IPV6           },
+    { "auto_ipv6",          AUTO_IPV6           },
+    { "link_local_ipv6",    LINK_LOCAL_IPV6     },
+};
+
+static uint32_t
+get_ip_addrtype(
+    const char *pszAddrTypes,
+    NET_ADDR_TYPE *ipAddrType)
+{
+    uint32_t err = 0;
+    char * pszIpAddrTypes = NULL;
+    char *s1 = NULL, *s2 = NULL;
+    NET_ADDR_TYPE addrType = 0;
+    size_t i = 0;
+    size_t addrTypeCount = sizeof(addrConvert)/sizeof(NETMGR_CLI_ADDR_CONVERT);
+
+    if (IS_NULL_OR_EMPTY(pszAddrTypes) || !ipAddrType)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = netmgr_alloc_string(pszAddrTypes, &pszIpAddrTypes);
+    bail_on_error(err);
+
+    if (strlen(pszIpAddrTypes) > 0)
+    {
+        s2 = pszIpAddrTypes;
+        do {
+            s1 = strsep(&s2, ",");
+            if (strlen(s1) > 0)
+            {
+                for (i = 0; i < addrTypeCount; i++)
+                {
+                    if (!strcmp(s1, addrConvert[i].pszIpAddrType))
+                    {
+                        addrType |= addrConvert[i].ipAddrType;
+                        break;
+                    }
+                }
+                if (i == addrTypeCount)
+                {
+                    err = EINVAL;
+                }
+            }
+            bail_on_error(err);
+        } while (s2 != NULL);
+    }
+
+    *ipAddrType = addrType;
+
+cleanup:
+    netmgr_free(pszIpAddrTypes);
+    return err;
+
+error:
+    if (ipAddrType)
+    {
+        *ipAddrType = 0;
+    }
+    goto cleanup;
+}
+
+static uint32_t
+cmd_wait_for_ip(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    long int ltimeout = 0;
+    char *pszIfname = NULL, *pszTimeOut = NULL, *pszEnd = NULL;
+    char *pszAddrTypes = NULL;
+    NET_ADDR_TYPE ipAddrTypes = 0;
+
+    err = netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
+    bail_on_error(err);
+
+    err = netmgrcli_find_cmdopt(pCmd, "timeout", &pszTimeOut);
+    bail_on_error(err);
+
+    if ((ltimeout = strtol(pszTimeOut, &pszEnd, 10)) < 0)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = netmgrcli_find_cmdopt(pCmd, "addrtype", &pszAddrTypes);
+    if (err == ENOENT)
+    {
+        err = 0;
+    }
+    bail_on_error(err);
+    if (pszAddrTypes != NULL)
+    {
+        err = get_ip_addrtype(pszAddrTypes, &ipAddrTypes);
+        bail_on_error(err);
+    }
+
+    err = nm_wait_for_ip(pszIfname, (uint32_t)ltimeout, ipAddrTypes);
+    bail_on_error(err);
+
+cleanup:
+    return err;
+
+error:
+    goto cleanup;
+}
+
 typedef struct _NETMGR_CLI_HANDLER
 {
     CMD_ID id;
@@ -1119,6 +1239,7 @@ NETMGR_CLI_HANDLER cmdHandler[] =
     { CMD_HOSTNAME,            cmd_hostname        },
     { CMD_NET_INFO,            cmd_net_info        },
     { CMD_WAIT_FOR_LINK,       cmd_wait_for_link   },
+    { CMD_WAIT_FOR_IP,         cmd_wait_for_ip     },
 };
 
 void
