@@ -76,10 +76,11 @@ ini_cfg_read(
 
     while(!feof(fp))
     {
-        char buffer[1024];
+        size_t lineLen = 0;
+        char *pszLine = NULL, *lp;
         const char* pszCursor = NULL;
 
-        if (!fgets(buffer, sizeof(buffer), fp))
+        if (getline(&pszLine, &lineLen, fp) < 0)
         {
             if (feof(fp))
             {
@@ -89,7 +90,15 @@ ini_cfg_read(
             bail_on_error(err);
         }
 
-        pszCursor = &buffer[0];
+        // remove any trailing spaces
+        lp = pszLine + strlen(pszLine) - 1;
+        while ((lp > pszLine) && (*lp == '\n' || isspace((int)*lp)))
+        {
+            lp--;
+        }
+        *(lp + 1) = '\0';
+
+        pszCursor = pszLine;
 
         // skip leading whitespace
         while (pszCursor && *pszCursor && isspace((int)*pszCursor))
@@ -140,6 +149,7 @@ ini_cfg_read(
             err = ini_cfg_add_key(pSection, pszKey, pszValue);
             bail_on_error(err);
         }
+        free(pszLine);
     }
 
     *ppConfig = pConfig;
