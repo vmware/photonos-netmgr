@@ -63,3 +63,8 @@ build/*
 *.i*86
 *.x86_64
 *.hex
+
+# Tests
+tests/testsuite
+tests/package.m4
+

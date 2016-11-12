@@ -1,0 +1,10 @@
+[Match]
+Name=eth0
+
+[Network]
+DHCP=no
+Address=10.10.10.1/24
+
+[DHCP]
+UseDNS=false
+

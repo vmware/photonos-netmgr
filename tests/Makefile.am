@@ -28,13 +28,26 @@ EXTRA_DIST += $(TESTSUITE_AT)
 DISTCLEANFILES = atconfig testsuite
 
 check-local: atconfig $(TESTSUITE)
-	$(SHELL) '$(TESTSUITE)' AUTOTEST_PATH='$(abs_top_srcdir)/tools/netmgr' \
-	$(TESTSUITEFLAGS)
-     
+	systemctl start docker && pushd $(top_srcdir) && \
+	if docker ps | grep netmgr_unittest > /dev/null; \
+          then docker kill netmgr_unittest; \
+        fi && \
+	if docker ps -a | grep netmgr_unittest > /dev/null; \
+          then docker rm netmgr_unittest; \
+        fi && \
+	docker build -t netmgr_ut . && \
+	docker run -d --name netmgr_unittest --privileged --cap-add=SYS_ADMIN \
+            --cap-add=NET_ADMIN --security-opt seccomp=unconfined \
+            --stop-signal=SIGRTMIN+3 --tmpfs --cap-add=/run --tmpfs /run/lock \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:ro netmgr_ut && sleep 2 && \
+	docker exec -ti netmgr_unittest /netmgr/run_tests.sh && sleep 2 && \
+	docker kill netmgr_unittest && docker rm netmgr_unittest && \
+	echo "Done!"
+
 installcheck-local: atconfig $(TESTSUITE)
 	$(SHELL) '$(TESTSUITE)' AUTOTEST_PATH='$(abs_top_srcdir)/tools/netmgr' \
 	$(TESTSUITEFLAGS)
-     
+
 clean-local:
 	test ! -f '$(TESTSUITE)' || \
 	$(SHELL) '$(TESTSUITE)' --clean
