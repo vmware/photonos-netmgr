@@ -69,6 +69,7 @@ AC_CONFIG_FILES([Makefile
                  cli/Makefile
                  src/Makefile
                  tests/Makefile
+                 tests/apitest/Makefile
                  tools/Makefile
                  tools/netmgr/Makefile
                 ])

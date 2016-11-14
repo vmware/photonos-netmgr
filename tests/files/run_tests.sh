@@ -10,5 +10,7 @@ if mount | grep resolv > /dev/null
     systemctl start systemd-resolved
 fi
 
-cd /netmgr/unittests && ./tests/testsuite
+cd /netmgr/unittest/clitest && ./testsuite
+cd /netmgr/unittest/apitest && ./testutils
+cd /netmgr/unittest/apitest && ./testnetmgr
 

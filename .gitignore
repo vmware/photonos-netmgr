@@ -65,6 +65,7 @@ build/*
 *.hex
 
 # Tests
-tests/testsuite
-tests/package.m4
+test-driver
+tests/clitest/testsuite
+tests/clitest/package.m4
 
