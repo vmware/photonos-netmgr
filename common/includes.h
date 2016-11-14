@@ -27,5 +27,5 @@
 #include <fcntl.h>
 
 #include "defines.h"
-#include "prototypes.h"
+#include "nm_memory.h"
 #include "common_utils.h"

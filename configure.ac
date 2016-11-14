@@ -68,9 +68,10 @@ AC_CONFIG_FILES([Makefile
                  common/Makefile
                  cli/Makefile
                  src/Makefile
-                 tests/Makefile
                  tools/Makefile
                  tools/netmgr/Makefile
+                 tests/Makefile
+                 tests/apitest/Makefile
                 ])
 AC_OUTPUT
 

@@ -31,8 +31,8 @@
 #include <netmgmtsys.h>
 #include <netmgr.h>
 #include <iniparser.h>
-#include "../common/prototypes.h"
 #include "../common/common_utils.h"
+#include "../common/nm_memory.h"
 #include "defines.h"
 #include "structs.h"
 #include "prototypes.h"
