@@ -12,14 +12,24 @@
  * under the License.
  */
 
-#include <config.h>
+#include "includes.h"
+#include <check.h>
+#include "utils.h"
 
-#include <getopt.h>
+START_TEST(test_getkeyvalue)
+{
+    uint32_t err = 0;
+    char *pszValue = NULL;
 
-#include <netmgmtsys.h>
+    printf("nm_get_key_value test:\n");
+    err = nm_get_key_value("eth0", "Match", "Name", &pszValue);
+    ck_assert(strcmp(pszValue, "eth0") == 0);
+    netmgr_free(pszValue);
+}
+END_TEST
 
-#include "../common/nm_memory.h"
-#include <netmgr.h>
-#include "defines.h"
-#include "structs.h"
-#include "netmgrcli.h"
+int main()
+{
+    printf("Running utils API Tests..\n");
+    return 0;
+}
