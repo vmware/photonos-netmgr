@@ -1,26 +1,27 @@
 FROM vmware/photon
 
+ARG NMROOT=/root/netmgmt/
 ENV container docker
 ENV LC_ALL C
 
 # Copying netmgr rpms and tests..
-ADD ./build/rpmbuild/RPMS/x86_64 /netmgr/unittests/rpms
-ADD ./tests/testsuite /netmgr/unittests/tests/
-ADD ./tests/*.at /netmgr/unittests/tests/
+ADD ./build/rpmbuild/RPMS/x86_64 /netmgr/rpms
 ADD ./tests/files/10-eth0.network /etc/systemd/network/
-ADD ./tests/files/run_tests.sh /netmgr/
+ADD ./tests/files/run_tests.sh /netmgr/unittest/
+ADD ./tests/clitest/testsuite /netmgr/unittest/clitest/
+ADD ./tests/clitest/*.at /netmgr/unittest/clitest/
+ADD ./build/tests/apitest/* /netmgr/unittest/apitest/
+ADD ./build/ $NMROOT/build/
 
 # Install systemd, netmgr, and other supporting rpms..
 RUN tdnf install -y systemd
 RUN tdnf install -y sed gawk diffutils iproute2
-RUN rpm -Uvh --force /netmgr/unittests/rpms/*.rpm
+RUN tdnf install -y gcc binutils glibc-devel pcre-devel glib-devel
+RUN rpm -Uvh --force /netmgr/rpms/*.rpm
 
 # Debug
-#RUN tdnf install -y gdb gcc binutils make rpm-build libtool pcre pcre-devel
-#RUN tdnf install -y automake autoconf glibc glibc-devel tar glib glib-devel
-#RUN tdnf install -y cpio
+#RUN tdnf install -y gdb make rpm-build libtool automake autoconf cpio
 #ADD ./nm.tar /root/
-
 
 RUN cd /lib/systemd/system/sysinit.target.wants/; \
 ls | grep -v systemd-tmpfiles-setup | xargs rm -f $1 \
@@ -40,17 +41,12 @@ RUN sed -i s/#DNS=/DNS=10.10.10.250/ /etc/systemd/resolved.conf
 RUN mkdir -p /tools/netmgr
 RUN ln -s /usr/bin/netmgr /tools/netmgr/netmgr
 
-RUN sed -i "s/^ExecStart=/ExecStartPre=\/usr\/sbin\/ip addr flush dev eth0\nExecStartPre=\/usr\/bin\/sleep 2\nExecStart=/" /usr/lib/systemd/system/systemd-networkd.service
-
+RUN sed -i "s/^ExecStart=/ExecStartPre=\/usr\/sbin\/ip addr flush dev eth0\nExecStartPre=\/usr\/bin\/sleep 1\nExecStart=/" /usr/lib/systemd/system/systemd-networkd.service
 RUN systemctl set-default multi-user.target
 
 ENV init /lib/systemd/systemd
 
 VOLUME [ "/sys/fs/cgroup" ]
-
-CMD umount /etc/resolv.conf
-CMD rm -f /etc/resolv.conf
-CMD ln -f -s /run/systemd/resolve/resolv.conf /etc/resolv.conf
 
 ENTRYPOINT ["/lib/systemd/systemd"]
 

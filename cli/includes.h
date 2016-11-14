@@ -21,7 +21,7 @@
 #include <getopt.h>
 #include <arpa/inet.h>
 
-#include "../common/prototypes.h"
 #include "../common/common_utils.h"
+#include "../common/nm_memory.h"
 #include "defines.h"
 #include "netmgrcli.h"

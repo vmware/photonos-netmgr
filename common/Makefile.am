@@ -1,7 +1,7 @@
 noinst_LTLIBRARIES = libcommon.la
 
 libcommon_la_SOURCES = \
-    memory.c \
+    nm_memory.c \
     common_utils.c
 
 libcommon_la_CPPFLAGS = \
