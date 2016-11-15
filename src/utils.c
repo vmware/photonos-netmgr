@@ -339,6 +339,7 @@ nm_atomic_file_update(
         err = EBADF;
         bail_on_error(err);
     }
+
     fclose(pFile);
     pFile = NULL;
 
