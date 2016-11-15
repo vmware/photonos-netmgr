@@ -741,6 +741,7 @@ ini_cfg_save(
     {
         PKEYVALUE_INI pKeyValue = pSection->pKeyValue;
 
+        /* coverity[var_deref_model] */
         if (fprintf(fp, "\n[%s]\n", pSection->pszName) < 0)
         {
             err = EBADF;

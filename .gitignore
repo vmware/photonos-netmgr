@@ -23,10 +23,13 @@ ltmain.sh
 libtool
 ar-lib
 
+/include/config.h
 /include/config.h.in*
 /include/stamp*
 /common/.deps
 /common/.libs
+/cli/.deps
+/cli/.libs
 /src/.deps
 /src/.libs
 /tools/netmgr/.deps
@@ -66,6 +69,8 @@ build/*
 
 # Tests
 test-driver
+tests/atconfig
+tests/apitest/.deps/
 tests/clitest/testsuite
 tests/clitest/package.m4
 

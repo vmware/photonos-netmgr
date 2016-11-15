@@ -334,6 +334,7 @@ nm_atomic_file_update(
         bail_on_error(err);
     }
 
+    /* coverity[var_deref_model] */
     if (fprintf(pFile, "%s", pszFileBuf) < 0)
     {
         err = EBADF;
