@@ -186,6 +186,7 @@ nm_read_conf_file(
         err = errno;
         bail_on_error(err);
     }
+    /* coverity[var_deref_model] */
     if (fseek(fp, 0, SEEK_END) != 0)
     {
         err = errno;
@@ -1769,7 +1770,7 @@ nm_get_ip_default_gateway(
         err = errno;
         bail_on_error(err);
     }
-    
+
     pszMsgBuf = szMsgBuf;
     nlMsg = (struct nlmsghdr *)pszMsgBuf;
     rtMsg = (struct rtmsg *)NLMSG_DATA(nlMsg);
@@ -1779,6 +1780,7 @@ nm_get_ip_default_gateway(
     nlMsg->nlmsg_seq = msgSeq++;
     pId = nlMsg->nlmsg_pid = getpid();
 
+    /* coverity[negative_returns] */
     if (send(sockFd, nlMsg, nlMsg->nlmsg_len, 0) < 0)
     {
         err = errno;
@@ -1960,6 +1962,7 @@ nm_set_sysctl_procfs_value(
         bail_on_error(err);
     }
 
+    /* coverity[var_deref_model] */
     if (fputs(pszValue, pFile) == EOF)
     {
         err = ferror(pFile);
@@ -5127,16 +5130,15 @@ nm_add_firewall_rule(
         bail_on_error(err);
     }
 
-    if (pNetFwRule->type == FW_RAW)
+    if (pNetFwRule->type != FW_RAW)
     {
-        err = netmgr_alloc_string_printf(&pszFwRule, "iptables %s",
-                                         pNetFwRule->pszRawFwRule);
+        err = EINVAL;
         bail_on_error(err);
     }
-    else
-    {
-        // TODO:
-    }
+
+    err = netmgr_alloc_string_printf(&pszFwRule, "iptables %s",
+                                     pNetFwRule->pszRawFwRule);
+    bail_on_error(err);
 
     err = nm_read_conf_file(FIREWALL_CONF_FILENAME, &pszFileBuf);
     bail_on_error(err);
@@ -5197,16 +5199,15 @@ nm_delete_firewall_rule(
         bail_on_error(err);
     }
 
-    if (pNetFwRule->type == FW_RAW)
+    if (pNetFwRule->type != FW_RAW)
     {
-        err = netmgr_alloc_string_printf(&pszFwRule, "iptables %s",
-                                         pNetFwRule->pszRawFwRule);
+        err = EINVAL;
         bail_on_error(err);
     }
-    else
-    {
-        // TODO:
-    }
+
+    err = netmgr_alloc_string_printf(&pszFwRule, "iptables %s",
+                                     pNetFwRule->pszRawFwRule);
+    bail_on_error(err);
 
     err = nm_read_conf_file(FIREWALL_CONF_FILENAME, &pszFileBuf);
     bail_on_error(err);
