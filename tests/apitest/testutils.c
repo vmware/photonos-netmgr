@@ -20,14 +20,39 @@ START_TEST(test_getkeyvalue)
     char *pszValue = NULL;
 
     printf("nm_get_key_value test:\n");
-    err = nm_get_key_value("eth0", "Match", "Name", &pszValue);
-    ck_assert(strcmp(pszValue, "eth0") == 0);
+    err = nm_get_key_value("/etc/systemd/network/10-eth0.network",
+                           "Match",
+                           "Name",
+                           &pszValue);
+    ck_assert_msg(strcmp(pszValue, "eth0") == 0, "Was expecting 'eth0'");
     netmgr_free(pszValue);
 }
 END_TEST
 
-int main()
+Suite *test_utils_suite(void)
 {
+    Suite *s;
+    TCase *tcCore;
+
+    s = suite_create("UtilsTestSuite");
+    tcCore = tcase_create("UtilsTestCore");
+    tcase_add_test(tcCore, test_getkeyvalue);
+    suite_add_tcase(s, tcCore);
+    return s;
+}
+
+int main(void)
+{
+    int numFailed;
+    Suite *s;
+    SRunner *sr;
+
     printf("Running utils API Tests..\n");
-    return 0;
+
+    s = test_utils_suite();
+    sr = srunner_create(s);
+    srunner_run_all(sr, CK_NORMAL);
+    numFailed = srunner_ntests_failed(sr);
+    srunner_free(sr);
+    return (numFailed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

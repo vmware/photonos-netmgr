@@ -16,7 +16,7 @@ ADD ./build/ $NMROOT/build/
 # Install systemd, netmgr, and other supporting rpms..
 RUN tdnf install -y systemd
 RUN tdnf install -y sed gawk diffutils iproute2
-RUN tdnf install -y gcc binutils glibc-devel pcre-devel glib-devel
+RUN tdnf install -y gcc binutils glibc-devel pcre-devel glib-devel check
 RUN rpm -Uvh --force /netmgr/rpms/*.rpm
 
 # Debug

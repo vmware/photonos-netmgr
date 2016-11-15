@@ -1,6 +1,6 @@
 AC_PREREQ(2.59)
 
-AC_INIT([netmgmt], [1.0.4], [support@vmware.com])
+AC_INIT([netmgmt], [1.0.5], [support@vmware.com])
 AC_CANONICAL_SYSTEM
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 
@@ -63,6 +63,8 @@ AM_CONDITIONAL([GLIB],  [test "$have_libglib" = "yes"])
 
 AC_SUBST(DL_LIBS)
 AC_SUBST(PTHREAD_LIBS)
+
+PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
 
 AC_CONFIG_FILES([Makefile
                  common/Makefile
