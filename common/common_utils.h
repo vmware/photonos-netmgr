@@ -15,6 +15,9 @@
 #ifndef __COMMON_UTILS_H__
 #define __COMMON_UTILS_H__
 
+#define IS_VALID_INTERFACE_NAME(_pstr) \
+    ((_pstr) && (*_pstr) && (strnlen(_pstr, IFNAMSIZ) < IFNAMSIZ))
+
 typedef struct _NETLINK_MESSAGE
 {
     struct _NETLINK_MESSAGE *pNext;

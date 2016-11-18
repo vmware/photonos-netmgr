@@ -57,7 +57,7 @@ ini_cfg_read(
 
     if (!pszPath || !*pszPath || !ppConfig)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -128,7 +128,7 @@ ini_cfg_read(
         {
             if (!pSection)
             {
-                err = EBADMSG;
+                err = NM_ERR_BAD_CONFIG_FILE;
                 bail_on_error(err);
             }
 
@@ -199,7 +199,7 @@ ini_cfg_create_config(
 
     if (!ppConfig)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -239,7 +239,7 @@ ini_cfg_add_section(
 
     if (!pConfig || !pszName || !*pszName || !ppSection)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -300,7 +300,7 @@ ini_cfg_find_sections(
 
     if (!pConfig || !pszName || !*pszName || !pppSections || !pdwNumSections)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -380,7 +380,7 @@ ini_cfg_delete_sections(
 
     if (!pConfig || !pszName || !*pszName)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -420,7 +420,7 @@ ini_cfg_delete_section(
 
     if (!pConfig || !pSection)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -436,7 +436,7 @@ ini_cfg_delete_section(
 
     if (!pCandidate)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
 
@@ -544,7 +544,7 @@ ini_cfg_add_key(
 
     if (!pSection || !pszKey || !*pszKey)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -602,14 +602,14 @@ ini_cfg_set_value(
 
     if (!pSection || !pszKey || !*pszKey || !pszValue || !*pszValue)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
     pCandidate = ini_cfg_find_key(pSection, pszKey);
     if (!pCandidate)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
 
@@ -640,7 +640,7 @@ ini_cfg_delete_key(
 
     if (!pSection || !pszKey || !*pszKey)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -679,7 +679,7 @@ ini_cfg_delete_key_value(
 
     if (!pSection || !pKeyValue)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -719,7 +719,7 @@ ini_cfg_save(
 
     if (!pszPath || !*pszPath || !pConfig)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -743,16 +743,16 @@ ini_cfg_save(
 
         if (fprintf(fp, "\n[%s]\n", pSection->pszName) < 0)
         {
-            err = EBADF;
+            err = NM_ERR_WRITE_FAILED;
             bail_on_error(err);
         }
 
         for (; pKeyValue; pKeyValue = pKeyValue->pNext)
         {
             pszValue = (pKeyValue->pszValue != NULL) ? pKeyValue->pszValue : "";
-            if(fprintf(fp, "%s=%s\n", pKeyValue->pszKey, pszValue) < 0)
+            if (fprintf(fp, "%s=%s\n", pKeyValue->pszKey, pszValue) < 0)
             {
-                err = EBADF;
+                err = NM_ERR_WRITE_FAILED;
                 bail_on_error(err);
             }
         }
@@ -763,7 +763,8 @@ ini_cfg_save(
 
     if (chmod(pszTmpPath, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH) != 0)
     {
-        bail_on_error(errno);
+        err = errno;
+        bail_on_error(err);
     }
 
     if (rename(pszTmpPath, pszPath) < 0)
@@ -834,7 +835,7 @@ ini_cfg_parse_section_name(
     // check prefix
     if (!pszCursor || !*pszCursor || *pszCursor != '[')
     {
-        err = EBADMSG;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
     // skip prefix
@@ -847,7 +848,7 @@ ini_cfg_parse_section_name(
     pszNameMarker = pszCursor;
     if (!pszNameMarker || !*pszNameMarker)
     {
-        err = EBADMSG;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
     // allow only (('a'-'z') || ('A'-'Z'))+
@@ -864,7 +865,7 @@ ini_cfg_parse_section_name(
     // check suffix
     if (!pszCursor || !*pszCursor || *pszCursor != ']')
     {
-        err = EBADMSG;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
     // skip suffix
@@ -877,7 +878,7 @@ ini_cfg_parse_section_name(
     // Expect end of line and a non-empty name
     if ((pszCursor && *pszCursor) || !len)
     {
-        err = EBADMSG;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
 
@@ -929,7 +930,7 @@ ini_cfg_parse_key_value(
     pszKeyMarker = pszCursor;
     if (!pszKeyMarker || !*pszKeyMarker)
     {
-        err = EBADMSG;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
     // allow only (('a'-'z') || ('A'-'Z') || ('0'-'9'))+
@@ -946,7 +947,7 @@ ini_cfg_parse_key_value(
     // check operator
     if (!pszCursor || !*pszCursor || *pszCursor != '=')
     {
-        err = EBADMSG;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
     // skip operator
@@ -969,7 +970,7 @@ ini_cfg_parse_key_value(
     }
     if ((pszCursor && *pszCursor) || !len_key)
     {
-        err = EBADMSG;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
 

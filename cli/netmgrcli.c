@@ -1467,6 +1467,74 @@ error:
 }
 
 
+static struct option errInfoOptions[] =
+{
+    {"errcode",      required_argument,    0,    'e'},
+    {0, 0, 0, 0}
+};
+
+static uint32_t
+cli_err_info(
+    int argc,
+    char **argv,
+    PNETMGR_CMD pCmd
+    )
+{
+    uint32_t err = 0, validErrCode = 0;
+    int nOptionIndex = 0, nOption = 0;
+
+    opterr = 0;
+    optind = 1;
+    while (1)
+    {
+        nOption = getopt_long(argc,
+                              argv,
+                              "e:",
+                              errInfoOptions,
+                              &nOptionIndex);
+        if (nOption == -1)
+            break;
+
+        switch(nOption)
+        {
+            case 'e':
+                if (strlen(optarg) > 0)
+                {
+                    err = netmgrcli_alloc_keyvalue("errcode", optarg, pCmd);
+                    validErrCode = 1;
+                }
+                else
+                {
+                    fprintf(stderr, "Invalid error code.\n");
+                    err = EDOM;
+                }
+                break;
+            case '?':
+                /* Option not handled here. Ignore. */
+                break;
+        }
+        bail_on_error(err);
+    }
+
+    if (!validErrCode)
+    {
+        err = EDOM;
+        bail_on_error(err);
+    }
+
+    pCmd->id = CMD_ERR_INFO;
+
+cleanup:
+    return err;
+
+error:
+    if(err == EDOM)
+    {
+        fprintf(stderr, "Usage:\nerror_info --errcode <Error Code>\n");
+    }
+    goto cleanup;
+}
+
 static struct option netInfoOptions[] =
 {
     {"set",          no_argument,          0,    's'},
@@ -1650,6 +1718,11 @@ NETMGRCLI_CMD_MAP cmdMap[] =
      "--interface <interface name> --timeout <timeout> --addrtype <ipv4,ipv6,"
      "static_ipv4,static_ipv6,dhcp_ipv4,dhcp_ipv6,auto_ipv6,link_local_ipv6>",
      "waits until timeout for the interface to get a valid IP address"
+    },
+    {"error_info",
+     cli_err_info,
+     "--errcode <Error code>",
+     "get error information from error code"
     },
     {"net_info",
      cli_net_info,

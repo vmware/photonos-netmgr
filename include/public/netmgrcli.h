@@ -35,6 +35,7 @@ typedef enum _CMD_ID
     CMD_WAIT_FOR_LINK,
     CMD_WAIT_FOR_IP,
     CMD_NET_INFO,
+    CMD_ERR_INFO,
     CMD_MAX
 } CMD_ID;
 
