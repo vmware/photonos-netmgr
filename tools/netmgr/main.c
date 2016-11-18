@@ -14,6 +14,16 @@
 
 #include "includes.h"
 
+
+static uint32_t
+get_cli_error_code(uint32_t nmErrCode)
+{
+    uint32_t cliErrCode = nmErrCode & 0xFF;
+    cliErrCode = (nmErrCode < NM_CLI_BASE_ERROR) ?
+                     nmErrCode : (NM_CLI_BASE_ERROR + cliErrCode);
+    return cliErrCode;
+}
+
 static uint32_t
 cmd_link_info(PNETMGR_CMD pCmd)
 {
@@ -1159,6 +1169,43 @@ error:
 }
 
 static uint32_t
+cmd_err_info(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0, errCode = 0;
+    char *pszErrCode = NULL, *pszEnd = NULL;
+    const char *pszErrInfo = NULL;
+
+    err = netmgrcli_find_cmdopt(pCmd, "errcode", &pszErrCode);
+    bail_on_error(err);
+
+    if ((errCode = (uint32_t)strtol(pszErrCode, &pszEnd, 10)) < 0)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    if (errCode > NM_CLI_BASE_ERROR)
+    {
+        errCode -= NM_CLI_BASE_ERROR;
+        errCode += NM_BASE_ERROR;
+    }
+
+    pszErrInfo = nm_get_error_info(errCode);
+    if (pszErrInfo == NULL)
+    {
+        err = ENOENT;
+        bail_on_error(err);
+    }
+
+    fprintf(stdout, "ErrorInfo: %s\n", pszErrInfo);
+
+cleanup:
+    return err;
+error:
+    goto cleanup;
+}
+
+static uint32_t
 cmd_net_info(PNETMGR_CMD pCmd)
 {
     uint32_t err = 0;
@@ -1233,6 +1280,7 @@ NETMGR_CLI_HANDLER cmdHandler[] =
     { CMD_HOSTNAME,            cmd_hostname        },
     { CMD_WAIT_FOR_LINK,       cmd_wait_for_link   },
     { CMD_WAIT_FOR_IP,         cmd_wait_for_ip     },
+    { CMD_ERR_INFO,            cmd_err_info        },
     { CMD_NET_INFO,            cmd_net_info        },
 };
 
@@ -1262,7 +1310,7 @@ int main(int argc, char* argv[])
 
 cleanup:
     netmgrcli_free_cmd(pCmd);
-    return err;
+    return get_cli_error_code(err);
 error:
     goto cleanup;
 }
