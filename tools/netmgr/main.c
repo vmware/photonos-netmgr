@@ -1159,6 +1159,38 @@ error:
 }
 
 static uint32_t
+cmd_err_info(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    long int errCode = 0;
+    char *pszErrCode = NULL, *pszEnd = NULL;
+    const char *pszErrInfo = NULL;
+
+    err = netmgrcli_find_cmdopt(pCmd, "errcode", &pszErrCode);
+    bail_on_error(err);
+
+    if ((errCode = strtol(pszErrCode, &pszEnd, 10)) < 0)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    pszErrInfo = nm_get_error_info((uint32_t)errCode);
+    if (pszErrInfo == NULL)
+    {
+        err = ENOENT;
+        bail_on_error(err);
+    }
+
+    fprintf(stdout, "ErrorInfo: %s\n", pszErrInfo);
+
+cleanup:
+    return err;
+error:
+    goto cleanup;
+}
+
+static uint32_t
 cmd_net_info(PNETMGR_CMD pCmd)
 {
     uint32_t err = 0;
@@ -1233,6 +1265,7 @@ NETMGR_CLI_HANDLER cmdHandler[] =
     { CMD_HOSTNAME,            cmd_hostname        },
     { CMD_WAIT_FOR_LINK,       cmd_wait_for_link   },
     { CMD_WAIT_FOR_IP,         cmd_wait_for_ip     },
+    { CMD_ERR_INFO,            cmd_err_info        },
     { CMD_NET_INFO,            cmd_net_info        },
 };
 

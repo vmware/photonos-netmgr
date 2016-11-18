@@ -32,7 +32,7 @@ nm_set_key_value(
     if (IS_NULL_OR_EMPTY(pszConfigFileName) || IS_NULL_OR_EMPTY(pszSection) ||
         IS_NULL_OR_EMPTY(pszKey))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -58,8 +58,7 @@ nm_set_key_value(
 
     if (dwNumSections > 1)
     {
-        /* TODO: Better error reporting */
-        err = EINVAL;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
     else if ((dwNumSections == 0) && (pszValue != NULL))
@@ -125,7 +124,7 @@ nm_add_key_value(
     if (IS_NULL_OR_EMPTY(pszConfigFileName) || IS_NULL_OR_EMPTY(pszSection) ||
         IS_NULL_OR_EMPTY(pszKey) || IS_NULL_OR_EMPTY(pszValue))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -137,8 +136,7 @@ nm_add_key_value(
 
     if (dwNumSections > 1)
     {
-        /* TODO: Better error reporting */
-        err = EINVAL;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
     else if (dwNumSections == 0)
@@ -154,7 +152,7 @@ nm_add_key_value(
     pKeyValue = ini_cfg_find_key_value(pSection, pszKey, pszValue);
     if (pKeyValue != NULL)
     {
-        err = EEXIST;
+        err = NM_ERR_VALUE_EXISTS;
     }
     else
     {
@@ -194,7 +192,7 @@ nm_delete_key_value(
     if (IS_NULL_OR_EMPTY(pszConfigFileName) || IS_NULL_OR_EMPTY(pszSection) ||
         IS_NULL_OR_EMPTY(pszKey) || IS_NULL_OR_EMPTY(pszValue))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -206,13 +204,12 @@ nm_delete_key_value(
 
     if (dwNumSections > 1)
     {
-        /* TODO: Better error reporting */
-        err = EINVAL;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
     else if (dwNumSections == 0)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
     else
@@ -223,7 +220,7 @@ nm_delete_key_value(
     pKeyValue = ini_cfg_find_key_value(pSection, pszKey, pszValue);
     if (pKeyValue == NULL)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
     }
     else
     {
@@ -263,7 +260,7 @@ nm_get_key_value(
     if (IS_NULL_OR_EMPTY(pszConfigFileName) || IS_NULL_OR_EMPTY(pszSection) ||
         IS_NULL_OR_EMPTY(pszKey))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -276,12 +273,12 @@ nm_get_key_value(
     if (dwNumSections > 1)
     {
         /* TODO: Log error */
-        err = EINVAL;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
     else if (dwNumSections == 0)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
 
@@ -290,7 +287,7 @@ nm_get_key_value(
     pKeyValue = ini_cfg_find_key(pSection, pszKey);
     if (pKeyValue == NULL)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
     /* malloc return memory - caller to free */
@@ -320,7 +317,7 @@ nm_atomic_file_update(
 
     if (!pszFileName || !*pszFileName || !pszFileBuf)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -336,7 +333,7 @@ nm_atomic_file_update(
 
     if (fprintf(pFile, "%s", pszFileBuf) < 0)
     {
-        err = EBADF;
+        err = NM_ERR_WRITE_FAILED;
         bail_on_error(err);
     }
 
@@ -377,7 +374,7 @@ nm_run_command(
 
     if (pszCommand == NULL)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -413,7 +410,7 @@ nm_acquire_write_lock(
 
     if (!pLockId)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -456,7 +453,7 @@ nm_release_write_lock(
 
     if (lockId < 0)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 

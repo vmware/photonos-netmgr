@@ -77,6 +77,42 @@ nm_ip_addr_type_to_string(
     return "Unknown addrtype";
 }
 
+const char *
+nm_get_error_info(
+    uint32_t nmErrCode
+)
+{
+    switch (nmErrCode)
+    {
+        case NM_ERR_INVALID_PARAMETER:
+            return "invalid parameter";
+        case NM_ERR_NOT_SUPPORTED:
+            return "not supported";
+        case NM_ERR_OUT_OF_MEMORY:
+            return "out of memory";
+        case NM_ERR_VALUE_NOT_FOUND:
+            return "value not found";
+        case NM_ERR_VALUE_EXISTS:
+            return "value exists";
+        case NM_ERR_INVALID_INTERFACE:
+            return "invalid interface";
+        case NM_ERR_INVALID_ADDRESS:
+            return "invalid address";
+        case NM_ERR_ADDRESS_NOT_FOUND:
+            return "address no found";
+        case NM_ERR_INVALID_MODE:
+            return "invalid mode";
+        case NM_ERR_BAD_CONFIG_FILE:
+            return "error in config file";
+        case NM_ERR_WRITE_FAILED:
+            return "write failed";
+        case NM_ERR_TIME_OUT:
+            return "timed out";
+        default:
+            return strerror(nmErrCode);
+    }
+}
+
 static uint32_t
 nm_alloc_conf_filename(
     char **ppszFilename,
@@ -89,7 +125,7 @@ nm_alloc_conf_filename(
 
     if (!ppszFilename || !pszPath || !pszFname)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -136,7 +172,7 @@ nm_get_network_auto_conf_filename(
 
     if ((pszIfname == NULL) || (strlen(pszIfname) >= IFNAMSIZ) || !ppszFilename)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
     sprintf(fname, "10-%s.network", pszIfname);
@@ -155,7 +191,7 @@ nm_get_network_manual_conf_filename(
 
     if ((pszIfname == NULL) || (strlen(pszIfname) >= IFNAMSIZ) || !ppszFilename)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
     sprintf(fname, "10-%s.network.manual", pszIfname);
@@ -176,7 +212,7 @@ nm_read_conf_file(
 
     if (IS_NULL_OR_EMPTY(pszFilename) || !ppszFileBuf)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -242,9 +278,10 @@ nm_regex_match_ifname(
     char *q, *pszPattern = NULL;
     const char *p;
 
-    if (IS_NULL_OR_EMPTY(pszIfName) || IS_NULL_OR_EMPTY(pszMatchName))
+    if (!IS_VALID_INTERFACE_NAME(pszIfName) ||
+        !IS_VALID_INTERFACE_NAME(pszMatchName))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_INTERFACE;
         bail_on_error(err);
     }
 
@@ -271,7 +308,7 @@ nm_regex_match_ifname(
     bail_on_error(err);
     if ((rm.rm_eo - rm.rm_so) < ifNameLen)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
 
@@ -294,9 +331,9 @@ nm_get_network_conf_filename(
     DIR *dirFile = NULL;
     char *p, *pszFileName = NULL, *pszMatchName = NULL, *pszCfgFileName = NULL;
 
-    if (IS_NULL_OR_EMPTY(pszIfName) || !ppszFilename)
+    if (!IS_VALID_INTERFACE_NAME(pszIfName) || !ppszFilename)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -384,7 +421,7 @@ nm_string_to_line_array(
 
     if (!pszStrBuf || !*pszStrBuf || !pLineCount || !pppszLineBuf)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -403,7 +440,7 @@ nm_string_to_line_array(
 
     if (lineCount == 0)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
 
@@ -459,10 +496,9 @@ nm_update_mac_address(
     int sockFd = -1, addrLen = 0;
     struct ifreq ifr;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) >= IFNAMSIZ))
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_INTERFACE;
         bail_on_error(err);
     }
 
@@ -485,7 +521,7 @@ nm_update_mac_address(
                                     &ifr.ifr_hwaddr.sa_data[5]);
     if (addrLen != ETHER_ADDR_LEN)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_ADDRESS;
         bail_on_error(err);
     }
 
@@ -526,9 +562,9 @@ nm_set_link_mac_addr(
     err = nm_acquire_write_lock(0, &lockId);
     bail_on_error(err);
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_INTERFACE;
         bail_on_error(err);
     }
 
@@ -571,10 +607,9 @@ nm_get_link_mac_addr(
     char *pszMacAddress = NULL;
     struct ifreq ifr;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) >= IFNAMSIZ) || !ppszMacAddress)
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !ppszMacAddress)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -636,9 +671,10 @@ nm_set_link_mode(
     err = nm_acquire_write_lock(0, &lockId);
     bail_on_error(err);
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) || (mode >= LINK_MODE_UNKNOWN))
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
+        (mode >= LINK_MODE_UNKNOWN))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -679,7 +715,7 @@ nm_set_link_mode(
             }
             break;
         default:
-            err = EINVAL;
+            err = NM_ERR_INVALID_PARAMETER;
             break;
     }
 
@@ -703,10 +739,9 @@ nm_get_link_mode(
     uint32_t err = 0;
     char *pszCfgFileName = NULL;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) >= IFNAMSIZ) || !pLinkMode)
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !pLinkMode)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -748,10 +783,9 @@ nm_update_link_mtu(
     int sockFd = -1;
     struct ifreq ifr;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) >= IFNAMSIZ))
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_INTERFACE;
         bail_on_error(err);
     }
 
@@ -813,9 +847,9 @@ nm_set_link_mtu(
     err = nm_acquire_write_lock(0, &lockId);
     bail_on_error(err);
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_INTERFACE;
         bail_on_error(err);
     }
 
@@ -862,10 +896,9 @@ nm_get_link_mtu(
     int sockFd = -1;
     struct ifreq ifr;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) >= IFNAMSIZ) || !pMtu)
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !pMtu)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -916,11 +949,10 @@ nm_set_link_state(
     err = nm_acquire_write_lock(0, &lockId);
     bail_on_error(err);
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) >= IFNAMSIZ) ||
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
         (linkState >= LINK_STATE_UNKNOWN))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -959,7 +991,7 @@ nm_set_link_state(
             CLEAR_FLAG(ifr.ifr_flags, IFF_UP);
             break;
         default:
-            err = EINVAL;
+            err = NM_ERR_INVALID_PARAMETER;
     }
     bail_on_error(err);
 
@@ -991,10 +1023,9 @@ nm_get_link_state(
     int sockFd = -1;
     struct ifreq ifr;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) >= IFNAMSIZ) || !pLinkState)
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !pLinkState)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -1042,12 +1073,11 @@ nm_do_arping(
     uint32_t err = 0;
     char *pszArpingCmd = NULL;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) >= IFNAMSIZ) ||
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
         IS_NULL_OR_EMPTY(pszCommandOptions) ||
         IS_NULL_OR_EMPTY(pszDestIPv4Addr))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -1111,10 +1141,9 @@ nm_ifup(
     char **ppszIpv4AddrList = NULL, **ppszIpv6AddrList = NULL;
     char **ppszStaticIpv4AddrList = NULL;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) >= IFNAMSIZ))
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_INTERFACE;
         bail_on_error(err);
     }
 
@@ -1123,7 +1152,7 @@ nm_ifup(
 
     err = nm_get_interface_ipaddr(pszInterfaceName, STATIC_IPV4, &ip4Count,
                                   &ppszIpv4AddrList);
-    if (err == ENOENT)
+    if (err == NM_ERR_VALUE_NOT_FOUND)
     {
         err = 0;
     }
@@ -1133,7 +1162,7 @@ nm_ifup(
     {
         err = nm_get_interface_ipaddr(pszInterfaceName, STATIC_IPV6, &ip6Count,
                                       &ppszIpv6AddrList);
-        if (err == ENOENT)
+        if (err == NM_ERR_VALUE_NOT_FOUND)
         {
             err = 0;
         }
@@ -1147,7 +1176,7 @@ nm_ifup(
 
     err = nm_get_static_ip_addr(pszInterfaceName, STATIC_IPV4, &staticIp4Count,
                                 &ppszStaticIpv4AddrList);
-    if (err == ENOENT)
+    if (err == NM_ERR_VALUE_NOT_FOUND)
     {
         err = 0;
     }
@@ -1162,7 +1191,7 @@ nm_ifup(
     if (staticIp4Count && ip4Count &&
         (strcmp(ppszStaticIpv4AddrList[0], ppszIpv4AddrList[0]) != 0))
     {
-        err = EINVAL;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
 
@@ -1172,7 +1201,7 @@ nm_ifup(
                         &prefix);
         if ((retVal != 1) && (retVal != 2))
         {
-            err = EINVAL;
+            err = NM_ERR_BAD_CONFIG_FILE;
             bail_on_error(err);
         }
 
@@ -1226,10 +1255,9 @@ nm_ifdown(
 {
     uint32_t err = 0;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) >= IFNAMSIZ))
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_INTERFACE;
         bail_on_error(err);
     }
 
@@ -1275,14 +1303,14 @@ nm_enumerate_systemd_interfaces(
 
     if (!ppInterfaces)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
     dirFile = opendir(SYSTEMD_NET_PATH);
     if (dirFile == NULL)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
 
@@ -1297,7 +1325,7 @@ nm_enumerate_systemd_interfaces(
         pszStr1 = strstr(hFile->d_name, "10-");
         if (pszStr1 == NULL)
         {
-            err = ENOENT;
+            err = NM_ERR_VALUE_NOT_FOUND;
             bail_on_error(err);
         }
 
@@ -1306,7 +1334,7 @@ nm_enumerate_systemd_interfaces(
 
         if (pszStr2 == NULL)
         {
-            err = ENOENT;
+            err = NM_ERR_VALUE_NOT_FOUND;
             bail_on_error(err);
         }
         size2 = pszStr2 - (pszStr1 + size1);
@@ -1360,10 +1388,9 @@ nm_get_interface_info(
     NET_LINK_MODE linkMode = LINK_MODE_UNKNOWN;
     NET_LINK_INFO *pLinkInfo = NULL;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) || !ppLinkInfo ||
-        (strlen(pszInterfaceName) >= IFNAMSIZ))
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !ppLinkInfo)
     {
-        err =  EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -1418,7 +1445,7 @@ nm_get_link_info(
 
     if (!ppLinkInfo)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -1491,9 +1518,10 @@ nm_get_static_ip_addr(
     PSECTION_INI *ppSections = NULL, pSection = NULL;
     PKEYVALUE_INI pKeyValue = NULL, pNextKeyValue = NULL;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) || !pCount || !pppszIpAddrList)
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !pCount ||
+        !pppszIpAddrList)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -1509,12 +1537,12 @@ nm_get_static_ip_addr(
 
     if (dwNumSections > 1)
     {
-        err = EINVAL;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
     else if (dwNumSections == 0)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
     pSection = ppSections[0];
@@ -1529,7 +1557,7 @@ nm_get_static_ip_addr(
         }
         if (sscanf(pNextKeyValue->pszValue, "%[^/]/%u", ipAddr, &prefix) < 1)
         {
-            err = EINVAL;
+            err = NM_ERR_BAD_CONFIG_FILE;
             bail_on_error(err);
         }
         if (TEST_FLAG(addrTypes, STATIC_IPV4) && is_ipv4_addr(ipAddr))
@@ -1570,7 +1598,7 @@ nm_get_static_ip_addr(
     }
     else
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
 
@@ -1623,10 +1651,10 @@ nm_get_interface_ipaddr(
     char szIpAddr[INET6_ADDRSTRLEN];
     const char *pszIpAddr = NULL;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) >= IFNAMSIZ) || !pCount || !pppszIpAddress)
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !pCount ||
+        !pppszIpAddress)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -1649,7 +1677,7 @@ nm_get_interface_ipaddr(
 
     if (!ip4Type && !ip6Type)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
 
@@ -1671,7 +1699,7 @@ nm_get_interface_ipaddr(
 
     if (count == 0)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
 
@@ -1758,9 +1786,9 @@ nm_get_ip_default_gateway(
     char *pszMsgBuf, szIfName[IFNAMSIZ] = {0}, szMsgBuf[BUFSIZE] = {0};
     char *pszGateway = NULL, szGateway[INET6_ADDRSTRLEN] = {0};
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) || !ppszGateway)
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !ppszGateway)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -1885,7 +1913,7 @@ nm_set_sysctl_persistent_value(
 
     if (IS_NULL_OR_EMPTY(pszSysctlKey) || IS_NULL_OR_EMPTY(pszValue))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -1949,7 +1977,7 @@ nm_set_sysctl_procfs_value(
 
     if (IS_NULL_OR_EMPTY(pszProcfsPath) || IS_NULL_OR_EMPTY(pszValue))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -1990,7 +2018,7 @@ nm_get_sysctl_procfs_value(
 
     if (IS_NULL_OR_EMPTY(pszProcfsPath) || !ppszValue)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -2049,9 +2077,9 @@ nm_set_ip_dhcp_mode(
     char szAutov6Value[] = "0";
     char szDhcpValue[MAX_LINE] = "no";
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_INTERFACE;
         bail_on_error(err);
     }
 
@@ -2073,7 +2101,8 @@ nm_set_ip_dhcp_mode(
     err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
-    if (TEST_FLAG(dhcpModeFlags, fDHCP_IPV4) && TEST_FLAG(dhcpModeFlags, fDHCP_IPV6))
+    if (TEST_FLAG(dhcpModeFlags, fDHCP_IPV4) &&
+        TEST_FLAG(dhcpModeFlags, fDHCP_IPV6))
     {
         strcpy(szDhcpValue, "yes");
     }
@@ -2117,9 +2146,9 @@ nm_get_ip_dhcp_mode(
     char *pszProcfsAutov6Path = NULL;
     char *pszAutov6Value = NULL;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) || !pDhcpModeFlags)
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !pDhcpModeFlags)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -2128,7 +2157,7 @@ nm_get_ip_dhcp_mode(
 
     err = nm_get_key_value(pszCfgFileName, SECTION_NETWORK, KEY_DHCP,
                            &pszDhcpValue);
-    if ((err == ENOENT) || !strcmp(pszDhcpValue, "no"))
+    if ((err == NM_ERR_VALUE_NOT_FOUND) || !strcmp(pszDhcpValue, "no"))
     {
         mode = 0;
         err = 0;
@@ -2147,7 +2176,7 @@ nm_get_ip_dhcp_mode(
     }
     else
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
     }
     bail_on_error(err);
 
@@ -2231,10 +2260,10 @@ nm_set_static_ip_gateway(
     uint32_t err = 0, addrType;
     char *pszCfgFileName = NULL;;
 
-    /* TODO: Handle eth0:0 virtual interfaces */
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) || IS_NULL_OR_EMPTY(pszIpGwAddr))
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
+        IS_NULL_OR_EMPTY(pszIpGwAddr))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -2248,7 +2277,7 @@ nm_set_static_ip_gateway(
     }
     else
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_ADDRESS;
         bail_on_error(err);
     }
 
@@ -2279,10 +2308,9 @@ nm_delete_static_ip_gateway(
     size_t i, count = 0;
     char *pszCfgFileName = NULL, **ppszGwAddrList = NULL;
 
-    /* TODO: Handle eth0:0 virtual interfaces */
-    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_INTERFACE;
         bail_on_error(err);
     }
 
@@ -2323,9 +2351,10 @@ nm_get_static_ip_gateway(
     PSECTION_INI *ppSections = NULL, pSection = NULL;
     PKEYVALUE_INI pKeyValue = NULL, pNextKeyValue = NULL;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) || !pCount || !pppszGwAddrList)
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !pCount ||
+        !pppszGwAddrList)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -2341,12 +2370,12 @@ nm_get_static_ip_gateway(
 
     if (dwNumSections > 1)
     {
-        err = EINVAL;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
     else if (dwNumSections == 0)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
     pSection = ppSections[0];
@@ -2442,16 +2471,16 @@ nm_set_static_ipv4_addr(
     uint32_t err = 0;
     char *pszCfgFileName = NULL, szIpAddr[MAX_LINE];
 
-    /* TODO: Handle eth0:0 virtual interfaces */
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) || IS_NULL_OR_EMPTY(pszIPv4Addr))
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
+        IS_NULL_OR_EMPTY(pszIPv4Addr))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
     if (!is_ipv4_addr(pszIPv4Addr) || (prefix > 32))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_ADDRESS;
         bail_on_error(err);
     }
 
@@ -2461,7 +2490,7 @@ nm_set_static_ipv4_addr(
     sprintf(szIpAddr, "%s/%hhu", pszIPv4Addr, prefix);
 
     err = nm_delete_static_ipv4_addr(pszInterfaceName);
-    if (err == ENOENT)
+    if (err == NM_ERR_VALUE_NOT_FOUND)
     {
         err = 0;
     }
@@ -2487,10 +2516,9 @@ nm_delete_static_ipv4_addr(
     size_t count = 0;
     char *pszCfgFileName = NULL, **ppszIpAddrList = NULL;
 
-    /* TODO: Handle eth0:0 virtual interfaces */
-    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_INTERFACE;
         bail_on_error(err);
     }
 
@@ -2502,7 +2530,7 @@ nm_delete_static_ipv4_addr(
     bail_on_error(err);
     if (count > 1)
     {
-        err = EINVAL;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
 
@@ -2538,9 +2566,10 @@ nm_set_ipv4_addr_gateway(
     err = nm_acquire_write_lock(0, &lockId);
     bail_on_error(err);
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) || (mode >= IPV4_ADDR_MODE_MAX))
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
+        (mode >= IPV4_ADDR_MODE_MAX))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -2549,7 +2578,7 @@ nm_set_ipv4_addr_gateway(
         ((n = sscanf(pszIPv4AddrPrefix, "%[^/]/%hhu", szIpAddr, &prefix)) < 1)
         || !is_ipv4_addr(szIpAddr) || (prefix > 32)))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_ADDRESS;
         bail_on_error(err);
     }
 
@@ -2559,14 +2588,14 @@ nm_set_ipv4_addr_gateway(
     prefix = ((mode == IPV4_ADDR_MODE_STATIC) && (n == 1)) ? 32 : prefix;
 
     err = nm_delete_static_ipv4_addr(pszInterfaceName);
-    if (err == ENOENT)
+    if (err == NM_ERR_VALUE_NOT_FOUND)
     {
         err = 0;
     }
     bail_on_error(err);
 
     err = nm_delete_static_ip_gateway(pszInterfaceName, STATIC_IPV4);
-    if (err == ENOENT)
+    if (err == NM_ERR_VALUE_NOT_FOUND)
     {
         err = 0;
     }
@@ -2623,10 +2652,10 @@ nm_get_ipv4_addr_gateway(
     char **ppszIpAddrList = NULL, **ppszGwAddrList = NULL;
     size_t ipCount, gwCount;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) || !pMode || !ppszIPv4AddrPrefix ||
-        !ppszIPv4Gateway)
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !pMode ||
+        !ppszIPv4AddrPrefix || !ppszIPv4Gateway)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -2639,7 +2668,7 @@ nm_get_ipv4_addr_gateway(
 
         err = nm_get_interface_ipaddr(pszInterfaceName, DHCP_IPV4, &ipCount,
                                       &ppszIpAddrList);
-        if (err == ENOENT)
+        if (err == NM_ERR_VALUE_NOT_FOUND)
         {
             err = 0;
         }
@@ -2648,7 +2677,7 @@ nm_get_ipv4_addr_gateway(
         //TODO: Get DHCP IPv4 gateway from routes
         err = nm_get_ip_default_gateway(pszInterfaceName, DHCP_IPV4,
                                         &pszIPv4Gateway);
-        if (err == ENOENT)
+        if (err == NM_ERR_VALUE_NOT_FOUND)
         {
             err = 0;
         }
@@ -2659,7 +2688,7 @@ nm_get_ipv4_addr_gateway(
         /* Get IP addresss from interface via API. If that fails, read file */
         err = nm_get_interface_ipaddr(pszInterfaceName, STATIC_IPV4, &ipCount,
                                       &ppszIpAddrList);
-        if (err == ENOENT)
+        if (err == NM_ERR_VALUE_NOT_FOUND)
         {
             err = 0;
         }
@@ -2669,7 +2698,7 @@ nm_get_ipv4_addr_gateway(
         {
             err = nm_get_static_ip_addr(pszInterfaceName, STATIC_IPV4,
                                         &ipCount, &ppszIpAddrList);
-            if (err == ENOENT)
+            if (err == NM_ERR_VALUE_NOT_FOUND)
             {
                 err = 0;
             }
@@ -2682,7 +2711,7 @@ nm_get_ipv4_addr_gateway(
 
             err = nm_get_ip_default_gateway(pszInterfaceName, STATIC_IPV4,
                                             &pszIPv4Gateway);
-            if (err == ENOENT)
+            if (err == NM_ERR_VALUE_NOT_FOUND)
             {
                 err = 0;
             }
@@ -2749,9 +2778,9 @@ nm_set_ipv6_enable(
     char *pszProcfsDisablev6Path = NULL;
     char szDisablev6Value[] = "0";
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_INTERFACE;
         bail_on_error(err);
     }
 
@@ -2794,9 +2823,9 @@ nm_get_ipv6_enable(
     char *pszDisableIpv6 = NULL;
     char *pszProcfsDisablev6Path = NULL;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) || !pEnabled)
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !pEnabled)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -2842,12 +2871,12 @@ nm_add_static_ipv6_addr(
     err = nm_acquire_write_lock(0, &lockId);
     bail_on_error(err);
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
         IS_NULL_OR_EMPTY(pszIPv6AddrPrefix) ||
         ((n = sscanf(pszIPv6AddrPrefix, "%[^/]/%hhu", szIpAddr, &prefix)) < 1)
         || !is_ipv6_addr(szIpAddr) || (prefix > 128))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -2893,12 +2922,12 @@ nm_delete_static_ipv6_addr(
     err = nm_acquire_write_lock(0, &lockId);
     bail_on_error(err);
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
         IS_NULL_OR_EMPTY(pszIPv6AddrPrefix) ||
         ((n = sscanf(pszIPv6AddrPrefix, "%[^/]/%hhu", szIpAddr, &prefix)) < 1)
         || !is_ipv6_addr(szIpAddr) || (prefix > 128))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -2916,7 +2945,7 @@ nm_delete_static_ipv6_addr(
     if (!autov6 && !dhcpv6)
     {
         err = nm_get_static_ip_addr(pszInterfaceName, STATIC_IPV6, &c, &ppszIp);
-        if (err == ENOENT)
+        if (err == NM_ERR_VALUE_NOT_FOUND)
         {
             err = 0;
         }
@@ -2992,7 +3021,7 @@ nm_set_ipv6_addr_mode(
     if (!enableDhcp && !enableAutoconf)
     {
         err = nm_get_static_ip_addr(pszInterfaceName, STATIC_IPV6, &c, &ppszIp);
-        if (err == ENOENT)
+        if (err == NM_ERR_VALUE_NOT_FOUND)
         {
             err = 0;
         }
@@ -3071,10 +3100,11 @@ nm_get_ip_addr_type(
     char ipAddr[INET6_ADDRSTRLEN], *p, **ppszIpAddrList = NULL;
     NET_ADDR_TYPE addrType = 0;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) || IS_NULL_OR_EMPTY(pszIpAddr) ||
-        !pAddrType || (sscanf(pszIpAddr, "%[^/]/%u", ipAddr, &prefix) < 1))
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
+        IS_NULL_OR_EMPTY(pszIpAddr) || !pAddrType ||
+        (sscanf(pszIpAddr, "%[^/]/%u", ipAddr, &prefix) < 1))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -3082,7 +3112,7 @@ nm_get_ip_addr_type(
     {
         err = nm_get_static_ip_addr(pszInterfaceName, STATIC_IPV4, &count,
                                     &ppszIpAddrList);
-        if (err == ENOENT)
+        if (err == NM_ERR_VALUE_NOT_FOUND)
         {
             err = 0;
         }
@@ -3112,7 +3142,7 @@ nm_get_ip_addr_type(
         {
             err = nm_get_static_ip_addr(pszInterfaceName, STATIC_IPV6, &count,
                                         &ppszIpAddrList);
-            if (err == ENOENT)
+            if (err == NM_ERR_VALUE_NOT_FOUND)
             {
                 err = 0;
             }
@@ -3136,7 +3166,7 @@ nm_get_ip_addr_type(
 
     if (addrType == 0)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_ADDRESS;
         bail_on_error(err);
     }
 
@@ -3169,11 +3199,10 @@ nm_get_ip_addr(
     NET_IP_ADDR **ppIpAddrList = NULL;
 
     //TODO: If pszInterfaceName is NULL, enumerate all IPs
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
-        (strlen(pszInterfaceName) >= IFNAMSIZ) ||
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
         !pCount || !pppIpAddrList || !addrTypes)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -3184,7 +3213,7 @@ nm_get_ip_addr(
     {
         err = nm_get_interface_ipaddr(pszInterfaceName, DHCP_IPV4, &ip4Count,
                                       &ppszIp4AddrList);
-        if (err == ENOENT)
+        if (err == NM_ERR_VALUE_NOT_FOUND)
         {
             err = 0;
         }
@@ -3194,7 +3223,7 @@ nm_get_ip_addr(
     {
         err = nm_get_static_ip_addr(pszInterfaceName, STATIC_IPV4, &ip4Count,
                                     &ppszIp4AddrList);
-        if (err == ENOENT)
+        if (err == NM_ERR_VALUE_NOT_FOUND)
         {
             err = 0;
         }
@@ -3208,13 +3237,13 @@ nm_get_ip_addr(
                                       DHCP_IPV6 | AUTO_IPV6 | STATIC_IPV6,
                                       &ip6Count,
                                       &ppszIp6AddrList);
-        if (err == ENOENT)
+        if (err == NM_ERR_VALUE_NOT_FOUND)
         {
             err = nm_get_static_ip_addr(pszInterfaceName,
                                         STATIC_IPV6,
                                         &ip6Count,
                                         &ppszIp6AddrList);
-            if (err == ENOENT)
+            if (err == NM_ERR_VALUE_NOT_FOUND)
             {
                 err = 0;
             }
@@ -3226,7 +3255,7 @@ nm_get_ip_addr(
 
     if (nCount == 0)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
 
@@ -3308,10 +3337,11 @@ nm_set_ipv6_gateway(
     err = nm_acquire_write_lock(0, &lockId);
     bail_on_error(err);
 
-    if (!pszInterfaceName || (!IS_NULL_OR_EMPTY(pszIPv6Gateway) &&
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
+        (!IS_NULL_OR_EMPTY(pszIPv6Gateway) &&
         !is_ipv6_addr(pszIPv6Gateway)))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -3323,7 +3353,7 @@ nm_set_ipv6_gateway(
     else
     {
         err = nm_delete_static_ip_gateway(pszInterfaceName, STATIC_IPV6);
-        if (err == ENOENT)
+        if (err == NM_ERR_VALUE_NOT_FOUND)
         {
             err = 0;
         }
@@ -3348,15 +3378,15 @@ nm_get_ipv6_gateway(
     char *pszIPv6Gateway = NULL, **ppszGwAddrList = NULL;
     size_t count = 0;
 
-    if (!pszInterfaceName || !ppszIPv6Gateway)
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !ppszIPv6Gateway)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
     err = nm_get_ip_default_gateway(pszInterfaceName, DHCP_IPV6,
                                     &pszIPv6Gateway);
-    if (err == ENOENT)
+    if (err == NM_ERR_VALUE_NOT_FOUND)
     {
         err = 0;
     }
@@ -3405,11 +3435,11 @@ nm_add_route_section(
     PSECTION_INI *ppSections = NULL, pSection = NULL;
     PKEYVALUE_INI pDestKeyVal = NULL;
 
-    if (!pRoute || IS_NULL_OR_EMPTY(pRoute->pszInterfaceName) ||
+    if (!pRoute || !IS_VALID_INTERFACE_NAME(pRoute->pszInterfaceName) ||
         IS_NULL_OR_EMPTY(pRoute->pszDestNetwork) ||
         IS_NULL_OR_EMPTY(pRoute->pszGateway))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -3430,7 +3460,7 @@ nm_add_route_section(
                                              pRoute->pszDestNetwork);
         if (pDestKeyVal != NULL)
         {
-            err = EEXIST;
+            err = NM_ERR_VALUE_EXISTS;
             bail_on_error(err);
         }
     }
@@ -3467,7 +3497,7 @@ nm_add_route_section(
                 strcpy(buf, "host");
                 break;
             default:
-                err = EINVAL;
+                err = NM_ERR_INVALID_PARAMETER;
                 bail_on_error(err);
         }
         sprintf(buf, "%u", pRoute->metric);
@@ -3505,10 +3535,10 @@ nm_delete_route_section(
     PSECTION_INI *ppSections = NULL;
     PKEYVALUE_INI pDestKeyVal = NULL;
 
-    if (!pRoute || IS_NULL_OR_EMPTY(pRoute->pszInterfaceName) ||
+    if (!pRoute || !IS_VALID_INTERFACE_NAME(pRoute->pszInterfaceName) ||
         IS_NULL_OR_EMPTY(pRoute->pszDestNetwork))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -3535,7 +3565,7 @@ nm_delete_route_section(
 
     if (pDestKeyVal == NULL)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
 
@@ -3575,9 +3605,9 @@ nm_get_routes(
     PKEYVALUE_INI pKeyVal = NULL;
     NET_IP_ROUTE **ppRoutes = NULL;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) || !pCount || !pppRoutes)
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !pCount || !pppRoutes)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -3591,7 +3621,7 @@ nm_get_routes(
                                 &dwNumSections);
     if (dwNumSections == 0)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
     }
     bail_on_error(err);
 
@@ -3665,12 +3695,12 @@ nm_add_static_ip_route(
     err = nm_acquire_write_lock(0, &lockId);
     bail_on_error(err);
 
-    if (IS_NULL_OR_EMPTY(pRoute->pszInterfaceName) ||
+    if (!IS_VALID_INTERFACE_NAME(pRoute->pszInterfaceName) ||
         IS_NULL_OR_EMPTY(pRoute->pszDestNetwork) ||
         IS_NULL_OR_EMPTY(pRoute->pszGateway) ||
         (sscanf(pRoute->pszDestNetwork, "%[^/]/%hhu", szDestAddr, &prefix) < 1))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -3679,7 +3709,7 @@ nm_add_static_ip_route(
         prefix = (prefix == 255) ? 32 : prefix;
         if ((prefix > 32) || !is_ipv4_addr(pRoute->pszGateway))
         {
-            err = EINVAL;
+            err = NM_ERR_INVALID_ADDRESS;
             bail_on_error(err);
         }
     }
@@ -3688,13 +3718,13 @@ nm_add_static_ip_route(
         prefix = (prefix == 255) ? 128 : prefix;
         if ((prefix > 128) || !is_ipv6_addr(pRoute->pszGateway))
         {
-            err = EINVAL;
+            err = NM_ERR_INVALID_ADDRESS;
             bail_on_error(err);
         }
     }
     else
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_ADDRESS;
         bail_on_error(err);
     }
 
@@ -3729,11 +3759,11 @@ nm_delete_static_ip_route(
     err = nm_acquire_write_lock(0, &lockId);
     bail_on_error(err);
 
-    if (IS_NULL_OR_EMPTY(pRoute->pszInterfaceName) ||
+    if (!IS_VALID_INTERFACE_NAME(pRoute->pszInterfaceName) ||
         IS_NULL_OR_EMPTY(pRoute->pszDestNetwork) ||
         (sscanf(pRoute->pszDestNetwork, "%[^/]/%hhu", szDestAddr, &prefix) < 1))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -3747,7 +3777,7 @@ nm_delete_static_ip_route(
     }
     else
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_ADDRESS;
         bail_on_error(err);
     }
 
@@ -3777,9 +3807,9 @@ nm_get_static_ip_routes(
 {
     uint32_t err = 0;
 
-    if (!pszInterfaceName)
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_INTERFACE;
         bail_on_error(err);
     }
 
@@ -3813,7 +3843,7 @@ nm_space_delimited_string_append(
 
     if (ppszNewString == NULL)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -3821,7 +3851,7 @@ nm_space_delimited_string_append(
     {
         if (ppszStrings == NULL)
         {
-            err = EINVAL;
+            err = NM_ERR_INVALID_PARAMETER;
             bail_on_error(err);
         }
         for (i = 0; i < count; i++)
@@ -3884,7 +3914,7 @@ nm_space_delimited_string_to_list(
 
     if (!pCount || !pppszStringList)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -3952,7 +3982,7 @@ nm_get_dns_mode(
 
     if (pMode == NULL)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -3961,7 +3991,7 @@ nm_get_dns_mode(
 
     err = nm_get_key_value(pszCfgFileName, SECTION_DHCP, KEY_USE_DNS,
                            &pszUseDnsValue);
-    if ((err == ENOENT) || !strcmp(pszUseDnsValue, "true"))
+    if ((err == NM_ERR_VALUE_NOT_FOUND) || !strcmp(pszUseDnsValue, "true"))
     {
         mode = DHCP_DNS;
         err = 0;
@@ -3972,7 +4002,7 @@ nm_get_dns_mode(
     }
     else
     {
-        err = EINVAL;
+        err = NM_ERR_BAD_CONFIG_FILE;
     }
     bail_on_error(err);
 
@@ -4013,7 +4043,7 @@ nm_add_dns_server(
     if (IS_NULL_OR_EMPTY(pszDnsServer) || !(is_ipv4_addr(pszDnsServer) ||
         is_ipv6_addr(pszDnsServer)))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -4023,7 +4053,7 @@ nm_add_dns_server(
 
     if (mode == DHCP_DNS)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_MODE;
         bail_on_error(err);
     }
 
@@ -4041,7 +4071,7 @@ nm_add_dns_server(
 
     err = nm_get_key_value(pszCfgFileName, szSectionName, KEY_DNS,
                            &pszCurrentDnsServers);
-    if (err != ENOENT)
+    if (err != NM_ERR_VALUE_NOT_FOUND)
     {
         bail_on_error(err);
     }
@@ -4090,7 +4120,7 @@ nm_delete_dns_server(
     if (IS_NULL_OR_EMPTY(pszDnsServer) || !(is_ipv4_addr(pszDnsServer) ||
         is_ipv6_addr(pszDnsServer)))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -4099,7 +4129,7 @@ nm_delete_dns_server(
     bail_on_error(err);
     if (mode == DHCP_DNS)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_MODE;
         bail_on_error(err);
     }
 
@@ -4122,7 +4152,7 @@ nm_delete_dns_server(
     pszMatch = strstr(pszCurrentDnsServers, pszDnsServer);
     if (pszMatch == NULL)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
 
@@ -4195,7 +4225,7 @@ nm_set_dns_servers(
                                            &pszDnsServersValue);
     bail_on_error(err);
 
-    err = EINVAL;
+    err = NM_ERR_INVALID_MODE;
     if (mode == DHCP_DNS)
     {
         sprintf(szUseDnsValue, "true");
@@ -4278,7 +4308,7 @@ nm_get_dns_servers(
 
     if ((pMode == NULL) || (pCount == NULL) || (pppszDnsServers == NULL))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -4335,7 +4365,7 @@ nm_get_dns_servers(
 
         err = nm_get_key_value(pszCfgFileName, szSectionName, KEY_DNS,
                                &pszDnsServersValue);
-        if (err == ENOENT)
+        if (err == NM_ERR_VALUE_NOT_FOUND)
         {
             err = 0;
             goto error;
@@ -4388,7 +4418,7 @@ nm_add_dns_domain(
 
     if (pszDnsDomain == NULL)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -4406,7 +4436,7 @@ nm_add_dns_domain(
 
     err = nm_get_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
                            &pszCurrentDnsDomains);
-    if (err != ENOENT)
+    if (err != NM_ERR_VALUE_NOT_FOUND)
     {
         bail_on_error(err);
     }
@@ -4456,7 +4486,7 @@ nm_delete_dns_domain(
 
     if (pszDnsDomain == NULL)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -4477,14 +4507,14 @@ nm_delete_dns_domain(
     bail_on_error(err);
 
     pszMatch = strstr(pszCurrentDnsDomains, pszDnsDomain);
-    if(pszMatch == NULL)
+    if (pszMatch == NULL)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
 
     pszNext = pszMatch + strlen(pszDnsDomain);
-    if(*pszNext == ' ')
+    if (*pszNext == ' ')
     {
         memmove(pszMatch, (pszNext + 1), strlen(pszNext));
     }
@@ -4588,7 +4618,7 @@ nm_get_dns_domains(
 
     if ((pCount == NULL) || (pppszDnsDomains == NULL))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -4600,13 +4630,13 @@ nm_get_dns_domains(
         pszDnsDomainsValue = strstr(pszFileBuf, STR_SEARCH);
         if (pszDnsDomainsValue == NULL)
         {
-            err = ENOENT;
+            err = NM_ERR_VALUE_NOT_FOUND;
             bail_on_error(err);
         }
         pszDnsDomainsValue = strstr(pszDnsDomainsValue, " ");
         if (pszDnsDomainsValue == NULL)
         {
-            err = ENOENT;
+            err = NM_ERR_VALUE_NOT_FOUND;
             bail_on_error(err);
         }
         pszDnsDomainsValue++;
@@ -4639,7 +4669,7 @@ nm_get_dns_domains(
 
         err = nm_get_key_value(pszCfgFileName, szSectionName, KEY_DOMAINS,
                                &pszDnsDomainsValue);
-        if (err == ENOENT)
+        if (err == NM_ERR_VALUE_NOT_FOUND)
         {
             err = 0;
             goto error;
@@ -4690,9 +4720,9 @@ nm_set_iaid(
     err = nm_acquire_write_lock(0, &lockId);
     bail_on_error(err);
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_INTERFACE;
         bail_on_error(err);
     }
 
@@ -4731,9 +4761,9 @@ nm_get_iaid(
     char *pszCfgFileName = NULL;
     char *pszIaid = NULL;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) || !pIaid)
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !pIaid)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -4802,7 +4832,7 @@ nm_set_duid(
     if (pszInterfaceName != NULL)
     {
         /* TODO: Add support */
-        err = ENOTSUP;
+        err = NM_ERR_NOT_SUPPORTED;
     }
     else
     {
@@ -4824,14 +4854,14 @@ nm_set_duid(
     {
         if (sscanf(pszDuid, "%hx:%hx:%s", &n1, &n2, szDuid) != 3)
         {
-            err = EINVAL;
+            err = NM_ERR_INVALID_PARAMETER;
             bail_on_error(err);
         }
 
         duidType = nm_duid_strtype_from_type((n1 << 8) | n2);
         if (duidType == NULL)
         {
-            err = EINVAL;
+            err = NM_ERR_INVALID_PARAMETER;
             bail_on_error(err);
         }
         /* TODO: Validate DUID length and DUID bytes */
@@ -4868,14 +4898,14 @@ nm_get_duid(
 
     if (ppszDuid == NULL)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
     if (pszInterfaceName != NULL)
     {
         /* TODO: Add support */
-        err = ENOTSUP;
+        err = NM_ERR_NOT_SUPPORTED;
     }
     else
     {
@@ -4890,7 +4920,7 @@ nm_get_duid(
     duidType = nm_duid_type_from_strtype(pszDuidType);
     if (duidType == 0)
     {
-        err = EINVAL;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
 
@@ -5053,7 +5083,7 @@ nm_get_ntp_servers(
 
     if ((pCount == NULL) || (pppszNtpServers == NULL))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -5123,13 +5153,13 @@ nm_add_firewall_rule(
 
     if ((pNetFwRule == NULL) || (pNetFwRule->type >= FW_RULE_TYPE_MAX))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
     if (pNetFwRule->type != FW_RAW)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -5142,7 +5172,7 @@ nm_add_firewall_rule(
 
     if (strstr(pszFileBuf, pszFwRule) != NULL)
     {
-        err = EEXIST;
+        err = NM_ERR_VALUE_EXISTS;
         bail_on_error(err);
     }
 
@@ -5192,13 +5222,13 @@ nm_delete_firewall_rule(
 
     if ((pNetFwRule == NULL) || (pNetFwRule->type >= FW_RULE_TYPE_MAX))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
     if (pNetFwRule->type != FW_RAW)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -5212,7 +5242,7 @@ nm_delete_firewall_rule(
     if (strcmp(pszFwRule, "iptables *") &&
         (strstr(pszFileBuf, pszFwRule) == NULL))
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
 
@@ -5284,7 +5314,7 @@ nm_get_firewall_rules(
 
     if (!pCount || !pppNetFwRules)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -5368,7 +5398,7 @@ nm_set_hostname(
 
     if (IS_NULL_OR_EMPTY(pszHostname))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -5397,7 +5427,7 @@ nm_get_hostname(
 
     if (!ppszHostname)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -5439,9 +5469,9 @@ nm_wait_for_link_up(
     PNET_NETLINK_MESSAGE pCurNetLinkMsgList = NULL;
     NET_LINK_STATE linkState = LINK_STATE_UNKNOWN;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_INTERFACE;
         bail_on_error(err);
     }
 
@@ -5480,7 +5510,7 @@ nm_wait_for_link_up(
         }
         else
         {
-            err = ETIME;
+            err = NM_ERR_TIME_OUT;
         }
         bail_on_error(err);
 
@@ -5536,12 +5566,12 @@ nm_validate_netlink_ipaddr(
     char *pszIpAddrPrefix = NULL;
     struct rtattr *pRouteAttr = NULL;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) || !pIfAddrMsg ||!ifAddrMsgLen ||
-        !addrType)
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !pIfAddrMsg ||
+        !ifAddrMsgLen || !addrType)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
+        bail_on_error(err);
     }
-    bail_on_error(err);
 
     pRouteAttr = IFA_RTA(pIfAddrMsg);
     for (;RTA_OK(pRouteAttr, ifAddrMsgLen);
@@ -5582,7 +5612,7 @@ nm_validate_netlink_ipaddr(
 
     if (!ipAddrValid)
     {
-        err = ENOMSG;
+        err = NM_ERR_ADDRESS_NOT_FOUND;
     }
 
 cleanup:
@@ -5612,9 +5642,9 @@ nm_wait_for_ip(
     PNET_NETLINK_MESSAGE pNetLinkMsgList = NULL;
     PNET_NETLINK_MESSAGE pCurNetLinkMsgList = NULL;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName))
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_INTERFACE;
         bail_on_error(err);
     }
 
@@ -5628,7 +5658,7 @@ nm_wait_for_ip(
                                   addrTypes,
                                   &ipCount,
                                   &ppszIpAddrList);
-    if (err == ENOENT)
+    if (err == NM_ERR_VALUE_NOT_FOUND)
     {
         err = 0;
     }
@@ -5685,7 +5715,7 @@ nm_wait_for_ip(
         }
         else
         {
-            err = ETIME;
+            err = NM_ERR_TIME_OUT;
         }
         bail_on_error(err);
 
@@ -5719,7 +5749,7 @@ nm_wait_for_ip(
                 ipAddrValid = 1;
                 break;
             }
-            if (err == ENOMSG)
+            if (err == NM_ERR_ADDRESS_NOT_FOUND)
             {
                 err = 0;
             }
@@ -5760,9 +5790,10 @@ nm_set_network_param(
     char *pszParam = NULL, *pszParamPtr = NULL;
     char *pszSectionName = NULL, *pszKeyName = NULL;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) || IS_NULL_OR_EMPTY(pszParamName))
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
+        IS_NULL_OR_EMPTY(pszParamName))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -5775,7 +5806,7 @@ nm_set_network_param(
     pszSectionName = strsep(&pszParam, SECTION_KEY_DELIM);
     if (pszSectionName == NULL)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
     pszKeyName = pszParam;
@@ -5804,10 +5835,10 @@ nm_get_network_param(
     char *pszParam = NULL, *pszParamPtr = NULL;
     char *pszSectionName = NULL, *pszKeyName = NULL, *pszParamValue = NULL;
 
-    if (IS_NULL_OR_EMPTY(pszInterfaceName) || IS_NULL_OR_EMPTY(pszParamName) ||
-        !ppszParamValue)
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
+        IS_NULL_OR_EMPTY(pszParamName) || !ppszParamValue)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -5820,7 +5851,7 @@ nm_get_network_param(
     pszSectionName = strsep(&pszParam, SECTION_KEY_DELIM);
     if (pszSectionName == NULL)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
     pszKeyName = pszParam;
