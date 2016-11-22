@@ -1171,6 +1171,7 @@ error:
 static uint32_t
 cmd_err_info(PNETMGR_CMD pCmd)
 {
+    int lErrCode = 0;
     uint32_t err = 0, errCode = 0;
     char *pszErrCode = NULL, *pszEnd = NULL;
     const char *pszErrInfo = NULL;
@@ -1178,12 +1179,13 @@ cmd_err_info(PNETMGR_CMD pCmd)
     err = netmgrcli_find_cmdopt(pCmd, "errcode", &pszErrCode);
     bail_on_error(err);
 
-    if ((errCode = (uint32_t)strtol(pszErrCode, &pszEnd, 10)) < 0)
+    if ((lErrCode = strtol(pszErrCode, &pszEnd, 10)) < 0)
     {
         err = EINVAL;
         bail_on_error(err);
     }
 
+    errCode = (uint32_t)lErrCode;
     if (errCode > NM_CLI_BASE_ERROR)
     {
         errCode -= NM_CLI_BASE_ERROR;
