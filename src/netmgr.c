@@ -390,6 +390,12 @@ nm_get_network_conf_filename(
         }
     }
 
+    if (!pszCfgFileName)
+    {
+        err = NM_ERR_VALUE_NOT_FOUND;
+        bail_on_error(err);
+    }
+
     *ppszFilename = pszCfgFileName;
 
 cleanup:
