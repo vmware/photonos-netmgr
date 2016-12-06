@@ -5,7 +5,7 @@
 
 check_PROGRAMS = testnetmgr testutils
 
-testnetmgr_SOURCES = testnetmgr.c
+testnetmgr_SOURCES = testnetmgr.c test_helper.c
 testnetmgr_CFLAGS = \
 	@CHECK_CFLAGS@ \
 	-I$(top_srcdir)/include \

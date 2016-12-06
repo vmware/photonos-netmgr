@@ -15,12 +15,15 @@ ADD ./build/ $NMROOT/build/
 
 # Install systemd, netmgr, and other supporting rpms..
 RUN tdnf install -y systemd
-RUN tdnf install -y sed gawk diffutils iproute2
+RUN tdnf install -y sed gawk diffutils iproute2 iputils net-tools dbus ntp iptables
 RUN tdnf install -y gcc binutils glibc-devel pcre-devel glib-devel check
 RUN rpm -Uvh --force /netmgr/rpms/*.rpm
 
+# Create SystemCtl Config File
+RUN echo "net.ipv4.tcp_syncookies=1\nnet.ipv4.ip_dynaddr=2 " > /etc/sysctl.d/99-sysctl.conf
+
 # Debug
-#RUN tdnf install -y gdb make rpm-build libtool automake autoconf cpio
+#RUN tdnf install -y gdb make rpm-build libtool automake autoconf cpio strace
 #ADD ./nm.tar /root/
 
 RUN cd /lib/systemd/system/sysinit.target.wants/; \
@@ -41,7 +44,7 @@ RUN sed -i s/#DNS=/DNS=10.10.10.250/ /etc/systemd/resolved.conf
 RUN mkdir -p /tools/netmgr
 RUN ln -s /usr/bin/netmgr /tools/netmgr/netmgr
 
-RUN sed -i "s/^ExecStart=/ExecStartPre=\/usr\/sbin\/ip addr flush dev eth0\nExecStartPre=\/usr\/bin\/sleep 1\nExecStart=/" /usr/lib/systemd/system/systemd-networkd.service
+RUN sed -i "s/^ExecStart=/ExecStartPre=\/usr\/sbin\/ip addr flush dev eth0\nExecStartPre=\/usr\/bin\/sleep 2\nExecStart=/" /usr/lib/systemd/system/systemd-networkd.service
 RUN systemctl set-default multi-user.target
 
 ENV init /lib/systemd/systemd

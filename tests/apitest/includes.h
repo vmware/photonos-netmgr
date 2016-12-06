@@ -14,6 +14,7 @@
 
 #include <config.h>
 #include <errno.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,5 +26,7 @@
 #include "../common/common_utils.h"
 #include "../common/nm_memory.h"
 #include "../src/utils.h"
+#include "../src/defines.h"
 #include "defines.h"
+#include "test_helper.h"
 
