@@ -1911,6 +1911,7 @@ nm_set_sysctl_persistent_value(
     size_t len, i, lineCount = 0;
     char *pszFileBuf = NULL, *pszNewFileBuf = NULL;
     char *pszKeyValue = NULL, **ppszLineBuf = NULL;
+    FILE *fp;
 
     if (IS_NULL_OR_EMPTY(pszSysctlKey) || IS_NULL_OR_EMPTY(pszValue))
     {
@@ -1919,10 +1920,26 @@ nm_set_sysctl_persistent_value(
     }
 
     err = nm_read_conf_file(SYSCTL_CONF_FILENAME, &pszFileBuf);
+    if (err == ENOENT)
+    {
+        err = 0;
+        if ((fp = fopen(SYSCTL_CONF_FILENAME, "a+")) != NULL)
+        {
+            fclose(fp);
+        }
+        else
+        {
+            err = errno;
+            bail_on_error(err);
+        }
+    }
     bail_on_error(err);
 
-    err = nm_string_to_line_array(pszFileBuf, &lineCount, &ppszLineBuf);
-    bail_on_error(err);
+    if (!IS_NULL_OR_EMPTY(pszFileBuf))
+    {
+        err = nm_string_to_line_array(pszFileBuf, &lineCount, &ppszLineBuf);
+        bail_on_error(err);
+    }
 
     len = strlen(pszSysctlKey) + strlen(pszValue) + 4;
 
