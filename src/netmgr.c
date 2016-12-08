@@ -240,10 +240,13 @@ nm_read_conf_file(
     err = netmgr_alloc((len + 1), (void **)&pszFileBuf);
     bail_on_error(err);
 
-    if (fread(pszFileBuf, len, 1, fp) != len)
+    if (fread(pszFileBuf, len, 1, fp) != 1)
     {
-        err = errno;
-        bail_on_error(err);
+        if (!feof(fp))
+        {
+            err = ferror(fp);
+            bail_on_error(err);
+        }
     }
 
     *ppszFileBuf = pszFileBuf;
