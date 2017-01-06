@@ -161,44 +161,6 @@ nm_get_networkd_conf_filename(
 }
 
 static uint32_t
-nm_get_network_auto_conf_filename(
-    const char *pszIfname,
-    char **ppszFilename)
-{
-    uint32_t err = 0;
-    char fname[IFNAMSIZ+strlen("10-.network")+1];
-
-    if ((pszIfname == NULL) || (strlen(pszIfname) >= IFNAMSIZ) || !ppszFilename)
-    {
-        err = NM_ERR_INVALID_PARAMETER;
-        bail_on_error(err);
-    }
-    sprintf(fname, "10-%s.network", pszIfname);
-    err = nm_alloc_conf_filename(ppszFilename, SYSTEMD_NET_PATH, fname);
-error:
-    return err;
-}
-
-static uint32_t
-nm_get_network_manual_conf_filename(
-    const char *pszIfname,
-    char **ppszFilename)
-{
-    uint32_t err = 0;
-    char fname[IFNAMSIZ+strlen("10-.network.manual")+1];
-
-    if ((pszIfname == NULL) || (strlen(pszIfname) >= IFNAMSIZ) || !ppszFilename)
-    {
-        err = NM_ERR_INVALID_PARAMETER;
-        bail_on_error(err);
-    }
-    sprintf(fname, "10-%s.network.manual", pszIfname);
-    err = nm_alloc_conf_filename(ppszFilename, SYSTEMD_NET_PATH, fname);
-error:
-    return err;
-}
-
-static uint32_t
 nm_read_conf_file(
     const char *pszFilename,
     char **ppszFileBuf)
@@ -322,9 +284,10 @@ error:
 }
 
 static uint32_t
-nm_get_network_conf_filename(
+nm_get_network_conf_filename_match(
     const char *pszIfName,
-    char **ppszFilename)
+    char **ppszFilename,
+    size_t *pMatchLen)
 {
     uint32_t err = 0;
     size_t matchLen, maxMatchLen = 0;
@@ -370,6 +333,7 @@ nm_get_network_conf_filename(
             {
                 netmgr_free(pszCfgFileName);
                 pszCfgFileName = pszFileName;
+                maxMatchLen = strlen(pszMatchName);
                 pszFileName = NULL;
                 break;
             }
@@ -400,6 +364,10 @@ nm_get_network_conf_filename(
     }
 
     *ppszFilename = pszCfgFileName;
+    if (pMatchLen)
+    {
+        *pMatchLen = maxMatchLen;
+    }
 
 cleanup:
     if (dirFile != NULL)
@@ -415,7 +383,155 @@ error:
     {
         *ppszFilename = NULL;
     }
+    if (pMatchLen)
+    {
+        *pMatchLen = 0;
+    }
     netmgr_free(pszCfgFileName);
+    goto cleanup;
+}
+
+static uint32_t
+nm_get_network_conf_filename(
+    const char *pszIfName,
+    char **ppszFilename)
+{
+    return nm_get_network_conf_filename_match(pszIfName, ppszFilename, NULL);
+}
+
+static uint32_t
+nm_get_network_conf_filename_for_update(
+    const char *pszIfName,
+    char **ppszFilename)
+{
+    uint32_t err = 0;
+    size_t ifNameLen, matchLen = 0;
+    char fName[IFNAMSIZ+strlen(SYSTEMD_NET_PATH)+strlen("10-.network")+4+1];
+    char *pszFilename = NULL;
+
+    if (!IS_VALID_INTERFACE_NAME(pszIfName) || !ppszFilename)
+    {
+        err = NM_ERR_INVALID_PARAMETER;
+        bail_on_error(err);
+    }
+
+    err = nm_get_network_conf_filename_match(pszIfName, ppszFilename, &matchLen);
+    if (err == NM_ERR_VALUE_NOT_FOUND)
+    {
+        err = 0;
+    }
+    bail_on_error(err);
+
+    ifNameLen = strlen(pszIfName);
+    if ((*ppszFilename == NULL) || (matchLen < ifNameLen))
+    {
+        netmgr_free(*ppszFilename);
+
+        sprintf(fName, "%s10-%s.network", SYSTEMD_NET_PATH, pszIfName);
+        if (access(fName, F_OK) == 0)
+        {
+            /* Designated conf file for this interface exists with bad match */
+            err = NM_ERR_BAD_CONFIG_FILE;
+            bail_on_error(err);
+        }
+
+        err = netmgr_alloc_string(fName, &pszFilename);
+        bail_on_error(err);
+
+        /* Create a conf file dedicated to the interface name */
+        err = nm_set_key_value(pszFilename,
+                               SECTION_MATCH,
+                               KEY_NAME,
+                               pszIfName,
+                               F_CREATE_CFG_FILE);
+        bail_on_error(err);
+
+        *ppszFilename = pszFilename;
+    }
+
+cleanup:
+    return err;
+
+error:
+    if (ppszFilename)
+    {
+        *ppszFilename = NULL;
+    }
+    netmgr_free(pszFilename);
+    goto cleanup;
+}
+
+static uint32_t
+nm_get_network_auto_conf_filename(
+    const char *pszIfName,
+    char **ppszFilename)
+{
+    uint32_t err = 0;
+    char *pszConfFilename = NULL, *pManual = NULL;
+
+    if (!IS_VALID_INTERFACE_NAME(pszIfName) || !ppszFilename)
+    {
+        err = NM_ERR_INVALID_PARAMETER;
+        bail_on_error(err);
+    }
+
+    err = nm_get_network_conf_filename_for_update(pszIfName, &pszConfFilename);
+    bail_on_error(err);
+
+    if ((pManual = strstr(pszConfFilename, ".manual")) != NULL)
+    {
+        *pManual = '\0';
+    }
+
+    *ppszFilename = pszConfFilename;
+
+cleanup:
+    return err;
+error:
+    if (ppszFilename)
+    {
+        *ppszFilename = NULL;
+    }
+    netmgr_free(pszConfFilename);
+    goto cleanup;
+}
+
+static uint32_t
+nm_get_network_manual_conf_filename(
+    const char *pszIfName,
+    char **ppszFilename)
+{
+    uint32_t err = 0;
+    char *pszConfFilename = NULL, *pManual = NULL;
+
+    if (!IS_VALID_INTERFACE_NAME(pszIfName) || !ppszFilename)
+    {
+        err = NM_ERR_INVALID_PARAMETER;
+        bail_on_error(err);
+    }
+
+    err = nm_get_network_conf_filename_for_update(pszIfName, &pszConfFilename);
+    bail_on_error(err);
+
+    if ((pManual = strstr(pszConfFilename, ".manual")) == NULL)
+    {
+        err = nm_alloc_conf_filename(ppszFilename, pszConfFilename, ".manual");
+        bail_on_error(err);
+        netmgr_free(pszConfFilename);
+    }
+    else
+    {
+        *ppszFilename = pszConfFilename;
+    }
+
+cleanup:
+    return err;
+error:
+    if (ppszFilename)
+    {
+        *ppszFilename = NULL;
+    }
+    netmgr_free(pszConfFilename);
     goto cleanup;
 }
 
@@ -578,7 +694,8 @@ nm_set_link_mac_addr(
         bail_on_error(err);
     }
 
-    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename_for_update(pszInterfaceName,
+                                                  &pszCfgFileName);
     bail_on_error(err);
 
     err = nm_get_link_mac_addr(pszInterfaceName, &pszOldMacAddress);
@@ -688,16 +805,16 @@ nm_set_link_mode(
         bail_on_error(err);
     }
 
+    err = nm_get_network_conf_filename_for_update(pszInterfaceName,
+                                                  &pszCurrentCfgFileName);
+    bail_on_error(err);
+
     err = nm_get_network_auto_conf_filename(pszInterfaceName,
                                             &pszAutoCfgFileName);
     bail_on_error(err);
 
     err = nm_get_network_manual_conf_filename(pszInterfaceName,
                                               &pszManualCfgFileName);
-    bail_on_error(err);
-
-    err = nm_get_network_conf_filename(pszInterfaceName,
-                                       &pszCurrentCfgFileName);
     bail_on_error(err);
 
     switch (mode)
@@ -863,7 +980,8 @@ nm_set_link_mtu(
         bail_on_error(err);
     }
 
-    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename_for_update(pszInterfaceName,
+                                                  &pszCfgFileName);
     bail_on_error(err);
 
     err = nm_get_link_mtu(pszInterfaceName, &oldMtu);
@@ -2125,7 +2243,8 @@ nm_set_ip_dhcp_mode(
                                      pszInterfaceName);
     bail_on_error(err);
 
-    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename_for_update(pszInterfaceName,
+                                                  &pszCfgFileName);
     bail_on_error(err);
 
     if (TEST_FLAG(dhcpModeFlags, fDHCP_IPV4) &&
@@ -2308,7 +2427,8 @@ nm_set_static_ip_gateway(
         bail_on_error(err);
     }
 
-    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename_for_update(pszInterfaceName,
+                                                  &pszCfgFileName);
     bail_on_error(err);
 
     err = nm_delete_static_ip_gateway(pszInterfaceName, addrType);
@@ -2341,7 +2461,8 @@ nm_delete_static_ip_gateway(
         bail_on_error(err);
     }
 
-    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename_for_update(pszInterfaceName,
+                                                  &pszCfgFileName);
     bail_on_error(err);
 
     err = nm_get_static_ip_gateway(pszInterfaceName, addrTypes, &count,
@@ -2511,7 +2632,8 @@ nm_set_static_ipv4_addr(
         bail_on_error(err);
     }
 
-    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename_for_update(pszInterfaceName,
+                                                  &pszCfgFileName);
     bail_on_error(err);
 
     sprintf(szIpAddr, "%s/%hhu", pszIPv4Addr, prefix);
@@ -2549,7 +2671,8 @@ nm_delete_static_ipv4_addr(
         bail_on_error(err);
     }
 
-    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename_for_update(pszInterfaceName,
+                                                  &pszCfgFileName);
     bail_on_error(err);
 
     err = nm_get_static_ip_addr(pszInterfaceName, STATIC_IPV4, &count,
@@ -2907,7 +3030,8 @@ nm_add_static_ipv6_addr(
         bail_on_error(err);
     }
 
-    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename_for_update(pszInterfaceName,
+                                                  &pszCfgFileName);
     bail_on_error(err);
 
     err = nm_add_key_value(pszCfgFileName, SECTION_NETWORK, KEY_ADDRESS,
@@ -2958,7 +3082,8 @@ nm_delete_static_ipv6_addr(
         bail_on_error(err);
     }
 
-    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename_for_update(pszInterfaceName,
+                                                  &pszCfgFileName);
     bail_on_error(err);
 
     err = nm_delete_key_value(pszCfgFileName, SECTION_NETWORK, KEY_ADDRESS,
@@ -3470,8 +3595,8 @@ nm_add_route_section(
         bail_on_error(err);
     }
 
-    err = nm_get_network_conf_filename(pRoute->pszInterfaceName,
-                                       &pszCfgFileName);
+    err = nm_get_network_conf_filename_for_update(pRoute->pszInterfaceName,
+                                                  &pszCfgFileName);
     bail_on_error(err);
 
     err = ini_cfg_read(pszCfgFileName, &pConfig);
@@ -3569,8 +3694,8 @@ nm_delete_route_section(
         bail_on_error(err);
     }
 
-    err = nm_get_network_conf_filename(pRoute->pszInterfaceName,
-                                       &pszCfgFileName);
+    err = nm_get_network_conf_filename_for_update(pRoute->pszInterfaceName,
+                                                  &pszCfgFileName);
     bail_on_error(err);
 
     err = ini_cfg_read(pszCfgFileName, &pConfig);
@@ -4086,7 +4211,8 @@ nm_add_dns_server(
 
     if (pszInterfaceName != NULL)
     {
-        err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+        err = nm_get_network_conf_filename_for_update(pszInterfaceName,
+                                                      &pszCfgFileName);
         sprintf(szSectionName, SECTION_NETWORK);
     }
     else
@@ -4162,7 +4288,8 @@ nm_delete_dns_server(
 
     if (pszInterfaceName != NULL)
     {
-        err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+        err = nm_get_network_conf_filename_for_update(pszInterfaceName,
+                                                      &pszCfgFileName);
         sprintf(szSectionName, SECTION_NETWORK);
     }
     else
@@ -4238,7 +4365,8 @@ nm_set_dns_servers(
 
     if (pszInterfaceName != NULL)
     {
-        err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+        err = nm_get_network_conf_filename_for_update(pszInterfaceName,
+                                                      &pszCfgFileName);
         sprintf(szSectionName, SECTION_NETWORK);
     }
     else
@@ -4454,7 +4582,8 @@ nm_add_dns_domain(
 
     if (pszInterfaceName != NULL)
     {
-        err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+        err = nm_get_network_conf_filename_for_update(pszInterfaceName,
+                                                      &pszCfgFileName);
         sprintf(szSectionName, SECTION_NETWORK);
     }
     else
@@ -4522,7 +4651,8 @@ nm_delete_dns_domain(
 
     if (pszInterfaceName != NULL)
     {
-        err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+        err = nm_get_network_conf_filename_for_update(pszInterfaceName,
+                                                      &pszCfgFileName);
         sprintf(szSectionName, SECTION_NETWORK);
     }
     else
@@ -4594,7 +4724,8 @@ nm_set_dns_domains(
 
     if (pszInterfaceName != NULL)
     {
-        err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+        err = nm_get_network_conf_filename_for_update(pszInterfaceName,
+                                                      &pszCfgFileName);
         sprintf(szSectionName, SECTION_NETWORK);
     }
     else
@@ -4756,7 +4887,8 @@ nm_set_iaid(
         bail_on_error(err);
     }
 
-    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
+    err = nm_get_network_conf_filename_for_update(pszInterfaceName,
+                                                  &pszCfgFileName);
     bail_on_error(err);
 
     sprintf(szValue, "%u", iaid);
@@ -4861,8 +4993,8 @@ nm_set_duid(
 
     if (pszInterfaceName != NULL)
     {
-        /* TODO: Add support */
-        err = NM_ERR_NOT_SUPPORTED;
+        err = nm_get_network_conf_filename_for_update(pszInterfaceName,
+                                                      &pszCfgFileName);
     }
     else
     {
@@ -4934,8 +5066,7 @@ nm_get_duid(
 
     if (pszInterfaceName != NULL)
     {
-        /* TODO: Add support */
-        err = NM_ERR_NOT_SUPPORTED;
+        err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     }
     else
     {
