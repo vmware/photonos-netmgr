@@ -784,22 +784,18 @@ error:
     goto cleanup;
 }
 
-uint32_t
-nm_set_link_mode(
+static uint32_t
+nm_update_link_mode(
     const char *pszInterfaceName,
-    NET_LINK_MODE mode
+    NET_LINK_MODE linkMode
 )
 {
     uint32_t err = 0;
     char *pszAutoCfgFileName = NULL, *pszManualCfgFileName = NULL;
     char *pszCurrentCfgFileName = NULL;
-    int lockId;
-
-    err = nm_acquire_write_lock(0, &lockId);
-    bail_on_error(err);
 
     if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
-        (mode >= LINK_MODE_UNKNOWN))
+        (linkMode >= LINK_MODE_UNKNOWN))
     {
         err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
@@ -817,7 +813,7 @@ nm_set_link_mode(
                                               &pszManualCfgFileName);
     bail_on_error(err);
 
-    switch (mode)
+    switch (linkMode)
     {
         case LINK_MANUAL:
             if (strcmp(pszCurrentCfgFileName, pszManualCfgFileName))
@@ -847,12 +843,33 @@ nm_set_link_mode(
     }
 
 cleanup:
-    nm_release_write_lock(lockId);
     netmgr_free(pszCurrentCfgFileName);
     netmgr_free(pszAutoCfgFileName);
     netmgr_free(pszManualCfgFileName);
     return err;
 
+error:
+    goto cleanup;
+}
+
+uint32_t
+nm_set_link_mode(
+    const char *pszInterfaceName,
+    NET_LINK_MODE linkMode
+)
+{
+    uint32_t err = 0;
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
+
+    err = nm_update_link_mode(pszInterfaceName, linkMode);
+    bail_on_error(err);
+
+cleanup:
+    nm_release_write_lock(lockId);
+    return err;
 error:
     goto cleanup;
 }
@@ -1063,8 +1080,8 @@ error:
     goto cleanup;
 }
 
-uint32_t
-nm_set_link_state(
+static uint32_t
+nm_update_link_state(
     const char *pszInterfaceName,
     NET_LINK_STATE linkState
 )
@@ -1072,10 +1089,6 @@ nm_set_link_state(
     uint32_t err = 0;
     int sockFd = -1;
     struct ifreq ifr;
-    int lockId;
-
-    err = nm_acquire_write_lock(0, &lockId);
-    bail_on_error(err);
 
     if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
         (linkState >= LINK_STATE_UNKNOWN))
@@ -1131,11 +1144,32 @@ nm_set_link_state(
     }
 
 cleanup:
-    nm_release_write_lock(lockId);
     if (sockFd > -1)
     {
         close(sockFd);
     }
+    return err;
+error:
+    goto cleanup;
+}
+
+uint32_t
+nm_set_link_state(
+    const char *pszInterfaceName,
+    NET_LINK_STATE linkState
+)
+{
+    uint32_t err = 0;
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
+
+    err = nm_update_link_state(pszInterfaceName, linkState);
+    bail_on_error(err);
+
+cleanup:
+    nm_release_write_lock(lockId);
     return err;
 error:
     goto cleanup;
@@ -1239,6 +1273,12 @@ nm_do_ndsend(
 #endif
 
 static uint32_t
+nm_get_ip_dhcp_mode(
+    const char *pszInterfaceName,
+    uint32_t *pDhcpModeFlags
+);
+
+static uint32_t
 nm_get_static_ip_addr(
     const char *pszInterfaceName,
     uint32_t addrTypes,
@@ -1259,15 +1299,15 @@ nm_ifup(
     const char *pszInterfaceName
 )
 {
-    uint32_t err = 0, err1 = 0;
+    uint32_t err = 0, err1 = 0, dhcpModeFlags;
     uint8_t prefix;
     int retVal = 0;
-    size_t staticIp4Count = 0, ip4Count = 0, ip6Count = 0;
+    size_t staticIp4Count = 0, staticIp6Count = 0, ip4Count = 0, ip6Count = 0;
     NET_LINK_STATE linkState = LINK_STATE_UNKNOWN;
     NET_LINK_MODE linkMode = LINK_MODE_UNKNOWN;
     char ipAddr[INET6_ADDRSTRLEN];
     char **ppszIpv4AddrList = NULL, **ppszIpv6AddrList = NULL;
-    char **ppszStaticIpv4AddrList = NULL;
+    char **ppszStaticIpv4AddrList = NULL, **ppszStaticIpv6AddrList = NULL;
 
     if (!IS_VALID_INTERFACE_NAME(pszInterfaceName))
     {
@@ -1310,10 +1350,18 @@ nm_ifup(
     }
     bail_on_error(err);
 
+    err = nm_get_static_ip_addr(pszInterfaceName, STATIC_IPV6, &staticIp6Count,
+                                &ppszStaticIpv6AddrList);
+    if (err == NM_ERR_VALUE_NOT_FOUND)
+    {
+        err = 0;
+    }
+    bail_on_error(err);
+
     err = flush_interface_ipaddr(pszInterfaceName);
     bail_on_error(err);
 
-    err = nm_set_link_state(pszInterfaceName, LINK_UP);
+    err = nm_update_link_state(pszInterfaceName, LINK_UP);
     bail_on_error(err);
 
     if (staticIp4Count && ip4Count &&
@@ -1343,21 +1391,29 @@ nm_ifup(
 
     if (linkMode == LINK_MANUAL)
     {
-        err = nm_set_link_mode(pszInterfaceName, LINK_AUTO);
+        err = nm_update_link_mode(pszInterfaceName, LINK_AUTO);
         bail_on_error(err);
     }
 
     err = nm_restart_network_service();
     if (linkMode == LINK_MANUAL)
     {
-        err1 = nm_set_link_mode(pszInterfaceName, LINK_MANUAL);
+        err1 = nm_update_link_mode(pszInterfaceName, LINK_MANUAL);
         bail_on_error(err1);
     }
     bail_on_error(err);
 
-    err = nm_wait_for_ip(pszInterfaceName, DEFAULT_WAIT_FOR_IP_TIMEOUT,
-                         NET_ADDR_IPV4 | NET_ADDR_IPV6);
+    err = nm_get_ip_dhcp_mode(pszInterfaceName, &dhcpModeFlags);
     bail_on_error(err);
+
+    if (staticIp4Count || staticIp6Count ||
+        TEST_FLAG(dhcpModeFlags, fDHCP_IPV4) ||
+        TEST_FLAG(dhcpModeFlags, fDHCP_IPV6))
+    {
+        err = nm_wait_for_ip(pszInterfaceName, DEFAULT_WAIT_FOR_IP_TIMEOUT,
+                             NET_ADDR_IPV4 | NET_ADDR_IPV6);
+        bail_on_error(err);
+    }
 
     if (staticIp4Count && !ip4Count)
     {
@@ -1370,6 +1426,7 @@ cleanup:
     netmgr_list_free(ip4Count, (void **)ppszIpv4AddrList);
     netmgr_list_free(ip6Count, (void **)ppszIpv6AddrList);
     netmgr_list_free(staticIp4Count, (void **)ppszStaticIpv4AddrList);
+    netmgr_list_free(staticIp6Count, (void **)ppszStaticIpv6AddrList);
     return err;
 
 error:
@@ -3249,7 +3306,7 @@ nm_get_ip_addr_type(
 {
     uint32_t err = 0, prefix;
     size_t i, count = 0;
-    char ipAddr[INET6_ADDRSTRLEN], *p, **ppszIpAddrList = NULL;
+    char ipAddr[INET6_ADDRSTRLEN], **ppszIpAddrList = NULL, *pszMacAddr = NULL;
     NET_ADDR_TYPE addrType = 0;
 
     if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
@@ -3286,7 +3343,7 @@ nm_get_ip_addr_type(
 
     if (is_ipv6_addr(ipAddr))
     {
-        if ((p = strstr(ipAddr, "fe80:")) == ipAddr)
+        if (is_ipv6_link_local_addr(ipAddr))
         {
             addrType = LINK_LOCAL_IPV6;
         }
@@ -3310,8 +3367,18 @@ nm_get_ip_addr_type(
             }
             if (addrType == 0)
             {
-                //TODO: Determine if autoconf
-                addrType = DHCP_IPV6;
+                /* Determine if it is SLAAC / autoconf address */
+                err = nm_get_link_mac_addr(pszInterfaceName, &pszMacAddr);
+                bail_on_error(err);
+
+                if (is_ipv6_autoconf_addr(ipAddr, pszMacAddr))
+                {
+                    addrType = AUTO_IPV6;
+                }
+                else
+                {
+                    addrType = DHCP_IPV6;
+                }
             }
         }
     }
@@ -3326,6 +3393,7 @@ nm_get_ip_addr_type(
 
 cleanup:
     netmgr_list_free(count, (void **)ppszIpAddrList);
+    netmgr_free(pszMacAddr);
     return err;
 
 error:

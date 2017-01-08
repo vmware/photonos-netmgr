@@ -33,6 +33,12 @@ uint32_t
 is_ipv6_addr(const char *pszIpAddr);
 
 uint32_t
+is_ipv6_link_local_addr(const char *pszIpAddr);
+
+uint32_t
+is_ipv6_autoconf_addr(const char *pszIpAddr, const char *pszMacAddr);
+
+uint32_t
 flush_interface_ipaddr(
     const char *pszInterfaceName
 );
