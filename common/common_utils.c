@@ -24,8 +24,49 @@ is_ipv4_addr(const char *pszIpAddr)
 uint32_t
 is_ipv6_addr(const char *pszIpAddr)
 {
-    struct sockaddr_in6 sa;
+    struct sockaddr_in6 sa = {0};
     return (inet_pton(AF_INET6, pszIpAddr, &(sa.sin6_addr)) != 0);
+}
+
+uint32_t
+is_ipv6_link_local_addr(const char *pszIpAddr)
+{
+    char *p;
+
+    if (is_ipv6_addr(pszIpAddr))
+    {
+        if ((p = strcasestr(pszIpAddr, "fe80:")) == pszIpAddr)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+uint32_t
+is_ipv6_autoconf_addr(const char *pszIpAddr, const char *pszMacAddr)
+{
+    struct sockaddr_in6 sa = {0};
+    char eui64Mac[INET6_ADDRSTRLEN] = {0};
+
+    if (inet_pton(AF_INET6, pszIpAddr, &(sa.sin6_addr)) == 1)
+    {
+        if ((sa.sin6_addr.s6_addr[11] == 0xFF) &&
+            (sa.sin6_addr.s6_addr[12] == 0xFE))
+        {
+            sprintf(eui64Mac, "%02x:%02x:%02x:%02x:%02x",
+                              sa.sin6_addr.s6_addr[9],
+                              sa.sin6_addr.s6_addr[10],
+                              sa.sin6_addr.s6_addr[13],
+                              sa.sin6_addr.s6_addr[14],
+                              sa.sin6_addr.s6_addr[15]);
+            if (strcasestr(pszMacAddr, eui64Mac) != NULL)
+            {
+                return 1;
+            }
+        }
+    }
+    return 0;
 }
 
 uint32_t
