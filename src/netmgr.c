@@ -2131,7 +2131,12 @@ nm_set_sysctl_persistent_value(
                                      pszValue);
     bail_on_error(err);
 
-    err = netmgr_alloc(strlen(pszFileBuf) + len, (void **)&pszNewFileBuf);
+    if (pszFileBuf != NULL)
+    {
+        len += strlen(pszFileBuf);
+    }
+
+    err = netmgr_alloc(len, (void **)&pszNewFileBuf);
     bail_on_error(err);
 
     for (i = 0; i < lineCount; i++)
