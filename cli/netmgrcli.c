@@ -1696,12 +1696,12 @@ NETMGRCLI_CMD_MAP cmdMap[] =
     {"ntp_servers",
      cli_ntp_servers,
      "--set --del --add --servers <NTP servers list>",
-     "get or set DNS domains list"
+     "get or set NTP servers list"
     },
     {"fw_rule",
      cli_fw_rule,
      "--add --del --rule <Firewall Rule>",
-     "get or set DNS domains list"
+     "add or delete firewall rules"
     },
     {"hostname",
      cli_hostname,
@@ -1738,7 +1738,7 @@ show_help()
     int nCmdCount = sizeof(cmdMap)/sizeof(NETMGRCLI_CMD_MAP);
     fprintf(stdout, "Usage: netmgr command <command options ...>\n");
     fprintf(stdout, "\n");
-    fprintf(stdout, "For help: netmgr -h or netmgr --version\n");
+    fprintf(stdout, "For help: netmgr -h or netmgr --help\n");
     fprintf(stdout, "For version: netmgr -v or netmgr --version\n");
     fprintf(stdout, "\n");
 
