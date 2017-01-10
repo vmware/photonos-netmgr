@@ -465,9 +465,23 @@ cmd_ip_route(PNETMGR_CMD pCmd)
             if (err == ENOENT)
             {
                 err = 0;
-                // TODO: scope = default
             }
             bail_on_error(err);
+            if (pszScope != NULL)
+            {
+                if (!strcmp(pszScope, "link"))
+                {
+                    ipRoute.scope = LINK_ROUTE;
+                }
+                else if (!strcmp(pszScope, "host"))
+                {
+                    ipRoute.scope = HOST_ROUTE;
+                }
+                else
+                {
+                    ipRoute.scope = GLOBAL_ROUTE;
+                }
+            }
             /* fall through */
 
         case OP_DEL:

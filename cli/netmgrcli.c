@@ -328,7 +328,7 @@ error:
         fprintf(stderr,
                 "Usage:\nip4_address --get --interface <ifame>\n"
                 "ip4_address --set --interface <ifname> --mode dhcp|static|none"
-                " --addr <IPv4Address/prefix>\n");
+                " --addr <IPv4Address/prefix> --gateway <Gateway Address>\n");
     }
     goto cleanup;
 }

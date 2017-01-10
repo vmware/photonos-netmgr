@@ -3654,7 +3654,7 @@ nm_add_route_section(
 )
 {
     uint32_t err = 0, dwNumSections = 0, i;
-    char *pszCfgFileName = NULL, buf[MAX_LINE];
+    char *pszCfgFileName = NULL, buf[MAX_LINE] = {0};
     PCONFIG_INI pConfig = NULL;
     PSECTION_INI *ppSections = NULL, pSection = NULL;
     PKEYVALUE_INI pDestKeyVal = NULL;
@@ -3707,27 +3707,23 @@ nm_add_route_section(
         err = ini_cfg_add_key(pSection, KEY_METRIC, buf);
         bail_on_error(err);
     }
-    if (pRoute->scope && (pRoute->scope < NET_ROUTE_SCOPE_MAX))
+    switch (pRoute->scope)
     {
-        switch (pRoute->scope)
-        {
-            case GLOBAL_ROUTE:
-                strcpy(buf, "global");
-                break;
-            case LINK_ROUTE:
-                strcpy(buf, "link");
-                break;
-            case HOST_ROUTE:
-                strcpy(buf, "host");
-                break;
-            default:
-                err = NM_ERR_INVALID_PARAMETER;
-                bail_on_error(err);
-        }
-        sprintf(buf, "%u", pRoute->metric);
-        err = ini_cfg_add_key(pSection, KEY_SCOPE, buf);
-        bail_on_error(err);
+        case GLOBAL_ROUTE:
+            strcpy(buf, "global");
+            break;
+        case LINK_ROUTE:
+            strcpy(buf, "link");
+            break;
+        case HOST_ROUTE:
+            strcpy(buf, "host");
+            break;
+        default:
+            err = NM_ERR_INVALID_PARAMETER;
+            bail_on_error(err);
     }
+    err = ini_cfg_add_key(pSection, KEY_SCOPE, buf);
+    bail_on_error(err);
 
     err = ini_cfg_save(pszCfgFileName, pConfig);
     bail_on_error(err);
@@ -3913,7 +3909,7 @@ nm_add_static_ip_route(
     uint32_t err = 0;
     uint8_t prefix = 255;
     char szDestAddr[INET6_ADDRSTRLEN+5];
-    NET_IP_ROUTE route;
+    NET_IP_ROUTE route = {0};
     int lockId;
 
     err = nm_acquire_write_lock(0, &lockId);
