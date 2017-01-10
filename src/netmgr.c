@@ -290,7 +290,7 @@ nm_get_network_conf_filename_match(
     size_t *pMatchLen)
 {
     uint32_t err = 0;
-    size_t matchLen, maxMatchLen = 0;
+    size_t matchLen = 0;
     struct dirent *hFile;
     DIR *dirFile = NULL;
     char *p, *pszFileName = NULL, *pszMatchName = NULL, *pszCfgFileName = NULL;
@@ -308,6 +308,7 @@ nm_get_network_conf_filename_match(
         bail_on_error(err);
     }
 
+    // TODO: Looks fine but closely vet this logic with systemd
     errno = 0;
     while ((hFile = readdir(dirFile)) != NULL)
     {
@@ -329,23 +330,20 @@ nm_get_network_conf_filename_match(
                                    &pszMatchName);
             bail_on_error(err);
 
-            if (!strcmp(pszIfName, pszMatchName))
-            {
-                netmgr_free(pszCfgFileName);
-                pszCfgFileName = pszFileName;
-                maxMatchLen = strlen(pszMatchName);
-                pszFileName = NULL;
-                break;
-            }
-
             if (nm_regex_match_ifname(pszIfName, pszMatchName) == 0)
             {
-                matchLen = strlen(pszMatchName);
-                if (matchLen > maxMatchLen)
+                if (pszCfgFileName == NULL)
                 {
-                    maxMatchLen = matchLen;
+                    pszCfgFileName = pszFileName;
+                    matchLen = strlen(pszMatchName);
+                    pszFileName = NULL;
+                    continue;
+                }
+                if (strcmp(pszCfgFileName, pszFileName) > 0)
+                {
                     netmgr_free(pszCfgFileName);
                     pszCfgFileName = pszFileName;
+                    matchLen = strlen(pszMatchName);
                     pszFileName = NULL;
                 }
             }
@@ -366,7 +364,7 @@ nm_get_network_conf_filename_match(
     *ppszFilename = pszCfgFileName;
     if (pMatchLen)
     {
-        *pMatchLen = maxMatchLen;
+        *pMatchLen = matchLen;
     }
 
 cleanup:
@@ -406,7 +404,7 @@ nm_get_network_conf_filename_for_update(
 {
     uint32_t err = 0;
     size_t ifNameLen, matchLen = 0;
-    char fName[IFNAMSIZ+strlen(SYSTEMD_NET_PATH)+strlen("10-.network")+1];
+    char fName[IFNAMSIZ+strlen(SYSTEMD_NET_PATH)+strlen("00-.network")+1];
     char *pszFilename = NULL;
 
     if (!IS_VALID_INTERFACE_NAME(pszIfName) || !ppszFilename)
@@ -415,7 +413,7 @@ nm_get_network_conf_filename_for_update(
         bail_on_error(err);
     }
 
-    err = nm_get_network_conf_filename_match(pszIfName, ppszFilename, &matchLen);
+    err = nm_get_network_conf_filename_match(pszIfName, &pszFilename, &matchLen);
     if (err == NM_ERR_VALUE_NOT_FOUND)
     {
         err = 0;
@@ -423,11 +421,12 @@ nm_get_network_conf_filename_for_update(
     bail_on_error(err);
 
     ifNameLen = strlen(pszIfName);
-    if ((*ppszFilename == NULL) || (matchLen < ifNameLen))
+    if ((pszFilename == NULL) || (matchLen < ifNameLen))
     {
-        netmgr_free(*ppszFilename);
+        netmgr_free(pszFilename);
+        pszFilename = NULL;
 
-        sprintf(fName, "%s10-%s.network", SYSTEMD_NET_PATH, pszIfName);
+        sprintf(fName, "%s00-%s.network", SYSTEMD_NET_PATH, pszIfName);
         if (access(fName, F_OK) == 0)
         {
             /* Designated conf file for this interface exists with bad match */
@@ -445,9 +444,9 @@ nm_get_network_conf_filename_for_update(
                                pszIfName,
                                F_CREATE_CFG_FILE);
         bail_on_error(err);
-
-        *ppszFilename = pszFilename;
     }
+
+    *ppszFilename = pszFilename;
 
 cleanup:
     return err;
