@@ -3416,7 +3416,7 @@ nm_get_ip_addr(
     NET_IP_ADDR ***pppIpAddrList
 )
 {
-    uint32_t err = 0, modeFlags;
+    uint32_t err = 0, modeFlags, addrType;
     size_t i = 0, j = 0, ip4Count = 0, ip6Count = 0, nCount = 0;
     char **ppszIp4AddrList = NULL;
     char **ppszIp6AddrList = NULL;
@@ -3455,10 +3455,13 @@ nm_get_ip_addr(
     }
     nCount = ip4Count;
 
-    if (TEST_FLAG(addrTypes, DHCP_IPV6) || TEST_FLAG(addrTypes, AUTO_IPV6))
+    if (TEST_FLAG(addrTypes, DHCP_IPV6) ||
+        TEST_FLAG(addrTypes, AUTO_IPV6) ||
+        TEST_FLAG(addrTypes, STATIC_IPV6) ||
+        TEST_FLAG(addrTypes, LINK_LOCAL_IPV6))
     {
         err = nm_get_interface_ipaddr(pszInterfaceName,
-                                      DHCP_IPV6 | AUTO_IPV6 | STATIC_IPV6,
+                                      NET_ADDR_IPV6 | LINK_LOCAL_IPV6,
                                       &ip6Count,
                                       &ppszIp6AddrList);
         if (err == NM_ERR_VALUE_NOT_FOUND)
@@ -3500,8 +3503,16 @@ nm_get_ip_addr(
                                           DHCP_IPV4 : STATIC_IPV4;
     }
 
-    for (j = 0; j < ip6Count; j++, i++)
+    for (j = 0; j < ip6Count; j++)
     {
+        err = nm_get_ip_addr_type(pszInterfaceName,
+                                  ppszIp6AddrList[j],
+                                  &addrType);
+        bail_on_error(err);
+        if (!TEST_FLAG(addrTypes, addrType))
+        {
+            continue;
+        }
         err = netmgr_alloc(sizeof(NET_IP_ADDR), (void **)&ppIpAddrList[i]);
         bail_on_error(err);
         err = netmgr_alloc_string(pszInterfaceName,
@@ -3510,13 +3521,11 @@ nm_get_ip_addr(
         err = netmgr_alloc_string(ppszIp6AddrList[j],
                                   &ppIpAddrList[i]->pszIPAddrPrefix);
         bail_on_error(err);
-        err = nm_get_ip_addr_type(pszInterfaceName,
-                                  ppszIp6AddrList[j],
-                                  &(ppIpAddrList[i]->type));
-        bail_on_error(err);
+        ppIpAddrList[i]->type = addrType;
+        i++;
     }
 
-    *pCount = nCount;
+    *pCount = i;
     *pppIpAddrList = ppIpAddrList;
 
 cleanup:
