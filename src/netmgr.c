@@ -1478,10 +1478,8 @@ nm_enumerate_systemd_interfaces(
 )
 {
     uint32_t err = 0;
-    size_t size1 = 0, size2 = 0;
-    char *pszStr1 = NULL, *pszStr2 = NULL;
-    DIR *dirFile = NULL;
-    struct dirent *hFile;
+    char *pszFile = NULL;
+    struct ifaddrs *ifaddr = NULL, *ifa = NULL;
     PNET_INTERFACE pInterfaceList = NULL;
     PNET_INTERFACE pInterface = NULL;
 
@@ -1491,57 +1489,39 @@ nm_enumerate_systemd_interfaces(
         bail_on_error(err);
     }
 
-    dirFile = opendir(SYSTEMD_NET_PATH);
-    if (dirFile == NULL)
+    err = getifaddrs(&ifaddr);
+    if (err != 0)
     {
         err = errno;
         bail_on_error(err);
     }
 
-    errno = 0;
-    while ((hFile = readdir(dirFile)) != NULL)
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
     {
-        if (!strcmp(hFile->d_name, ".")) continue;
-        if (!strcmp(hFile->d_name, "..")) continue;
-        if (hFile->d_name[0] == '.') continue;
-        if (strstr(hFile->d_name, ".network") == NULL) continue;
-
-        pszStr1 = strstr(hFile->d_name, "10-");
-        if (pszStr1 == NULL)
+        if (ifa->ifa_addr->sa_family != AF_PACKET)
         {
-            err = NM_ERR_VALUE_NOT_FOUND;
-            bail_on_error(err);
+            continue;
         }
-
-        size1 = strlen("10-");
-        pszStr2 = strstr(pszStr1 + size1, ".");
-
-        if (pszStr2 == NULL)
+        if (nm_get_network_conf_filename(ifa->ifa_name, &pszFile) == 0)
         {
-            err = NM_ERR_VALUE_NOT_FOUND;
+            err = netmgr_alloc(sizeof(NET_INTERFACE), (void**)&pInterface);
             bail_on_error(err);
+
+            err = netmgr_alloc_string(ifa->ifa_name, &pInterface->pszName);
+            bail_on_error(err);
+
+            pInterface->pNext = pInterfaceList;
+            pInterfaceList = pInterface;
+            pInterface = NULL;
         }
-        size2 = pszStr2 - (pszStr1 + size1);
-
-        err = netmgr_alloc(sizeof(NET_INTERFACE), (void**)&pInterface);
-        bail_on_error(err);
-
-        err = netmgr_alloc_string_len(pszStr1 + size1, size2,
-                                      &pInterface->pszName);
-        bail_on_error(err);
-
-        pInterface->pNext = pInterfaceList;
-        pInterfaceList = pInterface;
-        pInterface = NULL;
+        netmgr_free(pszFile);
+        pszFile = NULL;
     }
 
     *ppInterfaces = pInterfaceList;
 
 cleanup:
-    if (dirFile != NULL)
-    {
-        closedir(dirFile);
-    }
+    freeifaddrs(ifaddr);
     return err;
 
 error:
