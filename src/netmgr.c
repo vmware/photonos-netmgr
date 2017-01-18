@@ -3526,6 +3526,11 @@ nm_get_ip_addr(
     }
 
     *pCount = i;
+    if (i == 0)
+    {
+        netmgr_list_free(nCount, (void **)ppIpAddrList);
+        ppIpAddrList = NULL;
+    }
     *pppIpAddrList = ppIpAddrList;
 
 cleanup:
