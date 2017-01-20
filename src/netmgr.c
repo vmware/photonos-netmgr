@@ -700,11 +700,14 @@ nm_set_link_mac_addr(
     err = nm_get_link_mac_addr(pszInterfaceName, &pszOldMacAddress);
     bail_on_error(err);
 
-    err = nm_update_mac_address(pszInterfaceName, pszMacAddress);
-    bail_on_error(err);
+    if (strlen(pszMacAddress) > 0)
+    {
+        err = nm_update_mac_address(pszInterfaceName, pszMacAddress);
+        bail_on_error(err);
+    }
 
     err = nm_set_key_value(pszCfgFileName, SECTION_LINK, KEY_MAC_ADDRESS,
-                           pszMacAddress, 0);
+                           strlen(pszMacAddress) ? pszMacAddress : NULL, 0);
     if (err)
     {
         err1 = nm_update_mac_address(pszInterfaceName, pszOldMacAddress);

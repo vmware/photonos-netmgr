@@ -166,16 +166,8 @@ cli_link_info(
                 }
                 break;
             case 'a':
-                if (strlen(optarg) > 0)
-                {
-                    err = netmgrcli_alloc_keyvalue("macaddr", optarg, pCmd);
-                    link_options_present = 1;
-                }
-                else
-                {
-                    fprintf(stderr, "Invalid macaddr.\n");
-                    err = EDOM;
-                }
+                err = netmgrcli_alloc_keyvalue("macaddr", optarg, pCmd);
+                link_options_present = 1;
                 break;
             case 'u':
                 if (strlen(optarg) > 0)
