@@ -1017,6 +1017,7 @@ cmd_hostname(PNETMGR_CMD pCmd)
             bail_on_error(err);
 
             err = nm_set_hostname(pszHostname);
+            pszHostname = NULL;
             bail_on_error(err);
             break;
 
