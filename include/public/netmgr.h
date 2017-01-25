@@ -536,14 +536,14 @@ nm_wait_for_ip(
 
 uint32_t
 nm_set_network_param(
-    const char *pszInterfaceName,
+    const char *pszObjectName,
     const char *pszParamName,
     const char *pszParamValue
 );
 
 uint32_t
 nm_get_network_param(
-    const char *pszInterfaceName,
+    const char *pszObjectName,
     const char *pszParamName,
     char **ppszParamValue
 );

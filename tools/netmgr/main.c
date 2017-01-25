@@ -1226,9 +1226,9 @@ static uint32_t
 cmd_net_info(PNETMGR_CMD pCmd)
 {
     uint32_t err = 0;
-    char *pszIfname = NULL, *pszParamName = NULL, *pszParamValue = NULL;
+    char *pszObjectName = NULL, *pszParamName = NULL, *pszParamValue = NULL;
 
-    netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
+    netmgrcli_find_cmdopt(pCmd, "objectname", &pszObjectName);
 
     switch (pCmd->op)
     {
@@ -1245,7 +1245,8 @@ cmd_net_info(PNETMGR_CMD pCmd)
 
             if (pszParamName != NULL)
             {
-                err = nm_set_network_param(pszIfname, pszParamName,
+                err = nm_set_network_param(pszObjectName,
+                                           pszParamName,
                                            pszParamValue);
                 pszParamValue = NULL;
                 bail_on_error(err);
@@ -1256,7 +1257,9 @@ cmd_net_info(PNETMGR_CMD pCmd)
             err = netmgrcli_find_cmdopt(pCmd, "paramname", &pszParamName);
             bail_on_error(err);
 
-            err = nm_get_network_param(pszIfname, pszParamName, &pszParamValue);
+            err = nm_get_network_param(pszObjectName,
+                                       pszParamName,
+                                       &pszParamValue);
             bail_on_error(err);
 
             fprintf(stdout, "ParamName: %s, ParamValue: %s\n", pszParamName,
