@@ -6006,28 +6006,46 @@ error:
 
 uint32_t
 nm_set_network_param(
-    const char *pszInterfaceName,
+    const char *pszObjectName,
     const char *pszParamName,
     const char *pszParamValue
 )
 {
     uint32_t err = 0;
+    struct stat fs = {0};
     char *pszCfgFileName = NULL;
     char *pszParam = NULL, *pszParamPtr = NULL;
     char *pszSectionName = NULL, *pszKeyName = NULL;
 
-    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
-        IS_NULL_OR_EMPTY(pszParamName))
+    if (IS_NULL_OR_EMPTY(pszObjectName) || IS_NULL_OR_EMPTY(pszParamName))
     {
         err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
-    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
-    bail_on_error(err);
+    if (stat(pszObjectName, &fs) != 0)
+    {
+        /* Assume pszObjectName is interface name */
+        err = nm_get_network_conf_filename(pszObjectName, &pszCfgFileName);
+        bail_on_error(err);
+    }
+    else
+    {
+        /* Check if pszObjectName is a regular file */
+        if (TEST_FLAG(fs.st_mode, S_IFREG))
+        {
+            err = netmgr_alloc_string(pszObjectName, &pszCfgFileName);
+        }
+        else
+        {
+            err = NM_ERR_INVALID_PARAMETER;
+        }
+        bail_on_error(err);
+    }
 
     err = netmgr_alloc_string(pszParamName, &pszParam);
     bail_on_error(err);
+
     pszParamPtr = pszParam;
     pszSectionName = strsep(&pszParam, SECTION_KEY_DELIM);
     if (pszSectionName == NULL)
@@ -6051,28 +6069,48 @@ error:
 
 uint32_t
 nm_get_network_param(
-    const char *pszInterfaceName,
+    const char *pszObjectName,
     const char *pszParamName,
     char **ppszParamValue
 )
 {
     uint32_t err = 0;
+    struct stat fs = {0};
     char *pszCfgFileName = NULL;
     char *pszParam = NULL, *pszParamPtr = NULL;
     char *pszSectionName = NULL, *pszKeyName = NULL, *pszParamValue = NULL;
 
-    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
-        IS_NULL_OR_EMPTY(pszParamName) || !ppszParamValue)
+    if (IS_NULL_OR_EMPTY(pszObjectName) ||
+        IS_NULL_OR_EMPTY(pszParamName) ||
+        !ppszParamValue)
     {
         err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
-    err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
-    bail_on_error(err);
+    if (stat(pszObjectName, &fs) != 0)
+    {
+        /* Assume pszObjectName is interface name */
+        err = nm_get_network_conf_filename(pszObjectName, &pszCfgFileName);
+        bail_on_error(err);
+    }
+    else
+    {
+        /* Check if pszObjectName is a regular file */
+        if (TEST_FLAG(fs.st_mode, S_IFREG))
+        {
+            err = netmgr_alloc_string(pszObjectName, &pszCfgFileName);
+        }
+        else
+        {
+            err = NM_ERR_INVALID_PARAMETER;
+        }
+        bail_on_error(err);
+    }
 
     err = netmgr_alloc_string(pszParamName, &pszParam);
     bail_on_error(err);
+
     pszParamPtr = pszParam;
     pszSectionName = strsep(&pszParam, SECTION_KEY_DELIM);
     if (pszSectionName == NULL)
