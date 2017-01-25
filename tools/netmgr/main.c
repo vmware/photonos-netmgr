@@ -1310,6 +1310,7 @@ show_version()
 int main(int argc, char* argv[])
 {
     uint32_t err = 0;
+    const char *pszErrMsg = NULL;
     PNETMGR_CMD pCmd = NULL;
     size_t i, cmdCount = sizeof(cmdHandler)/sizeof(NETMGR_CLI_HANDLER);
 
@@ -1324,11 +1325,14 @@ int main(int argc, char* argv[])
             break;
         }
     }
+    bail_on_error(err);
 
 cleanup:
     netmgrcli_free_cmd(pCmd);
     return get_cli_error_code(err);
 error:
+    pszErrMsg = nm_get_error_info(err);
+    fprintf(stderr, "Error: %s\n", pszErrMsg);
     goto cleanup;
 }
 
