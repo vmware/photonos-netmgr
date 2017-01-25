@@ -1531,7 +1531,7 @@ static struct option netInfoOptions[] =
 {
     {"set",          no_argument,          0,    's'},
     {"get",          no_argument,          0,    'g'},
-    {"interface",    required_argument,    0,    'i'},
+    {"object",       required_argument,    0,    'o'},
     {"paramname",    required_argument,    0,    'p'},
     {"paramvalue",   required_argument,    0,     0 },
     {0, 0, 0, 0}
@@ -1554,7 +1554,7 @@ cli_net_info(
     {
         nOption = getopt_long(argc,
                               argv,
-                              "sgi:p:",
+                              "sgo:p:",
                               netInfoOptions,
                               &nOptionIndex);
         if (nOption == -1)
@@ -1568,14 +1568,14 @@ cli_net_info(
             case 'g':
                 op = OP_GET;
                 break;
-            case 'i':
+            case 'o':
                 if (strlen(optarg) > 0)
                 {
-                    err = netmgrcli_alloc_keyvalue("interface", optarg, pCmd);
+                    err = netmgrcli_alloc_keyvalue("objectname", optarg, pCmd);
                 }
                 else
                 {
-                    fprintf(stderr, "Invalid interface name.\n");
+                    fprintf(stderr, "Invalid interface or file name.\n");
                     err = EDOM;
                 }
                 break;
@@ -1621,8 +1621,9 @@ error:
     if(err == EDOM)
     {
         fprintf(stderr,
-                "Usage:\nnet_info --get\nnet_info --set "
-                "--interface <ifname> --paramname <param name> "
+                "Usage:\nnet_info --get --object <ifname or filename> "
+                "--paramname <param name>\nnet_info --set "
+                "--object <ifname or filename> --paramname <param name> "
                 "--paramvalue <param value>\n");
     }
     goto cleanup;
@@ -1718,7 +1719,8 @@ NETMGRCLI_CMD_MAP cmdMap[] =
     },
     {"net_info",
      cli_net_info,
-     "--set --interface <interface name> --paramname <param name> --paramvalue <value>",
+     "--set --object <ifname or filename> --paramname <param name> "
+     "--paramvalue <value>",
      "get or set network parameters"
     },
 };
