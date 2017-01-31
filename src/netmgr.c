@@ -6016,6 +6016,7 @@ nm_set_network_param(
     char *pszCfgFileName = NULL;
     char *pszParam = NULL, *pszParamPtr = NULL;
     char *pszSectionName = NULL, *pszKeyName = NULL;
+    char op = 's';
 
     if (IS_NULL_OR_EMPTY(pszObjectName) || IS_NULL_OR_EMPTY(pszParamName))
     {
@@ -6043,6 +6044,12 @@ nm_set_network_param(
         bail_on_error(err);
     }
 
+    if ((pszParamName[0] == '+') || (pszParamName[0] == '-'))
+    {
+        op = pszParamName[0];
+        pszParamName++;
+    }
+
     err = netmgr_alloc_string(pszParamName, &pszParam);
     bail_on_error(err);
 
@@ -6055,9 +6062,32 @@ nm_set_network_param(
     }
     pszKeyName = pszParam;
 
-    err = nm_set_key_value(pszCfgFileName, pszSectionName, pszKeyName,
-                           pszParamValue, 0);
-    bail_on_error(err);
+    switch (op)
+    {
+        case '+':
+            err = nm_add_key_value(pszCfgFileName,
+                                   pszSectionName,
+                                   pszKeyName,
+                                   pszParamValue,
+                                   0);
+            bail_on_error(err);
+            break;
+        case '-':
+            err = nm_delete_key_value(pszCfgFileName,
+                                      pszSectionName,
+                                      pszKeyName,
+                                      pszParamValue,
+                                      0);
+            bail_on_error(err);
+            break;
+        default:
+            err = nm_set_key_value(pszCfgFileName,
+                                   pszSectionName,
+                                   pszKeyName,
+                                   pszParamValue,
+                                   0);
+            bail_on_error(err);
+    }
 
 cleanup:
     netmgr_free(pszParamPtr);
