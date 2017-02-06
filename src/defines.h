@@ -21,6 +21,7 @@
 
 #define SYSTEMD_PATH                   "/etc/systemd/"
 #define SYSTEMD_NET_PATH               "/etc/systemd/network/"
+#define PHOTON_ETH0_NAME               "eth0"
 
 #define IPTABLES_COMMAND               "/usr/sbin/iptables"
 #define IP6TABLES_COMMAND              "/usr/sbin/ip6tables"
