@@ -407,6 +407,7 @@ nm_get_network_conf_filename_for_update(
     char fName[IFNAMSIZ+strlen(SYSTEMD_NET_PATH)+strlen("00-.network")+1];
     char *pszFilename = NULL;
 
+    // TODO: IS VALID_INTERFACE_NAME needs to check if device actually exists
     if (!IS_VALID_INTERFACE_NAME(pszIfName) || !ppszFilename)
     {
         err = NM_ERR_INVALID_PARAMETER;
@@ -4265,7 +4266,7 @@ nm_add_dns_server(
     }
 
     /* Determine DNS mode from UseDNS value in 10-eth0.network */
-    err = nm_get_dns_mode("eth0", &mode);
+    err = nm_get_dns_mode(PHOTON_ETH0_NAME, &mode);
     bail_on_error(err);
 
     if (mode == DHCP_DNS)
@@ -4343,7 +4344,7 @@ nm_delete_dns_server(
     }
 
     /* Determine DNS mode from UseDNS value in 10-eth0.network */
-    err = nm_get_dns_mode("eth0", &mode);
+    err = nm_get_dns_mode(PHOTON_ETH0_NAME, &mode);
     bail_on_error(err);
     if (mode == DHCP_DNS)
     {
@@ -4536,7 +4537,7 @@ nm_get_dns_servers(
     }
 
     /* Determine DNS mode from UseDNS value in 10-eth0.network */
-    err = nm_get_dns_mode("eth0", pMode);
+    err = nm_get_dns_mode(PHOTON_ETH0_NAME, pMode);
     bail_on_error(err);
 
     if (pszInterfaceName == NULL)
@@ -4645,6 +4646,16 @@ nm_add_dns_domain(
         bail_on_error(err);
     }
 
+    if (!system("/usr/lib/systemd/systemd --v | grep systemd | \
+                 cut -d' ' -f2 | grep 2[0-2][0-8] > /dev/null"))
+    {
+        /* systemd version <= 228 */
+        if (pszInterfaceName == NULL)
+        {
+            pszInterfaceName = PHOTON_ETH0_NAME;
+        }
+    }
+
     if (pszInterfaceName != NULL)
     {
         err = nm_get_network_conf_filename_for_update(pszInterfaceName,
@@ -4712,6 +4723,16 @@ nm_delete_dns_domain(
     {
         err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
+    }
+
+    if (!system("/usr/lib/systemd/systemd --v | grep systemd | \
+                 cut -d' ' -f2 | grep 2[0-2][0-8] > /dev/null"))
+    {
+        /* systemd version <= 228 */
+        if (pszInterfaceName == NULL)
+        {
+            pszInterfaceName = PHOTON_ETH0_NAME;
+        }
     }
 
     if (pszInterfaceName != NULL)
@@ -4786,6 +4807,16 @@ nm_set_dns_domains(
 
     err = nm_acquire_write_lock(0, &lockId);
     bail_on_error(err);
+
+    if (!system("/usr/lib/systemd/systemd --v | grep systemd | \
+                 cut -d' ' -f2 | grep 2[0-2][0-8] > /dev/null"))
+    {
+        /* systemd version <= 228 */
+        if (pszInterfaceName == NULL)
+        {
+            pszInterfaceName = PHOTON_ETH0_NAME;
+        }
+    }
 
     if (pszInterfaceName != NULL)
     {

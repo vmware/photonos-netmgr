@@ -38,6 +38,7 @@
 #define NM_ERR_BAD_CONFIG_FILE                 (NM_BASE_ERROR + 9)
 #define NM_ERR_WRITE_FAILED                    (NM_BASE_ERROR + 10)
 #define NM_ERR_TIME_OUT                        (NM_BASE_ERROR + 11)
+#define NM_MAX_ERROR                           (NM_BASE_ERROR + 100)
 
 
 /*
