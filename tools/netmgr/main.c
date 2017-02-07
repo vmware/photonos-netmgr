@@ -1320,6 +1320,15 @@ int main(int argc, char* argv[])
     err = netmgrcli_parse_cmdline(argc, argv, &pCmd);
     bail_on_error(err);
 
+    if (pCmd->op != OP_GET)
+    {
+        if (geteuid())
+        {
+            err = EACCES;
+            bail_on_error(err);
+        }
+    }
+
     for (i = 0; i < cmdCount; i++)
     {
         if (pCmd->id == cmdHandler[i].id)
