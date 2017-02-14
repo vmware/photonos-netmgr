@@ -328,7 +328,6 @@ cmd_ip6_address(PNETMGR_CMD pCmd)
                     }
                 }
                 bail_on_error(err);
-                pszGateway = NULL;
             }
             /* fall through */
 
