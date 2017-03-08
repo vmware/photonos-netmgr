@@ -306,6 +306,56 @@ error:
 }
 
 uint32_t
+nm_get_systemd_version(
+    uint32_t *psdVersion
+)
+{
+    uint32_t err = 0, sdVer = 0;
+    char szBuf[MAX_LINE] = {0};
+    FILE *fp = NULL;
+
+    if (!psdVersion)
+    {
+        err = NM_ERR_INVALID_PARAMETER;
+        bail_on_error(err);
+    }
+
+    fp = popen("/usr/lib/systemd/systemd --v", "r");
+    if (!fp)
+    {
+        err = NM_ERR_VALUE_NOT_FOUND;
+        bail_on_error(err);
+    }
+
+    if (fgets(szBuf, MAX_LINE, fp) == NULL)
+    {
+        err = NM_ERR_VALUE_NOT_FOUND;
+        bail_on_error(err);
+    }
+
+    if (sscanf(szBuf, "systemd %u", &sdVer) != 1)
+    {
+        err = NM_ERR_VALUE_NOT_FOUND;
+        bail_on_error(err);
+    }
+
+    *psdVersion = sdVer;
+
+clean:
+    if (fp != NULL)
+    {
+        pclose(fp);
+    }
+    return err;
+error:
+    if (psdVersion)
+    {
+        *psdVersion = 0;
+    }
+    goto clean;
+}
+
+uint32_t
 nm_atomic_file_update(
     const char *pszFileName,
     const char *pszFileBuf

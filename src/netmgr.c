@@ -793,7 +793,7 @@ nm_update_link_mode(
     NET_LINK_MODE linkMode
 )
 {
-    uint32_t err = 0;
+    uint32_t err = 0, sdVersion = 0;;
     char *pszAutoCfgFileName = NULL, *pszManualCfgFileName = NULL;
     char *pszCurrentCfgFileName = NULL;
 
@@ -804,45 +804,75 @@ nm_update_link_mode(
         bail_on_error(err);
     }
 
+    err = nm_get_systemd_version(&sdVersion);
+    bail_on_error(err);
+
     err = nm_get_network_conf_filename_for_update(pszInterfaceName,
                                                   &pszCurrentCfgFileName);
     bail_on_error(err);
 
-    err = nm_get_network_auto_conf_filename(pszInterfaceName,
-                                            &pszAutoCfgFileName);
-    bail_on_error(err);
-
-    err = nm_get_network_manual_conf_filename(pszInterfaceName,
-                                              &pszManualCfgFileName);
-    bail_on_error(err);
-
-    switch (linkMode)
+    if (sdVersion >= 233)
     {
-        case LINK_MANUAL:
-            if (strcmp(pszCurrentCfgFileName, pszManualCfgFileName))
-            {
-                err = rename(pszAutoCfgFileName, pszManualCfgFileName);
-                if (err != 0)
+        switch (linkMode)
+        {
+            case LINK_MANUAL:
+                err = nm_set_key_value(pszCurrentCfgFileName,
+                                       SECTION_LINK,
+                                       KEY_UNMANAGED,
+                                       "yes",
+                                       0);
+                break;
+            case LINK_AUTO:
+                err = nm_set_key_value(pszCurrentCfgFileName,
+                                       SECTION_LINK,
+                                       KEY_UNMANAGED,
+                                       "no",
+                                       0);
+                break;
+            default:
+                err = NM_ERR_INVALID_PARAMETER;
+                break;
+        }
+        bail_on_error(err);
+    }
+    else
+    {
+        err = nm_get_network_auto_conf_filename(pszInterfaceName,
+                                                &pszAutoCfgFileName);
+        bail_on_error(err);
+
+        err = nm_get_network_manual_conf_filename(pszInterfaceName,
+                                                  &pszManualCfgFileName);
+        bail_on_error(err);
+
+        switch (linkMode)
+        {
+            case LINK_MANUAL:
+                if (strcmp(pszCurrentCfgFileName, pszManualCfgFileName))
                 {
-                    err = errno;
-                    bail_on_error(err);
+                    err = rename(pszAutoCfgFileName, pszManualCfgFileName);
+                    if (err != 0)
+                    {
+                        err = errno;
+                        bail_on_error(err);
+                    }
                 }
-            }
-            break;
-        case LINK_AUTO:
-            if (strcmp(pszCurrentCfgFileName, pszAutoCfgFileName))
-            {
-                err = rename(pszManualCfgFileName, pszAutoCfgFileName);
-                if (err != 0)
+                break;
+            case LINK_AUTO:
+                if (strcmp(pszCurrentCfgFileName, pszAutoCfgFileName))
                 {
-                    err = errno;
-                    bail_on_error(err);
+                    err = rename(pszManualCfgFileName, pszAutoCfgFileName);
+                    if (err != 0)
+                    {
+                        err = errno;
+                        bail_on_error(err);
+                    }
                 }
-            }
-            break;
-        default:
-            err = NM_ERR_INVALID_PARAMETER;
-            break;
+                break;
+            default:
+                err = NM_ERR_INVALID_PARAMETER;
+                break;
+        }
     }
 
 cleanup:
@@ -883,8 +913,8 @@ nm_get_link_mode(
     NET_LINK_MODE *pLinkMode
 )
 {
-    uint32_t err = 0;
-    char *pszCfgFileName = NULL;
+    uint32_t err = 0, sdVersion = 0;
+    char *pszCfgFileName = NULL, *pszUnmanaged = NULL;;
 
     if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !pLinkMode)
     {
@@ -892,23 +922,58 @@ nm_get_link_mode(
         bail_on_error(err);
     }
 
+    err = nm_get_systemd_version(&sdVersion);
+    bail_on_error(err);
+
     err = nm_get_network_conf_filename(pszInterfaceName, &pszCfgFileName);
     bail_on_error(err);
 
-    if (strstr(pszCfgFileName, ".manual"))
+    if (sdVersion >= 233)
     {
-        *pLinkMode = LINK_MANUAL;
-    }
-    else if (strstr(pszCfgFileName, ".network"))
-    {
-        *pLinkMode = LINK_AUTO;
+        err = nm_get_key_value(pszCfgFileName,
+                               SECTION_LINK,
+                               KEY_UNMANAGED,
+                               &pszUnmanaged);
+        if (err == NM_ERR_VALUE_NOT_FOUND)
+        {
+            err = 0;
+            *pLinkMode = LINK_AUTO;
+        }
+        else if (err == 0)
+        {
+            if (!strcasecmp(pszUnmanaged, "yes"))
+            {
+                *pLinkMode = LINK_MANUAL;
+            }
+            else if (!strcasecmp(pszUnmanaged, "no"))
+            {
+                *pLinkMode = LINK_AUTO;
+            }
+            else
+            {
+                *pLinkMode = LINK_MODE_UNKNOWN;
+            }
+        }
+        bail_on_error(err);
     }
     else
     {
-        *pLinkMode = LINK_MODE_UNKNOWN;
+        if (strstr(pszCfgFileName, ".manual"))
+        {
+            *pLinkMode = LINK_MANUAL;
+        }
+        else if (strstr(pszCfgFileName, ".network"))
+        {
+            *pLinkMode = LINK_AUTO;
+        }
+        else
+        {
+            *pLinkMode = LINK_MODE_UNKNOWN;
+        }
     }
 
 cleanup:
+    netmgr_free(pszUnmanaged);
     netmgr_free(pszCfgFileName);
     return err;
 
@@ -4630,7 +4695,7 @@ nm_add_dns_domain(
     const char *pszDnsDomain
 )
 {
-    uint32_t err = 0;
+    uint32_t err = 0, sdVersion = 0;
     char *pszCfgFileName = NULL;
     char szSectionName[MAX_LINE];
     char *pszCurrentDnsDomains = NULL;
@@ -4646,10 +4711,11 @@ nm_add_dns_domain(
         bail_on_error(err);
     }
 
-    if (!system("/usr/lib/systemd/systemd --v | grep systemd | \
-                 cut -d' ' -f2 | grep 2[0-2][0-8] > /dev/null"))
+    err = nm_get_systemd_version(&sdVersion);
+    bail_on_error(err);
+
+    if (sdVersion <= 228)
     {
-        /* systemd version <= 228 */
         if (pszInterfaceName == NULL)
         {
             pszInterfaceName = PHOTON_ETH0_NAME;

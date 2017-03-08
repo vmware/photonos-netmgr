@@ -54,6 +54,7 @@
 #define KEY_DUID_RAWDATA               "DUIDRawData"
 #define KEY_MTU                        "MTUBytes"
 #define KEY_MAC_ADDRESS                "MACAddress"
+#define KEY_UNMANAGED                  "Unmanaged"
 
 #define SECTION_KEY_DELIM              "_"
 
