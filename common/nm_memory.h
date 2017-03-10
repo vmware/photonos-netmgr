@@ -12,14 +12,43 @@
  * under the License.
  */
 
-#include <config.h>
+// memory.c
 
-#include <getopt.h>
+#define IS_NULL_OR_EMPTY(_pstr)  (!(_pstr) || !(*(_pstr)))
 
-#include <netmgmtsys.h>
+uint32_t
+netmgr_alloc(
+    size_t size,
+    void** pMemory
+    );
 
-#include "../common/nm_memory.h"
-#include <netmgr.h>
-#include "defines.h"
-#include "structs.h"
-#include "netmgrcli.h"
+uint32_t
+netmgr_alloc_string(
+    const char* pszSrc,
+    char**      ppszDst
+    );
+
+uint32_t
+netmgr_alloc_string_len(
+    const char* pszSrc,
+    size_t      len,
+    char**      ppszDst
+    );
+
+uint32_t
+netmgr_alloc_string_printf(
+    char** ppszDst,
+    const char* pszFmt,
+    ...
+    );
+
+void
+netmgr_free(
+    void* pMemory
+    );
+
+void
+netmgr_list_free(
+    size_t count,
+    void **ppMemory
+    );

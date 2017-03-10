@@ -14,8 +14,8 @@
 
 #include "includes.h"
 
-int
-set_key_value(
+uint32_t
+nm_set_key_value(
     const char *pszConfigFileName,
     const char *pszSection,
     const char *pszKey,
@@ -29,23 +29,23 @@ set_key_value(
     PKEYVALUE_INI pKeyValue = NULL;
     FILE *fp;
 
-    if (!pszConfigFileName || !pszSection || !pszKey)
+    if (IS_NULL_OR_EMPTY(pszConfigFileName) || IS_NULL_OR_EMPTY(pszSection) ||
+        IS_NULL_OR_EMPTY(pszKey))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
-    if ((flags & F_CREATE_CFG_FILE) && access(pszConfigFileName, R_OK|W_OK) < 0)
+    if (TEST_FLAG(flags, F_CREATE_CFG_FILE))
     {
-        /* 'touch' the file */
-        if ((fp = fopen(pszConfigFileName, "w")) != NULL)
+        /* 'touch' the file if it does't exist */
+        if ((fp = fopen(pszConfigFileName, "a+")) != NULL)
         {
             fclose(fp);
         }
         else
         {
-            /* TODO: Better error reporting */
-            err = EINVAL;
+            err = errno;
             bail_on_error(err);
         }
     }
@@ -58,8 +58,7 @@ set_key_value(
 
     if (dwNumSections > 1)
     {
-        /* TODO: Better error reporting */
-        err = EINVAL;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
     else if ((dwNumSections == 0) && (pszValue != NULL))
@@ -108,8 +107,144 @@ error:
     return err;
 }
 
-int
-get_key_value(
+uint32_t
+nm_add_key_value(
+    const char *pszConfigFileName,
+    const char *pszSection,
+    const char *pszKey,
+    const char *pszValue,
+    uint32_t flags
+)
+{
+    uint32_t err = 0, dwNumSections = 0;
+    PCONFIG_INI pConfig = NULL;
+    PSECTION_INI *ppSections = NULL, pSection = NULL;
+    PKEYVALUE_INI pKeyValue = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszConfigFileName) || IS_NULL_OR_EMPTY(pszSection) ||
+        IS_NULL_OR_EMPTY(pszKey) || IS_NULL_OR_EMPTY(pszValue))
+    {
+        err = NM_ERR_INVALID_PARAMETER;
+        bail_on_error(err);
+    }
+
+    err = ini_cfg_read(pszConfigFileName, &pConfig);
+    bail_on_error(err);
+
+    err = ini_cfg_find_sections(pConfig, pszSection, &ppSections, &dwNumSections);
+    bail_on_error(err);
+
+    if (dwNumSections > 1)
+    {
+        err = NM_ERR_BAD_CONFIG_FILE;
+        bail_on_error(err);
+    }
+    else if (dwNumSections == 0)
+    {
+        err = ini_cfg_add_section(pConfig, pszSection, &pSection);
+        bail_on_error(err);
+    }
+    else
+    {
+        pSection = ppSections[0];
+    }
+
+    pKeyValue = ini_cfg_find_key_value(pSection, pszKey, pszValue);
+    if (pKeyValue != NULL)
+    {
+        err = NM_ERR_VALUE_EXISTS;
+    }
+    else
+    {
+        err = ini_cfg_add_key(pSection, pszKey, pszValue);
+    }
+    bail_on_error(err);
+
+    err = ini_cfg_save(pszConfigFileName, pConfig);
+    bail_on_error(err);
+
+error:
+    if (ppSections != NULL)
+    {
+        ini_cfg_free_sections(ppSections, dwNumSections);
+    }
+    if (pConfig != NULL)
+    {
+        ini_cfg_free_config(pConfig);
+    }
+    return err;
+}
+
+uint32_t
+nm_delete_key_value(
+    const char *pszConfigFileName,
+    const char *pszSection,
+    const char *pszKey,
+    const char *pszValue,
+    uint32_t flags
+)
+{
+    uint32_t err = 0, dwNumSections = 0;
+    PCONFIG_INI pConfig = NULL;
+    PSECTION_INI *ppSections = NULL, pSection = NULL;
+    PKEYVALUE_INI pKeyValue = NULL;
+
+    if (IS_NULL_OR_EMPTY(pszConfigFileName) || IS_NULL_OR_EMPTY(pszSection) ||
+        IS_NULL_OR_EMPTY(pszKey) || IS_NULL_OR_EMPTY(pszValue))
+    {
+        err = NM_ERR_INVALID_PARAMETER;
+        bail_on_error(err);
+    }
+
+    err = ini_cfg_read(pszConfigFileName, &pConfig);
+    bail_on_error(err);
+
+    err = ini_cfg_find_sections(pConfig, pszSection, &ppSections, &dwNumSections);
+    bail_on_error(err);
+
+    if (dwNumSections > 1)
+    {
+        err = NM_ERR_BAD_CONFIG_FILE;
+        bail_on_error(err);
+    }
+    else if (dwNumSections == 0)
+    {
+        err = NM_ERR_VALUE_NOT_FOUND;
+        bail_on_error(err);
+    }
+    else
+    {
+        pSection = ppSections[0];
+    }
+
+    pKeyValue = ini_cfg_find_key_value(pSection, pszKey, pszValue);
+    if (pKeyValue == NULL)
+    {
+        err = NM_ERR_VALUE_NOT_FOUND;
+    }
+    else
+    {
+        err = ini_cfg_delete_key_value(pSection, pKeyValue);
+    }
+    bail_on_error(err);
+
+    err = ini_cfg_save(pszConfigFileName, pConfig);
+    bail_on_error(err);
+
+error:
+    if (ppSections != NULL)
+    {
+        ini_cfg_free_sections(ppSections, dwNumSections);
+    }
+    if (pConfig != NULL)
+    {
+        ini_cfg_free_config(pConfig);
+    }
+    return err;
+}
+
+uint32_t
+nm_get_key_value(
     const char *pszConfigFileName,
     const char *pszSection,
     const char *pszKey,
@@ -122,9 +257,10 @@ get_key_value(
     PKEYVALUE_INI pKeyValue = NULL;
     *ppszValue = NULL;
 
-    if (!pszConfigFileName || !pszSection || !pszKey)
+    if (IS_NULL_OR_EMPTY(pszConfigFileName) || IS_NULL_OR_EMPTY(pszSection) ||
+        IS_NULL_OR_EMPTY(pszKey))
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -137,12 +273,12 @@ get_key_value(
     if (dwNumSections > 1)
     {
         /* TODO: Log error */
-        err = EINVAL;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
     else if (dwNumSections == 0)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
 
@@ -151,7 +287,7 @@ get_key_value(
     pKeyValue = ini_cfg_find_key(pSection, pszKey);
     if (pKeyValue == NULL)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
     /* malloc return memory - caller to free */
@@ -169,3 +305,215 @@ error:
     return err;
 }
 
+uint32_t
+nm_get_systemd_version(
+    uint32_t *psdVersion
+)
+{
+    uint32_t err = 0, sdVer = 0;
+    char szBuf[MAX_LINE] = {0};
+    FILE *fp = NULL;
+
+    if (!psdVersion)
+    {
+        err = NM_ERR_INVALID_PARAMETER;
+        bail_on_error(err);
+    }
+
+    fp = popen("/usr/lib/systemd/systemd --v", "r");
+    if (!fp)
+    {
+        err = NM_ERR_VALUE_NOT_FOUND;
+        bail_on_error(err);
+    }
+
+    if (fgets(szBuf, MAX_LINE, fp) == NULL)
+    {
+        err = NM_ERR_VALUE_NOT_FOUND;
+        bail_on_error(err);
+    }
+
+    if (sscanf(szBuf, "systemd %u", &sdVer) != 1)
+    {
+        err = NM_ERR_VALUE_NOT_FOUND;
+        bail_on_error(err);
+    }
+
+    *psdVersion = sdVer;
+
+clean:
+    if (fp != NULL)
+    {
+        pclose(fp);
+    }
+    return err;
+error:
+    if (psdVersion)
+    {
+        *psdVersion = 0;
+    }
+    goto clean;
+}
+
+uint32_t
+nm_atomic_file_update(
+    const char *pszFileName,
+    const char *pszFileBuf
+)
+{
+    uint32_t err = 0;
+    char *pszTmpFileName = NULL;
+    FILE *pFile = NULL;
+
+    if (!pszFileName || !*pszFileName || !pszFileBuf)
+    {
+        err = NM_ERR_INVALID_PARAMETER;
+        bail_on_error(err);
+    }
+
+    err = netmgr_alloc_string_printf(&pszTmpFileName, "%s.new", pszFileName);
+    bail_on_error(err);
+
+    pFile = fopen(pszTmpFileName, "w+");
+    if (!pFile)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    if (fprintf(pFile, "%s", pszFileBuf) < 0)
+    {
+        err = NM_ERR_WRITE_FAILED;
+        bail_on_error(err);
+    }
+
+    fclose(pFile);
+    pFile = NULL;
+
+    if (chmod(pszTmpFileName, S_IRUSR|S_IWUSR|S_IXUSR|
+                              S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH) != 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    if (rename(pszTmpFileName, pszFileName) < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+clean:
+    netmgr_free(pszTmpFileName);
+    if (pFile)
+    {
+        fclose(pFile);
+    }
+    return err;
+error:
+    goto clean;
+}
+
+uint32_t
+nm_run_command(
+    const char *pszCommand
+)
+{
+    uint32_t err = 0;
+    FILE *pipe_fp = NULL;
+
+    if (pszCommand == NULL)
+    {
+        err = NM_ERR_INVALID_PARAMETER;
+        bail_on_error(err);
+    }
+
+    pipe_fp = popen(pszCommand, "r");
+    if (pipe_fp == NULL)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+clean:
+    if (pipe_fp != NULL)
+    {
+        if (pclose(pipe_fp) == -1)
+        {
+            err = errno;
+        }
+    }
+    return err;
+error:
+    goto clean;
+}
+
+uint32_t
+nm_acquire_write_lock(
+    uint32_t timeOut,
+    int *pLockId
+)
+{
+    uint32_t err = 0;
+    int lockFd = -1;
+    struct flock fLock = { F_WRLCK, SEEK_SET, 0, 0, getpid() };
+
+    if (!pLockId)
+    {
+        err = NM_ERR_INVALID_PARAMETER;
+        bail_on_error(err);
+    }
+
+    lockFd = open(NM_LOCK_FILENAME, O_CREAT | O_WRONLY, S_IRWXU);
+    if (lockFd == -1)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    if (fcntl(lockFd, F_SETLKW, &fLock) == -1)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    *pLockId = lockFd;
+
+cleanup:
+    return err;
+error:
+    if (lockFd > -1)
+    {
+        close(lockFd);
+    }
+    if (pLockId)
+    {
+        *pLockId = -1;
+    }
+    goto cleanup;
+}
+
+uint32_t
+nm_release_write_lock(
+    int lockId
+)
+{
+    uint32_t err = 0;
+    struct flock fLock = { F_UNLCK, SEEK_SET, 0, 0, getpid() };
+
+    if (lockId < 0)
+    {
+        err = NM_ERR_INVALID_PARAMETER;
+        bail_on_error(err);
+    }
+
+    if (fcntl(lockId, F_SETLKW, &fLock) == -1)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+    close(lockId);
+
+error:
+    return err;
+}

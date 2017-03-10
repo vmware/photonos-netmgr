@@ -12,29 +12,11 @@
  * under the License.
  */
 
-// memory.c
+#pragma once
 
-uint32_t
-netmgr_alloc(
-    size_t size,
-    void** pMemory
-    );
-
-uint32_t
-netmgr_alloc_string(
-    const char* pszSrc,
-    char**      ppszDst
-    );
-
-uint32_t
-netmgr_alloc_string_len(
-    const char* pszSrc,
-    size_t      len,
-    char**      ppszDst
-    );
-
-void
-netmgr_free(
-    void* pMemory
-    );
-
+#define bail_on_error(errcode) \
+    do { \
+       if (errcode) { \
+          goto error; \
+       } \
+    } while(0)

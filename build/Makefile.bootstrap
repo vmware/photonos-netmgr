@@ -26,6 +26,7 @@ CLEAN_OBJECTS = \
     include \
     libtool \
     rpmbuild \
+    cli \
     src \
     tools \
     $(SRCROOT)/aclocal.m4 \

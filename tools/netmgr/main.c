@@ -14,688 +14,627 @@
 
 #include "includes.h"
 
-//name of command,
-//pointer to command invoke
-//parameters if any
-//help message
-NETMGR_CLI_CMD_MAP arCmdMap[] =
+
+static uint32_t
+get_cli_error_code(uint32_t nmErrCode)
 {
-    {"help",
-     cmd_help,
-     "",
-     "show this message"
-    },
-    {"ifup",
-     cmd_ifup,
-     "<interfacename>",
-     "bring up the specified interface if it is currently down."
-    },
-    {"ifdown",
-     cmd_ifdown,
-     "<interfacename>",
-     "bring down the specified interface if it is currently up."
-    },
-    {"list",
-     cmd_list,
-     "-4 or -6",
-     "shows list of available interfaces. -4 is the default"
-    },
-    {"set_iaid",
-     cmd_set_iaid,
-     "<interfacename> <IAID>",
-     "set IAID"
-    },
-    {"get_iaid",
-     cmd_get_iaid,
-     "<interfacename>",
-     "get IAID"
-    },
-    {"set_duid",
-     cmd_set_duid,
-     "<interfacename> <DUID>",
-     "set DUID"
-    },
-    {"get_duid",
-     cmd_get_duid,
-     "<interfacename>",
-     "get DUID"
-    },
-    {"set_dns_servers_v0",
-     cmd_set_dns_servers_v0,
-     "<dns servers list>",
-     "set dns servers"
-    },
-    {"set_dns_servers",
-     cmd_set_dns_servers,
-     "<DNS mode> <dns servers list>",
-     "set dns mode and servers list"
-    },
-    {"get_dns_servers",
-     cmd_get_dns_servers,
-     "",
-     "get dns mode and servers list"
-    },
-    {"dns_servers",
-     cmd_dns_servers,
-     "--set --mode [dhcp|static] --servers <DNS servers list>",
-     "get or set DNS mode, DNS servers list"
-    },
-};
+    uint32_t cliErrCode = nmErrCode & 0xFF;
+    cliErrCode = (nmErrCode < NM_CLI_BASE_ERROR) ?
+                     nmErrCode : (NM_CLI_BASE_ERROR + cliErrCode);
+    return cliErrCode;
+}
 
-int main(int argc, char* argv[])
+static uint32_t
+cmd_link_info(PNETMGR_CMD pCmd)
 {
-    uint32_t err = 0;
-    PNETMGR_CMD_ARGS pCmdArgs = NULL;
+    uint32_t err = 0, mtu = 0;
+    char *pszIfname = NULL, *pszLinkMode = NULL, *pszLinkState = NULL;
+    char *pszMacAddr = NULL, *pszMtu = NULL, *pszEnd = NULL;
+    NET_LINK_MODE linkMode = LINK_MODE_UNKNOWN;
+    NET_LINK_INFO *pNetLinkInfo = NULL, *pCurNetLinkInfo = NULL;
 
-    int nCommandCount = sizeof(arCmdMap)/sizeof(NETMGR_CLI_CMD_MAP);
-    const char* pszCmd = NULL;
-    int nFound = 0;
-
-    err = parse_args(argc, argv, &pCmdArgs);
-    bail_on_error(err);
-
-    //If --version, show version and exit
-    if(pCmdArgs->nVersion)
+    switch (pCmd->op)
     {
-        show_version();
-    }
-    else if(pCmdArgs->nHelp)
-    {
-        cmd_help(pCmdArgs);
-    }
-    else if(pCmdArgs->nCmdCount > 0)
-    {
-        pszCmd = pCmdArgs->ppszCmds[0];
-        while(nCommandCount--)
-        {
-            if(!strcmp(pszCmd, arCmdMap[nCommandCount].pszCmdName))
-            {
-                err = arCmdMap[nCommandCount].pFnCmd(pCmdArgs);
-                bail_on_error(err);
-                nFound = 1;
-                break;
-            }
-        }
-        if(!nFound)
-        {
-            err = 1;
+        case OP_SET:
+            err = netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
             bail_on_error(err);
-        }
-    }
-    else
-    {
-        cmd_help(pCmdArgs);
-    }
 
-cleanup:
-    if(pCmdArgs)
-    {
-        free_cmd_args(pCmdArgs);
-    }
-    return err;
-error:
-    goto cleanup;
-}
-
-void
-show_version(
-    )
-{
-    fprintf(stdout, "%s: %s\n", PACKAGE_NAME, PACKAGE_VERSION);
-}
-
-uint32_t
-cmd_help(
-    PNETMGR_CMD_ARGS pCmdArgs
-    )
-{
-    int i = 0;
-    int nCommandCount = sizeof(arCmdMap)/sizeof(NETMGR_CLI_CMD_MAP);
-    fprintf(stdout, "Usage: netmgr [options] command\n");
-    fprintf(stdout, "\n");
-
-    fprintf(stdout, "List of commands\n");
-    fprintf(stdout, "\n");
-
-    for(i = 0; i < nCommandCount; ++i)
-    {
-        fprintf(stdout,
-                "%s %s\t%s\n",
-                arCmdMap[i].pszCmdName,
-                arCmdMap[i].pszParams,
-                arCmdMap[i].pszHelpMessage);
-    }
-
-    return 0;
-}
-
-uint32_t
-cmd_ifdown(
-    PNETMGR_CMD_ARGS pCmdArgs
-    )
-{
-    uint32_t err = 0;
-
-    if(!pCmdArgs)
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    if(pCmdArgs->nCmdCount < 2)
-    {
-        err = EDOM;
-        bail_on_error(err);
-    }
-
-    err = ifdown(pCmdArgs->ppszCmds[1]);
-    bail_on_error(err);
-
-cleanup:
-    return err;
-error:
-    if(err == EDOM)
-    {
-        fprintf(
-               stderr,
-               "ifdown requires interface name or names as argument\n");
-    }
-    goto cleanup;
-}
-
-uint32_t
-cmd_ifup(
-    PNETMGR_CMD_ARGS pCmdArgs
-    )
-{
-    uint32_t err = 0;
-
-    if(!pCmdArgs)
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    if(pCmdArgs->nCmdCount < 2)
-    {
-        err = EDOM;
-        bail_on_error(err);
-    }
-
-    err = ifup(pCmdArgs->ppszCmds[1]);
-    bail_on_error(err);
-
-cleanup:
-    return err;
-error:
-    if(err == EDOM)
-    {
-        fprintf(
-               stderr,
-               "ifup requires interface name or names as argument\n");
-    }
-    goto cleanup;
-}
-
-uint32_t
-cmd_list(
-    PNETMGR_CMD_ARGS pCmdArgs
-    )
-{
-    uint32_t err = 0;
-    int nFamily = PF_INET;
-    PNETMGR_INTERFACE pInterface = NULL;
-    PNETMGR_INTERFACE pCurrent = NULL;
-
-    if(!pCmdArgs)
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-    if(pCmdArgs->nIPv6)
-    {
-        nFamily = PF_INET6;
-    }
-
-    err = enum_interfaces(nFamily, &pInterface);
-    bail_on_error(err);
-
-    pCurrent = pInterface;
-    while(pCurrent)
-    {
-        fprintf(stdout, "%s\n", pCurrent->pszName);
-        pCurrent = pCurrent->pNext;
-    }
-
-cleanup:
-    if(pInterface)
-    {
-        free_interface(pInterface);
-    }
-    return err;
-error:
-    goto cleanup;
-}
-
-uint32_t
-cmd_set_iaid(
-    PNETMGR_CMD_ARGS pCmdArgs
-    )
-{
-    uint32_t err = 0;
-
-    if(!pCmdArgs)
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    if(pCmdArgs->nCmdCount < 3)
-    {
-        err = EDOM;
-        bail_on_error(err);
-    }
-
-    err = set_iaid(pCmdArgs->ppszCmds[1], (uint32_t)atoi(pCmdArgs->ppszCmds[2]));
-    bail_on_error(err);
-
-cleanup:
-    return err;
-
-error:
-    if(err == EDOM)
-    {
-        fprintf(
-               stderr,
-               "Usage: set_iaid <ifname> <iaid>\n");
-    }
-    goto cleanup;
-}
-
-uint32_t
-cmd_get_iaid(
-    PNETMGR_CMD_ARGS pCmdArgs
-    )
-{
-    uint32_t err = 0, iaid;
-
-    if(!pCmdArgs)
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    if(pCmdArgs->nCmdCount < 2)
-    {
-        err = EDOM;
-        bail_on_error(err);
-    }
-
-    err = get_iaid(pCmdArgs->ppszCmds[1], &iaid);
-    bail_on_error(err);
-
-    fprintf(stdout, "IAID=%u\n", iaid);
-
-cleanup:
-    return err;
-
-error:
-    if(err == EDOM)
-    {
-        fprintf(
-               stderr,
-               "Usage: get_iaid <ifname>\n");
-    }
-    goto cleanup;
-}
-
-uint32_t
-cmd_set_duid(
-    PNETMGR_CMD_ARGS pCmdArgs
-    )
-{
-    uint32_t err = 0;
-
-    if(!pCmdArgs)
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    if(pCmdArgs->nCmdCount < 2)
-    {
-        err = EDOM;
-        bail_on_error(err);
-    }
-
-    err = set_duid(NULL, pCmdArgs->ppszCmds[1]);
-    bail_on_error(err);
-
-cleanup:
-    return err;
-
-error:
-    if(err == EDOM)
-    {
-        fprintf(
-               stderr,
-               "Usage: set_duid <duid>\n");
-    }
-    goto cleanup;
-}
-
-uint32_t
-cmd_get_duid(
-    PNETMGR_CMD_ARGS pCmdArgs
-    )
-{
-    uint32_t err = 0;
-    char *duid = NULL;
-
-    if(!pCmdArgs)
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    if(pCmdArgs->nCmdCount < 1)
-    {
-        err = EDOM;
-        bail_on_error(err);
-    }
-
-    err = get_duid(NULL, &duid);
-    bail_on_error(err);
-
-    fprintf(stdout, "DUID=%s\n", duid);
-
-cleanup:
-    if (duid != NULL)
-    {
-        netmgr_free(duid);
-    }
-    return err;
-
-error:
-    if(err == EDOM)
-    {
-        fprintf(
-               stderr,
-               "Usage: get_duid\n");
-    }
-    goto cleanup;
-}
-
-uint32_t
-cmd_set_dns_servers_v0(
-    PNETMGR_CMD_ARGS pCmdArgs
-    )
-{
-    uint32_t err = 0;
-
-    if(!pCmdArgs)
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    if(pCmdArgs->nCmdCount < 2)
-    {
-        err = EDOM;
-        bail_on_error(err);
-    }
-
-    err = set_dns_servers_v0(NULL, pCmdArgs->ppszCmds[1]);
-    bail_on_error(err);
-
-cleanup:
-    return err;
-
-error:
-    if(err == EDOM)
-    {
-        fprintf(
-               stderr,
-               "Usage: set_dns_servers_v0 <dns server list>\n");
-    }
-    goto cleanup;
-}
-
-uint32_t
-cmd_set_dns_servers(
-    PNETMGR_CMD_ARGS pCmdArgs
-    )
-{
-    uint32_t err = 0, flags = 0;
-    size_t i = 0, count = 0;
-    NET_DNS_MODE mode;
-    char *s1, *s2, **szDnsServersList = NULL;
-    char szDnsServers[1024];
-
-    if(!pCmdArgs)
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    if(pCmdArgs->nCmdCount < 4)
-    {
-        err = EDOM;
-        bail_on_error(err);
-    }
-
-    if (!strcmp(pCmdArgs->ppszCmds[1], "1"))
-    {
-        flags |= fAPPEND_DNS_SERVERS_LIST;
-    }
-
-    if (!strcmp(pCmdArgs->ppszCmds[2], "dhcp"))
-    {
-        mode = DHCP_DNS;
-    }
-    else if (!strcmp(pCmdArgs->ppszCmds[2], "static"))
-    {
-        mode = STATIC_DNS;
-    }
-    else
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    strcpy(szDnsServers, pCmdArgs->ppszCmds[3]);
-    if (strlen(szDnsServers) > 0)
-    {
-        s2 = pCmdArgs->ppszCmds[3];
-        do {
-            s1 = strsep(&s2, " ");
-            if (strlen(s1) > 0)
+            err = netmgrcli_find_cmdopt(pCmd, "macaddr", &pszMacAddr);
+            if (err == ENOENT)
             {
-                count++;
+                err = 0;
             }
-        } while (s2 != NULL);
-    }
-
-    if (count > 0)
-    {
-        err = netmgr_alloc((count * sizeof(char *)), (void *)&szDnsServersList);
-        bail_on_error(err);
-
-        s2 = szDnsServers;
-        do {
-            s1 = strsep(&s2, " ");
-            if (strlen(s1) > 0)
+            bail_on_error(err);
+            if (pszMacAddr != NULL)
             {
-                err = netmgr_alloc_string(s1, &(szDnsServersList[i++]));
+                err = nm_set_link_mac_addr(pszIfname, pszMacAddr);
                 bail_on_error(err);
             }
-        } while (s2 != NULL);
-    }
 
-    err = set_dns_servers(NULL, mode, count, (const char **)szDnsServersList,
-                          flags);
-    bail_on_error(err);
-
-cleanup:
-    /* Free allocated memory */
-    if (szDnsServersList != NULL)
-    {
-        for (i = 0; i < count; i++)
-        {
-            if (szDnsServersList[i] != NULL)
+            err = netmgrcli_find_cmdopt(pCmd, "mode", &pszLinkMode);
+            if (err == ENOENT)
             {
-                netmgr_free(szDnsServersList[i]);
+                err = 0;
             }
-        }
-        netmgr_free(szDnsServersList);
-    }
-    return err;
-
-error:
-    if(err == EDOM)
-    {
-        fprintf(
-               stderr,
-               "Usage: set_dns_servers <append [1|0]> <dns mode> <dns server list>\n");
-    }
-    goto cleanup;
-}
-
-uint32_t
-cmd_get_dns_servers(
-    PNETMGR_CMD_ARGS pCmdArgs
-    )
-{
-    uint32_t err = 0;
-    NET_DNS_MODE mode;
-    size_t i, count;
-    char **dnsServers;
-
-    if(!pCmdArgs)
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    if(pCmdArgs->nCmdCount < 1)
-    {
-        err = EDOM;
-        bail_on_error(err);
-    }
-
-    err = get_dns_servers(NULL, 0, &mode, &count, &dnsServers);
-    bail_on_error(err);
-
-    if (mode == STATIC_DNS)
-    {
-        fprintf(stdout, "DNSMode=static\n");
-    }
-    else
-    {
-        fprintf(stdout, "DNSMode=dhcp\n");
-    }
-
-    fprintf(stdout, "DNSServers=");
-    for (i = 0; i < count; i++)
-    {
-        fprintf(stdout, "%s ", dnsServers[i]);
-        netmgr_free(dnsServers[i]);
-    }
-    netmgr_free(dnsServers);
-    fprintf(stdout, "\n");
-
-cleanup:
-    return err;
-
-error:
-    if(err == EDOM)
-    {
-        fprintf(
-               stderr,
-               "Usage: get_dns_servers\n");
-    }
-    goto cleanup;
-}
-
-typedef enum _CMD_OP
-{
-    OP_INVALID = 0,
-    OP_GET,
-    OP_SET,
-    OP_MAX
-} CMD_OP;
-
-static struct option dnsServerOptions[] =
-{
-    {"set",          no_argument,          0,    's'},
-    {"get",          no_argument,          0,    'g'},
-    {"mode",         required_argument,    0,    'm'},
-    {"servers",      required_argument,    0,     0 },
-    {"interface",    required_argument,    0,    'i'},
-    {0, 0, 0, 0}
-};
-
-uint32_t
-cmd_dns_servers(
-    PNETMGR_CMD_ARGS pCmdArgs
-    )
-{
-    uint32_t err = 0;
-    int nOptionIndex = 0;
-    int nOption = 0;
-    CMD_OP op = OP_INVALID;
-    size_t i = 0, count = 0;
-    int add_servers = 0;
-    NET_DNS_MODE mode = DNS_MODE_INVALID;
-    char *s1, *s2, **szDnsServersList = NULL;
-    char szServers[2048];
-
-    if(!pCmdArgs || (pCmdArgs->argc < 3))
-    {
-        err = EDOM;
-        bail_on_error(err);
-    }
-
-    opterr = 0;
-    optind = 1;
-    while (1)
-    {
-        nOption = getopt_long(pCmdArgs->argc,
-                              pCmdArgs->argv,
-                              "sgm:i:",
-                              dnsServerOptions,
-                              &nOptionIndex);
-        if (nOption == -1)
-            break;
-
-        switch(nOption)
-        {
-            case 's':
-                op = OP_SET;
-                break;
-            case 'g':
-                op = OP_GET;
-                break;
-            case 'm':
-                if (!strcmp(optarg, "dhcp"))
+            bail_on_error(err);
+            if (pszLinkMode != NULL)
+            {
+                if (!strcmp(pszLinkMode, "manual"))
                 {
-                    mode = DHCP_DNS;
+                    linkMode = LINK_MANUAL;
                 }
-                else if (!strcmp(optarg, "static"))
+                else if (!strcmp(pszLinkMode, "auto"))
                 {
-                    mode = STATIC_DNS;
+                    linkMode = LINK_AUTO;
+                }
+                if (linkMode == LINK_MODE_UNKNOWN)
+                {
+                    err = EDOM;
+                    bail_on_error(err);
+                }
+                err = nm_set_link_mode(pszIfname, linkMode);
+                bail_on_error(err);
+            }
+
+            err = netmgrcli_find_cmdopt(pCmd, "mtu", &pszMtu);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+            if (pszMtu != NULL)
+            {
+                mtu = (uint32_t)strtoul(pszMtu, &pszEnd, 10);
+                err = nm_set_link_mtu(pszIfname, mtu);
+                bail_on_error(err);
+            }
+
+            err = netmgrcli_find_cmdopt(pCmd, "state", &pszLinkState);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+            if (pszLinkState != NULL)
+            {
+                if (!strcmp(pszLinkState, "up"))
+                {
+                    err = nm_ifup(pszIfname);
+                }
+                else if (!strcmp(pszLinkState, "down"))
+                {
+                    err = nm_ifdown(pszIfname);
                 }
                 else
                 {
-                    mode = DNS_MODE_INVALID;
+                    err = EDOM;
                 }
-                break;
-            case 0:
-                /* --servers option */
-                strcpy(szServers, optarg);
-                if (strlen(szServers) > 0)
+                bail_on_error(err);
+            }
+            break;
+
+        case OP_GET:
+            err = netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
+
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            err = nm_get_link_info(pszIfname, &pNetLinkInfo);
+            bail_on_error(err);
+
+            pCurNetLinkInfo = pNetLinkInfo;
+            fprintf(stdout, "%-10s\t%-17s\t%-10s\t%-10s\t%-10s\n", "Name",
+                    "MacAddress", "Mode", "MTU", "State");
+            while (pCurNetLinkInfo)
+            {
+                fprintf(stdout, "%-10s\t", pCurNetLinkInfo->pszInterfaceName);
+                fprintf(stdout, "%-17s\t", pCurNetLinkInfo->pszMacAddress);
+                fprintf(stdout, "%-10s\t",
+                        nm_link_mode_to_string(pCurNetLinkInfo->mode));
+                fprintf(stdout, "%-10u\t", pCurNetLinkInfo->mtu);
+                fprintf(stdout, "%-25s\n",
+                        nm_link_state_to_string(pCurNetLinkInfo->state));
+                pCurNetLinkInfo = pCurNetLinkInfo->pNext;
+            }
+            break;
+
+        default:
+            err =  EINVAL;
+    }
+    bail_on_error(err);
+
+cleanup:
+    nm_free_link_info(pNetLinkInfo);
+    return err;
+
+error:
+    goto cleanup;
+}
+
+static uint32_t
+cmd_ip4_address(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    NET_IPV4_ADDR_MODE ip4Mode;
+    char *pszIfName = NULL, *pszMode = NULL;
+    char *pszIpAddr = NULL, *pszGateway = NULL;
+
+    netmgrcli_find_cmdopt(pCmd, "interface", &pszIfName);
+
+    switch (pCmd->op)
+    {
+        case OP_SET:
+            err = netmgrcli_find_cmdopt(pCmd, "mode", &pszMode);
+            bail_on_error(err);
+
+            if (!strcmp(pszMode, "dhcp"))
+            {
+                ip4Mode = IPV4_ADDR_MODE_DHCP;
+            }
+            else if (!strcmp(pszMode, "static"))
+            {
+                ip4Mode = IPV4_ADDR_MODE_STATIC;
+            }
+            else if (!strcmp(pszMode, "none"))
+            {
+                ip4Mode = IPV4_ADDR_MODE_NONE;
+            }
+            else
+            {
+                err = EINVAL;
+                bail_on_error(err);
+            }
+
+            netmgrcli_find_cmdopt(pCmd, "address", &pszIpAddr);
+
+            netmgrcli_find_cmdopt(pCmd, "gateway", &pszGateway);
+
+            err = nm_set_ipv4_addr_gateway(pszIfName, ip4Mode, pszIpAddr,
+                                           pszGateway);
+            pszIpAddr = NULL;
+            pszGateway = NULL;
+            bail_on_error(err);
+            break;
+
+        case OP_GET:
+            err = nm_get_ipv4_addr_gateway(pszIfName, &ip4Mode, &pszIpAddr,
+                                           &pszGateway);
+            bail_on_error(err);
+
+            if (ip4Mode == IPV4_ADDR_MODE_NONE)
+            {
+                fprintf(stdout, "IPv4 Address Mode: none\n");
+            }
+            else if (ip4Mode == IPV4_ADDR_MODE_DHCP)
+            {
+                fprintf(stdout, "IPv4 Address Mode: dhcp\n");
+            }
+            else
+            {
+                fprintf(stdout, "IPv4 Address Mode: static\n");
+            }
+            if (pszIpAddr != NULL)
+            {
+                fprintf(stdout, "IPv4 Address=%s\n", pszIpAddr);
+            }
+            if (pszGateway != NULL)
+            {
+                fprintf(stdout, "IPv4 Gateway=%s\n", pszGateway);
+            }
+            // TODO: Display DHCP IPv4 address as well as static IPv4 address
+            // TODO: Display address configured on interface (higher preference)
+            // TODO: Display default gateway from interface (higher preference over file info)
+            break;
+
+        default:
+            break;
+    }
+
+cleanup:
+    netmgr_free(pszIpAddr);
+    netmgr_free(pszGateway);
+    return err;
+
+error:
+    goto cleanup;
+}
+
+static uint32_t
+cmd_ip6_address(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0, dhcpEnabled, autoconfEnabled;;
+    char *pszIfName = NULL, *pszDhcp = NULL, *pszAutoconf = NULL;
+    char *pszAddrList = NULL, *pszGateway = NULL, *pszNewGateway = NULL;
+    char *a1, *a2;
+    NET_IP_ADDR **ppIpAddrList = NULL;
+    size_t i, count;
+
+    netmgrcli_find_cmdopt(pCmd, "interface", &pszIfName);
+
+    err = nm_get_ipv6_addr_mode(pszIfName, &dhcpEnabled, &autoconfEnabled);
+    bail_on_error(err);
+
+    switch (pCmd->op)
+    {
+        case OP_ADD:
+        case OP_DEL:
+            err = netmgrcli_find_cmdopt(pCmd, "addrlist", &pszAddrList);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            if (pszAddrList != NULL)
+            {
+                a2 = pszAddrList;
+                do {
+                    a1 = strsep(&a2, ",");
+                    if (strlen(a1) == 0)
+                    {
+                        continue;
+                    }
+                    if (pCmd->op == OP_ADD)
+                    {
+                        err = nm_add_static_ipv6_addr(pszIfName, a1);
+                    }
+                    else
+                    {
+                        err = nm_delete_static_ipv6_addr(pszIfName, a1);
+                    }
+                    bail_on_error(err);
+                } while (a2 != NULL);
+            }
+
+            err = netmgrcli_find_cmdopt(pCmd, "gateway", &pszNewGateway);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            if (pszNewGateway != NULL)
+            {
+                err = nm_get_ipv6_gateway(pszIfName, &pszGateway);
+                if (err == ENOENT)
                 {
-                    s2 = szServers;
+                    err = 0;
+                }
+                bail_on_error(err);
+
+                if (pCmd->op == OP_ADD)
+                {
+                    if (pszGateway != NULL)
+                    {
+                        err = EEXIST;
+                    }
+                    else
+                    {
+                        err = nm_set_ipv6_gateway(pszIfName, pszNewGateway);
+                    }
+                }
+                else
+                {
+                    if (!pszGateway || (strcmp(pszGateway, pszNewGateway) != 0))
+                    {
+                        err = ENOENT;
+                    }
+                    else
+                    {
+                        err = nm_set_ipv6_gateway(pszIfName, NULL);
+                    }
+                }
+                bail_on_error(err);
+            }
+            /* fall through */
+
+        case OP_SET:
+            err = netmgrcli_find_cmdopt(pCmd, "dhcp", &pszDhcp);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+            err = netmgrcli_find_cmdopt(pCmd, "autoconf", &pszAutoconf);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            if (!pszDhcp && !pszAutoconf)
+            {
+                break;
+            }
+
+            if (pszDhcp != NULL)
+            {
+                dhcpEnabled  = (!strcmp(pszDhcp, "1")) ? 1 : 0;
+            }
+            if (pszAutoconf != NULL)
+            {
+                autoconfEnabled  = (!strcmp(pszAutoconf, "1")) ? 1 : 0;
+            }
+
+            // TODO: Implement configuration of autoconf IPv6 enable / disable
+            err = nm_set_ipv6_addr_mode(pszIfName, dhcpEnabled,
+                                        autoconfEnabled);
+            bail_on_error(err);
+            break;
+
+        case OP_GET:
+
+            // TODO: Implement function to get IPv6 addr from ioctls,
+            // and query static IP addr if that fails.
+            err = nm_get_ip_addr(pszIfName, DHCP_IPV6 | AUTO_IPV6 | STATIC_IPV6,
+                                 &count, &ppIpAddrList);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            err = nm_get_ipv6_gateway(pszIfName, &pszGateway);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            if (dhcpEnabled)
+            {
+                fprintf(stdout, "DHCP IPv6 enabled\n");
+            }
+            if (autoconfEnabled)
+            {
+            // TODO: Implement configuration of autoconf IPv6 enable / disable
+                fprintf(stdout, "Autoconf IPv6 enabled\n");
+            }
+            for (i = 0; i < count; i++)
+            {
+                fprintf(stdout, "%s Address=%s\n",
+                        nm_ip_addr_type_to_string(ppIpAddrList[i]->type),
+                        ppIpAddrList[i]->pszIPAddrPrefix);
+            }
+            if (pszGateway != NULL)
+            {
+                fprintf(stdout, "IPv6 Gateway=%s\n", pszGateway);
+            }
+            // TODO: Display DHCP IPv4 address as well as static IPv4 address
+            // TODO: Display address configured on interface (higher preference)
+            // TODO: Display default gateway from interface (higher preference over file info)
+            break;
+
+        default:
+            err = EINVAL;
+    }
+
+cleanup:
+    if (ppIpAddrList != NULL)
+    {
+        for (i = 0; i < count; i++)
+        {
+            if (ppIpAddrList[i] == NULL)
+            {
+                continue;
+            }
+            netmgr_free(ppIpAddrList[i]->pszInterfaceName);
+            netmgr_free(ppIpAddrList[i]->pszIPAddrPrefix);
+        }
+        netmgr_list_free(count, (void **)ppIpAddrList);
+    }
+    netmgr_free(pszGateway);
+    return err;
+
+error:
+    goto cleanup;
+}
+
+static uint32_t
+cmd_ip_route(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    size_t i, count = 0;
+    char *pszMetric = NULL, *pszScope = NULL;
+    NET_IP_ROUTE ipRoute = {0}, **ppRoutesList = NULL;
+
+    netmgrcli_find_cmdopt(pCmd, "interface", &ipRoute.pszInterfaceName);
+
+    switch (pCmd->op)
+    {
+        case OP_ADD:
+            netmgrcli_find_cmdopt(pCmd, "gateway", &ipRoute.pszGateway);
+
+            err = netmgrcli_find_cmdopt(pCmd, "metric", &pszMetric);
+            if (err == ENOENT)
+            {
+                err = 0;
+                ipRoute.metric = 1024;
+            }
+            else
+            {
+                sscanf(pszMetric, "%u", &ipRoute.metric);
+            }
+            bail_on_error(err);
+
+            err = netmgrcli_find_cmdopt(pCmd, "scope", &pszScope);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+            if (pszScope != NULL)
+            {
+                if (!strcmp(pszScope, "link"))
+                {
+                    ipRoute.scope = LINK_ROUTE;
+                }
+                else if (!strcmp(pszScope, "host"))
+                {
+                    ipRoute.scope = HOST_ROUTE;
+                }
+                else
+                {
+                    ipRoute.scope = GLOBAL_ROUTE;
+                }
+            }
+            /* fall through */
+
+        case OP_DEL:
+            netmgrcli_find_cmdopt(pCmd, "destination", &ipRoute.pszDestNetwork);
+
+            if (pCmd->op == OP_ADD)
+            {
+                err = nm_add_static_ip_route(&ipRoute);
+            }
+            else
+            {
+                err = nm_delete_static_ip_route(&ipRoute);
+            }
+            bail_on_error(err);
+            break;
+
+        case OP_GET:
+            err = nm_get_static_ip_routes(ipRoute.pszInterfaceName, &count,
+                                          &ppRoutesList);
+            fprintf(stdout, "Static IP Routes:\n");
+            for (i = 0; i < count; i++)
+            {
+                fprintf(stdout, "Route #%zu\n", i+1);
+                fprintf(stdout, "  Dest=%s\n", ppRoutesList[i]->pszDestNetwork);
+                fprintf(stdout, "  Gateway=%s\n", ppRoutesList[i]->pszGateway);
+                fprintf(stdout, "  Scope=%u\n", ppRoutesList[i]->scope);
+                fprintf(stdout, "  Metric=%u\n", ppRoutesList[i]->metric);
+            }
+            fprintf(stdout, "\n");
+            break;
+
+        default:
+            err = EINVAL;
+    }
+    bail_on_error(err);
+
+cleanup:
+    /* TODO: MEM LEAK CHECK */
+    netmgr_list_free(count, (void **)ppRoutesList);
+    return err;
+
+error:
+    goto cleanup;
+}
+
+static uint32_t
+cmd_dhcp_duid(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    char *pszIfname = NULL, *pszDuid = NULL;
+
+    netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
+
+    if (pCmd->op == OP_SET)
+    {
+        err = netmgrcli_find_cmdopt(pCmd, "duid", &pszDuid);
+        bail_on_error(err);
+
+        err = nm_set_duid(pszIfname, pszDuid);
+        pszDuid = NULL;
+        bail_on_error(err);
+    }
+
+    if (pCmd->op == OP_GET)
+    {
+        err = nm_get_duid(pszIfname, &pszDuid);
+        bail_on_error(err);
+
+        fprintf(stdout, "DUID=%s\n", pszDuid);
+    }
+
+cleanup:
+    netmgr_free(pszDuid);
+    return err;
+
+error:
+    goto cleanup;
+}
+
+static uint32_t
+cmd_if_iaid(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0, iaid = 0;
+    char *pszIfname = NULL, *pszIaid = NULL;
+
+    err = netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
+    bail_on_error(err);
+
+    if (pCmd->op == OP_SET)
+    {
+        err = netmgrcli_find_cmdopt(pCmd, "iaid", &pszIaid);
+        bail_on_error(err);
+
+        err = nm_set_iaid(pszIfname, (uint32_t)atoi(pszIaid));
+        bail_on_error(err);
+    }
+
+    if (pCmd->op == OP_GET)
+    {
+        err = nm_get_iaid(pszIfname, &iaid);
+        bail_on_error(err);
+
+        fprintf(stdout, "IAID=%u\n", iaid);
+    }
+
+cleanup:
+    return err;
+
+error:
+    goto cleanup;
+}
+
+static uint32_t
+cmd_dns_servers(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    size_t i = 0, count = 0;
+    NET_DNS_MODE dnsMode = DNS_MODE_INVALID;
+    char *pszIfname = NULL, *pszMode = NULL;
+    char *pszDnsServers = NULL, *pszNoRestart = NULL;
+    char *s1, *s2, *pszServers = NULL, **ppszDnsServersList = NULL;
+
+    netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
+
+    switch (pCmd->op)
+    {
+        case OP_SET:
+            err = netmgrcli_find_cmdopt(pCmd, "mode", &pszMode);
+            bail_on_error(err);
+            if (!strcmp(pszMode, "dhcp"))
+            {
+                dnsMode = DHCP_DNS;
+            }
+            else if (!strcmp(pszMode, "static"))
+            {
+                dnsMode = STATIC_DNS;
+            }
+            /* fall through */
+        case OP_ADD:
+        case OP_DEL:
+            err = netmgrcli_find_cmdopt(pCmd, "servers", &pszDnsServers);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            if (pszDnsServers != NULL)
+            {
+                err = netmgr_alloc_string(pszDnsServers, &pszServers);
+                bail_on_error(err);
+                if (strlen(pszServers) > 0)
+                {
+                    s2 = pszServers;
                     do {
                         s1 = strsep(&s2, ",");
                         if (strlen(s1) > 0)
@@ -704,105 +643,707 @@ cmd_dns_servers(
                         }
                     } while (s2 != NULL);
                 }
-                if (count == 0)
-                {
-                    break;
-                }
-                err = netmgr_alloc((count * sizeof(char *)),
-                                   (void *)&szDnsServersList);
+            }
+            if (!count && (pCmd->op != OP_SET))
+            {
+                err = EDOM;
                 bail_on_error(err);
-                strcpy(szServers, optarg);
-                s2 = szServers;
+            }
+            if (count > 0)
+            {
+                err = netmgr_alloc((count * sizeof(char*)),
+                                   (void *)&ppszDnsServersList);
+                bail_on_error(err);
+                strcpy(pszServers, pszDnsServers);
+                s2 = pszServers;
                 do {
                     s1 = strsep(&s2, ",");
                     if (strlen(s1) > 0)
                     {
-                        if ((i == 0) && !strcmp(s1,"+"))
-                        {
-                            add_servers = 1;
-                            count -= 1;
-                            continue;
-                        }
-                        err = netmgr_alloc_string(s1, &(szDnsServersList[i++]));
+                        err = netmgr_alloc_string(s1,
+                                                  &(ppszDnsServersList[i++]));
                         bail_on_error(err);
                     }
                 } while (s2 != NULL);
-                break;
-            case '?':
-                /* Option not handled here. Ignore. */
-                break;
-        }
-    }
-
-    if (op == OP_INVALID)
-    {
-        err = EDOM;
-        bail_on_error(err);
-    }
-
-    if (op == OP_SET)
-    {
-        if (mode == DNS_MODE_INVALID)
-        {
-            err = EDOM;
+            }
+            err = netmgrcli_find_cmdopt(pCmd, "norestart", &pszNoRestart);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
             bail_on_error(err);
-        }
-        if (add_servers == 0)
-        {
-            err = set_dns_servers(NULL, mode, count,
-                                  (const char **)szDnsServersList, 0);
-        }
-        else
-        {
-            err = add_dns_servers(NULL, count, (const char **)szDnsServersList);
-        }
-        bail_on_error(err);
+            if ((pszNoRestart != NULL) && !strcmp(pszNoRestart, "true"))
+            {
+                //TODO: Handle norestart
+            }
+            if (pCmd->op == OP_SET)
+            {
+                err = nm_set_dns_servers(pszIfname, dnsMode, count,
+                                         (const char **)ppszDnsServersList);
+            }
+            else if (pCmd->op == OP_ADD)
+            {
+                err = nm_add_dns_server(pszIfname, ppszDnsServersList[0]);
+            }
+            else if (pCmd->op == OP_DEL)
+            {
+                err = nm_delete_dns_server(pszIfname, ppszDnsServersList[0]);
+            }
+            break;
+
+        case OP_GET:
+            err = nm_get_dns_servers(pszIfname, &dnsMode, &count,
+                                     &ppszDnsServersList);
+            bail_on_error(err);
+
+            if (dnsMode == STATIC_DNS)
+            {
+                fprintf(stdout, "DNSMode=static\n");
+            }
+            else
+            {
+                fprintf(stdout, "DNSMode=dhcp\n");
+            }
+
+            fprintf(stdout, "DNSServers=");
+            for (i = 0; i < count; i++)
+            {
+                fprintf(stdout, "%s ", ppszDnsServersList[i]);
+            }
+            fprintf(stdout, "\n");
+            break;
+
+        default:
+            err = EINVAL;
     }
-
-    if (op == OP_GET)
-    {
-        char **szDnsServers = NULL;
-        err = get_dns_servers(NULL, 0, &mode, &count, &szDnsServers);
-        bail_on_error(err);
-
-        if (mode == STATIC_DNS)
-        {
-            fprintf(stdout, "DNSMode=static\n");
-        }
-        else
-        {
-            fprintf(stdout, "DNSMode=dhcp\n");
-        }
-
-        fprintf(stdout, "DNSServers=");
-        for (i = 0; i < count; i++)
-        {
-            fprintf(stdout, "%s ", szDnsServers[i]);
-            netmgr_free(szDnsServers[i]);
-        }
-        netmgr_free(szDnsServers);
-        fprintf(stdout, "\n");
-    }
+    bail_on_error(err);
 
 cleanup:
-    /* Free allocated memory */
-    if (szDnsServersList != NULL)
-    {
-        for (i = 0; i < count; i++)
-        {
-            netmgr_free(szDnsServersList[i]);
-        }
-        netmgr_free(szDnsServersList);
-    }
+    netmgr_list_free(count, (void **)ppszDnsServersList);
+    netmgr_free(pszServers);
     return err;
 
 error:
-    if(err == EDOM)
+    goto cleanup;
+}
+
+static uint32_t
+cmd_dns_domains(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    size_t i = 0, count = 0;
+    char *s1, *s2, *pszDnsDomains= NULL, **ppszDnsDomainsList = NULL;
+    char *pszDomains = NULL, *pszIfname = NULL, *pszNoRestart = NULL;
+
+    netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
+
+    switch (pCmd->op)
     {
-        fprintf(stderr,
-                "Usage:\ndns_servers --get\ndns_servers --set --mode "
-                 "dhcp|static --servers <server1,server2,...>\n");
+        case OP_SET:
+        case OP_ADD:
+        case OP_DEL:
+            err = netmgrcli_find_cmdopt(pCmd, "domains", &pszDnsDomains);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            if (pszDnsDomains != NULL)
+            {
+                err = netmgr_alloc_string(pszDnsDomains, &pszDomains);
+                bail_on_error(err);
+                if (strlen(pszDomains) > 0)
+                {
+                    s2 = pszDomains;
+                    do {
+                        s1 = strsep(&s2, ",");
+                        if (strlen(s1) > 0)
+                        {
+                            count++;
+                        }
+                    } while (s2 != NULL);
+                }
+            }
+            if (!count && (pCmd->op != OP_SET))
+            {
+                err = EDOM;
+                bail_on_error(err);
+            }
+            if (count > 0)
+            {
+                err = netmgr_alloc((count * sizeof(char*)),
+                                   (void *)&ppszDnsDomainsList);
+                bail_on_error(err);
+                strcpy(pszDomains, pszDnsDomains);
+                s2 = pszDomains;
+                do {
+                    s1 = strsep(&s2, ",");
+                    if (strlen(s1) > 0)
+                    {
+                        err = netmgr_alloc_string(s1,
+                                                  &(ppszDnsDomainsList[i++]));
+                        bail_on_error(err);
+                    }
+                } while (s2 != NULL);
+            }
+            err = netmgrcli_find_cmdopt(pCmd, "norestart", &pszNoRestart);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+            if ((pszNoRestart != NULL) && !strcmp(pszNoRestart, "true"))
+            {
+                //TODO: Handle
+            }
+            if (pCmd->op == OP_SET)
+            {
+                err = nm_set_dns_domains(pszIfname, count,
+                                         (const char **)ppszDnsDomainsList);
+            }
+            else if (pCmd->op == OP_ADD)
+            {
+                err = nm_add_dns_domain(pszIfname, ppszDnsDomainsList[0]);
+            }
+            else if (pCmd->op == OP_DEL)
+            {
+                err = nm_delete_dns_domain(pszIfname, ppszDnsDomainsList[0]);
+                bail_on_error(err);
+            }
+            bail_on_error(err);
+            break;
+
+        case OP_GET:
+            err = nm_get_dns_domains(pszIfname, &count, &ppszDnsDomainsList);
+            bail_on_error(err);
+
+            fprintf(stdout, "Domains=");
+            for (i = 0; i < count; i++)
+            {
+                fprintf(stdout, "%s ", ppszDnsDomainsList[i]);
+            }
+            fprintf(stdout, "\n");
+            break;
+
+        default:
+            err = EINVAL;
     }
+    bail_on_error(err);
+
+cleanup:
+    netmgr_list_free(count, (void **)ppszDnsDomainsList);
+    netmgr_free(pszDomains);
+    return err;
+
+error:
+    goto cleanup;
+}
+
+static uint32_t
+cmd_ntp_servers(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    size_t i = 0, count = 0;
+    char *pszNtpServers = NULL;
+    char *s1, *s2, *pszServers = NULL, **ppszNtpServersList = NULL;
+
+    switch (pCmd->op)
+    {
+        case OP_SET:
+        case OP_ADD:
+        case OP_DEL:
+            err = netmgrcli_find_cmdopt(pCmd, "servers", &pszNtpServers);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            if (pszNtpServers != NULL)
+            {
+                err = netmgr_alloc_string(pszNtpServers, &pszServers);
+                bail_on_error(err);
+                if (strlen(pszServers) > 0)
+                {
+                    s2 = pszServers;
+                    do {
+                        s1 = strsep(&s2, ",");
+                        if (strlen(s1) > 0)
+                        {
+                            count++;
+                        }
+                    } while (s2 != NULL);
+                }
+            }
+            if (count > 0)
+            {
+                err = netmgr_alloc((count * sizeof(char*)),
+                                   (void *)&ppszNtpServersList);
+                bail_on_error(err);
+                strcpy(pszServers, pszNtpServers);
+                s2 = pszServers;
+                do {
+                    s1 = strsep(&s2, ",");
+                    if (strlen(s1) > 0)
+                    {
+                        err = netmgr_alloc_string(s1,
+                                                  &(ppszNtpServersList[i++]));
+                        bail_on_error(err);
+                    }
+                } while (s2 != NULL);
+            }
+            if (pCmd->op == OP_SET)
+            {
+                err = nm_set_ntp_servers(count,
+                                         (const char **)ppszNtpServersList);
+            }
+            else if (pCmd->op == OP_ADD)
+            {
+                err = nm_add_ntp_servers(count,
+                                         (const char **)ppszNtpServersList);
+            }
+            else if (pCmd->op == OP_DEL)
+            {
+                err = nm_delete_ntp_servers(count,
+                                            (const char **)ppszNtpServersList);
+            }
+            break;
+
+        case OP_GET:
+            err = nm_get_ntp_servers(&count, &ppszNtpServersList);
+            bail_on_error(err);
+
+            fprintf(stdout, "NTPServers= ");
+            for (i = 0; i < count; i++)
+            {
+                fprintf(stdout, "%s ", ppszNtpServersList[i]);
+            }
+            fprintf(stdout, "\n");
+            break;
+
+        default:
+            err = EINVAL;
+    }
+    bail_on_error(err);
+
+cleanup:
+    netmgr_list_free(count, (void **)ppszNtpServersList);
+    netmgr_free(pszServers);
+    return err;
+
+error:
+    goto cleanup;
+}
+
+static uint32_t
+cmd_fw_rule(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    char *pszFwRule = NULL;
+    size_t i, ruleCount = 0;
+    NET_FW_RULE netFwRule = {0}, **netFwRules = NULL;
+
+    switch (pCmd->op)
+    {
+        case OP_ADD:
+        case OP_DEL:
+            err = netmgrcli_find_cmdopt(pCmd, "rule", &pszFwRule);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            netFwRule.ipVersion = IPV4;
+            netFwRule.type = FW_RAW;
+            netFwRule.pszRawFwRule = pszFwRule;
+            pszFwRule = NULL;
+
+            if (pCmd->op == OP_ADD)
+            {
+                err = nm_add_firewall_rule(&netFwRule);
+            }
+            else if (pCmd->op == OP_DEL)
+            {
+                err = nm_delete_firewall_rule(&netFwRule);
+            }
+            break;
+
+        case OP_GET:
+            err = nm_get_firewall_rules(&ruleCount, &netFwRules);
+            bail_on_error(err);
+
+            fprintf(stdout, "Firewall rules:\n");
+            for (i = 0; i < ruleCount; i++)
+            {
+                fprintf(stdout, "%s\n", netFwRules[i]->pszRawFwRule);
+            }
+            break;
+
+        default:
+            err = EINVAL;
+    }
+    bail_on_error(err);
+
+cleanup:
+    for (i = 0; i < ruleCount; i++)
+    {
+        netmgr_free(netFwRules[i]->pszRawFwRule);
+        netmgr_free(netFwRules[i]);
+    }
+    netmgr_free(netFwRules);
+    return err;
+
+error:
+    goto cleanup;
+}
+
+static uint32_t
+cmd_hostname(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    char *pszHostname = NULL;
+
+    switch (pCmd->op)
+    {
+        case OP_SET:
+            err = netmgrcli_find_cmdopt(pCmd, "hostname", &pszHostname);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            err = nm_set_hostname(pszHostname);
+            pszHostname = NULL;
+            bail_on_error(err);
+            break;
+
+        case OP_GET:
+            err = nm_get_hostname(&pszHostname);
+            bail_on_error(err);
+
+            fprintf(stdout, "Hostname: %s\n", pszHostname);
+            break;
+
+        default:
+            err = EINVAL;
+            bail_on_error(err);
+    }
+
+cleanup:
+    netmgr_free(pszHostname);
+    return err;
+error:
+    goto cleanup;
+}
+
+static uint32_t
+cmd_wait_for_link(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    long int ltimeout = 0;
+    char *pszIfname = NULL, *pszTimeOut = NULL, *pszEnd = NULL;
+
+    err = netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
+    bail_on_error(err);
+
+    err = netmgrcli_find_cmdopt(pCmd, "timeout", &pszTimeOut);
+    bail_on_error(err);
+
+    if ((ltimeout = strtol(pszTimeOut, &pszEnd, 10)) < 0)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = nm_wait_for_link_up(pszIfname, (uint32_t)ltimeout);
+    bail_on_error(err);
+
+cleanup:
+    return err;
+
+error:
+    goto cleanup;
+}
+
+typedef struct _NM_CLI_ADDR_STR_TYPE
+{
+    char *pszIpAddrType;
+    NET_ADDR_TYPE ipAddrType;
+} NM_CLI_ADDR_STR_TYPE, *PNM_CLI_ADDR_STR_TYPE;
+
+NM_CLI_ADDR_STR_TYPE addrStrToTypeMap[] =
+{
+    { "ipv4",               NET_ADDR_IPV4       },
+    { "ipv6",               NET_ADDR_IPV6       },
+    { "static_ipv4",        STATIC_IPV4         },
+    { "static_ipv6",        STATIC_IPV6         },
+    { "dhcp_ipv4",          DHCP_IPV4           },
+    { "dhcp_ipv6",          DHCP_IPV6           },
+    { "auto_ipv6",          AUTO_IPV6           },
+    { "link_local_ipv6",    LINK_LOCAL_IPV6     },
+};
+
+static uint32_t
+get_ip_addrtype(
+    const char *pszAddrType,
+    NET_ADDR_TYPE *pIpAddrType)
+{
+    uint32_t err = 0;
+    NET_ADDR_TYPE addrType = 0;
+    size_t i = 0, addrTypeCount = 0;
+
+    if (IS_NULL_OR_EMPTY(pszAddrType) || !pIpAddrType)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    addrTypeCount = sizeof(addrStrToTypeMap)/sizeof(NM_CLI_ADDR_STR_TYPE);
+
+    for (i = 0; i < addrTypeCount; i++)
+    {
+        if (!strcmp(pszAddrType, addrStrToTypeMap[i].pszIpAddrType))
+        {
+            addrType = addrStrToTypeMap[i].ipAddrType;
+            break;
+        }
+    }
+
+    if (!addrType)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    *pIpAddrType = addrType;
+
+cleanup:
+    return err;
+
+error:
+    if (pIpAddrType)
+    {
+        *pIpAddrType = 0;
+    }
+    goto cleanup;
+}
+
+static uint32_t
+cmd_wait_for_ip(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    long int ltimeout = 0;
+    char *pszIfname = NULL, *pszTimeOut = NULL, *pszEnd = NULL;
+    char *pszAddrTypes = NULL, *pszIpAddrTypes = NULL;
+    char *s1 = NULL, *s2 = NULL;
+    NET_ADDR_TYPE ipAddrTypes = 0, addrType = 0;
+
+    err = netmgrcli_find_cmdopt(pCmd, "interface", &pszIfname);
+    bail_on_error(err);
+
+    err = netmgrcli_find_cmdopt(pCmd, "timeout", &pszTimeOut);
+    bail_on_error(err);
+
+    if ((ltimeout = strtol(pszTimeOut, &pszEnd, 10)) < 0)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    err = netmgrcli_find_cmdopt(pCmd, "addrtype", &pszAddrTypes);
+    bail_on_error(err);
+
+    err = netmgr_alloc_string(pszAddrTypes, &pszIpAddrTypes);
+    bail_on_error(err);
+
+    s2 = pszIpAddrTypes;
+    do {
+        s1 = strsep(&s2, ",");
+        if (strlen(s1) > 0)
+        {
+            addrType = 0;
+            err = get_ip_addrtype(s1, &addrType);
+            bail_on_error(err);
+            ipAddrTypes |= addrType;
+        }
+    } while (s2 != NULL);
+
+    err = nm_wait_for_ip(pszIfname, (uint32_t)ltimeout, ipAddrTypes);
+    bail_on_error(err);
+
+cleanup:
+    netmgr_free(pszIpAddrTypes);
+    return err;
+
+error:
+    goto cleanup;
+}
+
+static uint32_t
+cmd_err_info(PNETMGR_CMD pCmd)
+{
+    int lErrCode = 0;
+    uint32_t err = 0, errCode = 0;
+    char *pszErrCode = NULL, *pszEnd = NULL;
+    const char *pszErrInfo = NULL;
+
+    err = netmgrcli_find_cmdopt(pCmd, "errcode", &pszErrCode);
+    bail_on_error(err);
+
+    if ((lErrCode = strtol(pszErrCode, &pszEnd, 10)) < 0)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    errCode = (uint32_t)lErrCode;
+    if (errCode > NM_CLI_BASE_ERROR)
+    {
+        errCode -= NM_CLI_BASE_ERROR;
+        errCode += NM_BASE_ERROR;
+    }
+
+    pszErrInfo = nm_get_error_info(errCode);
+    if (pszErrInfo == NULL)
+    {
+        err = ENOENT;
+        bail_on_error(err);
+    }
+
+    fprintf(stdout, "ErrorInfo: %s\n", pszErrInfo);
+
+cleanup:
+    return err;
+error:
+    goto cleanup;
+}
+
+static uint32_t
+cmd_net_info(PNETMGR_CMD pCmd)
+{
+    uint32_t err = 0;
+    char *pszObjectName = NULL, *pszParamName = NULL, *pszParamValue = NULL;
+
+    netmgrcli_find_cmdopt(pCmd, "objectname", &pszObjectName);
+
+    switch (pCmd->op)
+    {
+        case OP_SET:
+            err = netmgrcli_find_cmdopt(pCmd, "paramname", &pszParamName);
+            bail_on_error(err);
+
+            err = netmgrcli_find_cmdopt(pCmd, "paramvalue", &pszParamValue);
+            if (err == ENOENT)
+            {
+                err = 0;
+            }
+            bail_on_error(err);
+
+            if (pszParamName != NULL)
+            {
+                err = nm_set_network_param(pszObjectName,
+                                           pszParamName,
+                                           pszParamValue);
+                pszParamValue = NULL;
+                bail_on_error(err);
+            }
+            break;
+
+        case OP_GET:
+            err = netmgrcli_find_cmdopt(pCmd, "paramname", &pszParamName);
+            bail_on_error(err);
+
+            err = nm_get_network_param(pszObjectName,
+                                       pszParamName,
+                                       &pszParamValue);
+            bail_on_error(err);
+
+            fprintf(stdout, "ParamName: %s, ParamValue: %s\n", pszParamName,
+                    pszParamValue);
+            break;
+
+        default:
+            err = EINVAL;
+    }
+    bail_on_error(err);
+
+cleanup:
+    netmgr_free(pszParamValue);
+    return err;
+
+error:
+    goto cleanup;
+}
+
+typedef struct _NETMGR_CLI_HANDLER
+{
+    CMD_ID id;
+    uint32_t (*pFnCmd)(PNETMGR_CMD);
+} NETMGR_CLI_HANDLER, *PNETMGR_CLI_HANDLER;
+
+NETMGR_CLI_HANDLER cmdHandler[] =
+{
+    { CMD_LINK_INFO,           cmd_link_info       },
+    { CMD_IP4_ADDRESS,         cmd_ip4_address     },
+    { CMD_IP6_ADDRESS,         cmd_ip6_address     },
+    { CMD_IP_ROUTE,            cmd_ip_route        },
+    { CMD_DHCP_DUID,           cmd_dhcp_duid       },
+    { CMD_IF_IAID,             cmd_if_iaid         },
+    { CMD_DNS_SERVERS,         cmd_dns_servers     },
+    { CMD_DNS_DOMAINS,         cmd_dns_domains     },
+    { CMD_NTP_SERVERS,         cmd_ntp_servers     },
+    { CMD_FW_RULE,             cmd_fw_rule         },
+    { CMD_HOSTNAME,            cmd_hostname        },
+    { CMD_WAIT_FOR_LINK,       cmd_wait_for_link   },
+    { CMD_WAIT_FOR_IP,         cmd_wait_for_ip     },
+    { CMD_ERR_INFO,            cmd_err_info        },
+    { CMD_NET_INFO,            cmd_net_info        },
+};
+
+void
+show_version()
+{
+    fprintf(stdout, "%s: %s\n", PACKAGE_NAME, PACKAGE_VERSION);
+}
+
+int main(int argc, char* argv[])
+{
+    uint32_t err = 0;
+    const char *pszErrMsg = NULL;
+    PNETMGR_CMD pCmd = NULL;
+    size_t i, cmdCount = sizeof(cmdHandler)/sizeof(NETMGR_CLI_HANDLER);
+
+    err = netmgrcli_parse_cmdline(argc, argv, &pCmd);
+    bail_on_error(err);
+
+    if (pCmd->op != OP_GET)
+    {
+        if (geteuid())
+        {
+            err = EACCES;
+            bail_on_error(err);
+        }
+    }
+
+    for (i = 0; i < cmdCount; i++)
+    {
+        if (pCmd->id == cmdHandler[i].id)
+        {
+            err = cmdHandler[i].pFnCmd(pCmd);
+            break;
+        }
+    }
+    bail_on_error(err);
+
+cleanup:
+    netmgrcli_free_cmd(pCmd);
+    return get_cli_error_code(err);
+error:
+    pszErrMsg = nm_get_error_info(err);
+    fprintf(stderr, "Error: %s\n", pszErrMsg);
     goto cleanup;
 }
 

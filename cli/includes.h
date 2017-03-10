@@ -13,13 +13,15 @@
  */
 
 #include <config.h>
-
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <errno.h>
 #include <getopt.h>
+#include <arpa/inet.h>
 
-#include <netmgmtsys.h>
-
+#include "../common/common_utils.h"
 #include "../common/nm_memory.h"
-#include <netmgr.h>
 #include "defines.h"
-#include "structs.h"
 #include "netmgrcli.h"

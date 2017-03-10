@@ -44,7 +44,7 @@ ini_cfg_free_keyvalue(
 uint32_t
 ini_cfg_read(
     const char*  pszPath,
-    PCONFIG_INI* ppConfig 
+    PCONFIG_INI* ppConfig
     )
 {
     uint32_t err = 0;
@@ -57,7 +57,7 @@ ini_cfg_read(
 
     if (!pszPath || !*pszPath || !ppConfig)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -76,10 +76,11 @@ ini_cfg_read(
 
     while(!feof(fp))
     {
-        char buffer[1024];
+        size_t lineLen = 0;
+        char *pszLine = NULL, *lp;
         const char* pszCursor = NULL;
 
-        if (!fgets(buffer, sizeof(buffer), fp))
+        if (getline(&pszLine, &lineLen, fp) < 0)
         {
             if (feof(fp))
             {
@@ -89,7 +90,15 @@ ini_cfg_read(
             bail_on_error(err);
         }
 
-        pszCursor = &buffer[0];
+        // remove any trailing spaces
+        lp = pszLine + strlen(pszLine) - 1;
+        while ((lp > pszLine) && (*lp == '\n' || isspace((int)*lp)))
+        {
+            lp--;
+        }
+        *(lp + 1) = '\0';
+
+        pszCursor = pszLine;
 
         // skip leading whitespace
         while (pszCursor && *pszCursor && isspace((int)*pszCursor))
@@ -119,7 +128,7 @@ ini_cfg_read(
         {
             if (!pSection)
             {
-                err = EBADMSG;
+                err = NM_ERR_BAD_CONFIG_FILE;
                 bail_on_error(err);
             }
 
@@ -140,6 +149,7 @@ ini_cfg_read(
             err = ini_cfg_add_key(pSection, pszKey, pszValue);
             bail_on_error(err);
         }
+        free(pszLine);
     }
 
     *ppConfig = pConfig;
@@ -189,7 +199,7 @@ ini_cfg_create_config(
 
     if (!ppConfig)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -229,7 +239,7 @@ ini_cfg_add_section(
 
     if (!pConfig || !pszName || !*pszName || !ppSection)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -290,7 +300,7 @@ ini_cfg_find_sections(
 
     if (!pConfig || !pszName || !*pszName || !pppSections || !pdwNumSections)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -365,41 +375,75 @@ ini_cfg_delete_sections(
     )
 {
     uint32_t err = 0;
-    PSECTION_INI pCursor = NULL;
+    PSECTION_INI *ppCursor = NULL;
+    PSECTION_INI pCandidate = NULL;
 
     if (!pConfig || !pszName || !*pszName)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
-    pCursor = pConfig->pSection; 
-    while (pCursor)
+    ppCursor = &pConfig->pSection;
+    while (*ppCursor)
     {
-        PSECTION_INI pCandidate = NULL;
-
-        if (!strcmp(pCursor->pszName, pszName))
+        if (!strcmp((*ppCursor)->pszName, pszName))
         {
-            pCandidate = pCursor;
-
-            if (pCursor == pConfig->pSection)
-            {
-                pConfig->pSection = pCursor->pNext;
-            }
+            pCandidate = *ppCursor;
+            *ppCursor = pCandidate->pNext;
+            break;
         }
 
-        pCursor = pCursor->pNext;
+        ppCursor = &(*ppCursor)->pNext;
+    }
+    if (pCandidate)
+    {
+        pCandidate->pNext = NULL;
 
-        if (pCandidate)
-        {
-            pCandidate->pNext = NULL;
-
-            ini_cfg_free_section(pCandidate);
-        }
+        ini_cfg_free_section(pCandidate);
     }
 
 error:
 
+    return err;
+}
+
+uint32_t
+ini_cfg_delete_section(
+    PCONFIG_INI   pConfig,
+    PSECTION_INI  pSection
+    )
+{
+    uint32_t err = 0;
+    PSECTION_INI *pCursor = NULL;
+    PSECTION_INI pCandidate = NULL;
+
+    if (!pConfig || !pSection)
+    {
+        err = NM_ERR_INVALID_PARAMETER;
+        bail_on_error(err);
+    }
+
+    for (pCursor = &pConfig->pSection; *pCursor; pCursor = &(*pCursor)->pNext)
+    {
+        if (*pCursor == pSection)
+        {
+            pCandidate = *pCursor;
+            *pCursor = pCandidate->pNext;
+            break;
+        }
+    }
+
+    if (!pCandidate)
+    {
+        err = NM_ERR_VALUE_NOT_FOUND;
+        bail_on_error(err);
+    }
+
+    pCandidate->pNext = NULL;
+    ini_cfg_free_section(pCandidate);
+
+error:
     return err;
 }
 
@@ -426,7 +470,64 @@ ini_cfg_find_key(
     }
 
 cleanup:
+    return pKeyValue;
+}
 
+PKEYVALUE_INI
+ini_cfg_find_next_key(
+    PSECTION_INI  pSection,
+    PKEYVALUE_INI pKeyValue,
+    const char*   pszKey
+    )
+{
+    PKEYVALUE_INI pNextKeyVal = NULL;
+    PKEYVALUE_INI pCursor;
+
+    if (!pszKey || !*pszKey)
+    {
+        goto cleanup;
+    }
+
+    pCursor = (pKeyValue == NULL) ? pSection->pKeyValue : pKeyValue->pNext;
+
+    for (; !pNextKeyVal && pCursor; pCursor = pCursor->pNext)
+    {
+        if (!strcmp(pCursor->pszKey, pszKey) && (pCursor->pszValue != NULL))
+        {
+            pNextKeyVal = pCursor;
+            break;
+        }
+    }
+
+cleanup:
+    return pNextKeyVal;
+}
+
+PKEYVALUE_INI
+ini_cfg_find_key_value(
+    PSECTION_INI  pSection,
+    const char*   pszKey,
+    const char*   pszValue
+    )
+{
+    PKEYVALUE_INI pKeyValue = NULL;
+    PKEYVALUE_INI pCursor = pSection->pKeyValue;
+
+    if (!pszKey || !*pszKey || !pszValue || !*pszValue)
+    {
+        goto cleanup;
+    }
+
+    for (; !pKeyValue && pCursor; pCursor = pCursor->pNext)
+    {
+        if (!strcmp(pCursor->pszKey, pszKey) && (pCursor->pszValue != NULL)
+            && !strcmp(pCursor->pszValue, pszValue))
+        {
+            pKeyValue = pCursor;
+        }
+    }
+
+cleanup:
     return pKeyValue;
 }
 
@@ -443,13 +544,7 @@ ini_cfg_add_key(
 
     if (!pSection || !pszKey || !*pszKey)
     {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    if (ini_cfg_find_key(pSection, pszKey))
-    {
-        err = EEXIST;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -507,14 +602,14 @@ ini_cfg_set_value(
 
     if (!pSection || !pszKey || !*pszKey || !pszValue || !*pszValue)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
     pCandidate = ini_cfg_find_key(pSection, pszKey);
     if (!pCandidate)
     {
-        err = ENOENT;
+        err = NM_ERR_VALUE_NOT_FOUND;
         bail_on_error(err);
     }
 
@@ -545,7 +640,7 @@ ini_cfg_delete_key(
 
     if (!pSection || !pszKey || !*pszKey)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -571,7 +666,45 @@ error:
 
     return err;
 }
-     
+
+uint32_t
+ini_cfg_delete_key_value(
+    PSECTION_INI  pSection,
+    PKEYVALUE_INI pKeyValue
+    )
+{
+    uint32_t err = 0;
+    PKEYVALUE_INI *pCursor = NULL;
+    PKEYVALUE_INI pCandidate = NULL;
+
+    if (!pSection || !pKeyValue)
+    {
+        err = NM_ERR_INVALID_PARAMETER;
+        bail_on_error(err);
+    }
+
+    pCursor = &pSection->pKeyValue;
+    while (*pCursor)
+    {
+        if (*pCursor == pKeyValue)
+        {
+            pCandidate = *pCursor;
+            *pCursor = pCandidate->pNext;
+            break;
+        }
+        pCursor = &(*pCursor)->pNext;
+    }
+
+    if (pCandidate)
+    {
+        pCandidate->pNext = NULL;
+        ini_cfg_free_keyvalue(pCandidate);
+    }
+
+error:
+    return err;
+}
+
 uint32_t
 ini_cfg_save(
     const char*   pszPath,
@@ -586,7 +719,7 @@ ini_cfg_save(
 
     if (!pszPath || !*pszPath || !pConfig)
     {
-        err = EINVAL;
+        err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
     }
 
@@ -608,18 +741,18 @@ ini_cfg_save(
     {
         PKEYVALUE_INI pKeyValue = pSection->pKeyValue;
 
-        if(fprintf(fp, "\n[%s]\n", pSection->pszName) < 0)
+        if (fprintf(fp, "\n[%s]\n", pSection->pszName) < 0)
         {
-            err = EBADF;
+            err = NM_ERR_WRITE_FAILED;
             bail_on_error(err);
         }
 
         for (; pKeyValue; pKeyValue = pKeyValue->pNext)
         {
             pszValue = (pKeyValue->pszValue != NULL) ? pKeyValue->pszValue : "";
-            if(fprintf(fp, "%s=%s\n", pKeyValue->pszKey, pszValue) < 0)
+            if (fprintf(fp, "%s=%s\n", pKeyValue->pszKey, pszValue) < 0)
             {
-                err = EBADF;
+                err = NM_ERR_WRITE_FAILED;
                 bail_on_error(err);
             }
         }
@@ -630,7 +763,8 @@ ini_cfg_save(
 
     if (chmod(pszTmpPath, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH) != 0)
     {
-        bail_on_error(errno);
+        err = errno;
+        bail_on_error(err);
     }
 
     if (rename(pszTmpPath, pszPath) < 0)
@@ -701,7 +835,7 @@ ini_cfg_parse_section_name(
     // check prefix
     if (!pszCursor || !*pszCursor || *pszCursor != '[')
     {
-        err = EBADMSG;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
     // skip prefix
@@ -714,7 +848,7 @@ ini_cfg_parse_section_name(
     pszNameMarker = pszCursor;
     if (!pszNameMarker || !*pszNameMarker)
     {
-        err = EBADMSG;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
     // allow only (('a'-'z') || ('A'-'Z'))+
@@ -731,7 +865,7 @@ ini_cfg_parse_section_name(
     // check suffix
     if (!pszCursor || !*pszCursor || *pszCursor != ']')
     {
-        err = EBADMSG;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
     // skip suffix
@@ -744,7 +878,7 @@ ini_cfg_parse_section_name(
     // Expect end of line and a non-empty name
     if ((pszCursor && *pszCursor) || !len)
     {
-        err = EBADMSG;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
 
@@ -796,7 +930,7 @@ ini_cfg_parse_key_value(
     pszKeyMarker = pszCursor;
     if (!pszKeyMarker || !*pszKeyMarker)
     {
-        err = EBADMSG;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
     // allow only (('a'-'z') || ('A'-'Z') || ('0'-'9'))+
@@ -813,7 +947,7 @@ ini_cfg_parse_key_value(
     // check operator
     if (!pszCursor || !*pszCursor || *pszCursor != '=')
     {
-        err = EBADMSG;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
     // skip operator
@@ -824,11 +958,6 @@ ini_cfg_parse_key_value(
         pszCursor++;
     }
     pszValueMarker = pszCursor;
-    if (!pszValueMarker)
-    {
-        err = EBADMSG;
-        bail_on_error(err);
-    }
     while (pszCursor && *pszCursor)
     {
         if (*pszCursor == '\n')
@@ -841,7 +970,7 @@ ini_cfg_parse_key_value(
     }
     if ((pszCursor && *pszCursor) || !len_key)
     {
-        err = EBADMSG;
+        err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
 
