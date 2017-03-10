@@ -12,26 +12,66 @@
  * under the License.
  */
 
-#define IsNullOrEmptyString(str) (!(str) || !(*str))
-
 #ifndef __DEFINES_H__
 #define __DEFINES_H__
 
 
 #define MAX_LINE                       512
+#define NM_LOCK_FILENAME               "/run/lock/netmgr.lck"
 
 #define SYSTEMD_PATH                   "/etc/systemd/"
 #define SYSTEMD_NET_PATH               "/etc/systemd/network/"
+#define PHOTON_ETH0_NAME               "eth0"
+
+#define IPTABLES_COMMAND               "/usr/sbin/iptables"
+#define IP6TABLES_COMMAND              "/usr/sbin/ip6tables"
+#define SED_COMMAND                    "/usr/bin/sed"
+#define ARPING_COMMAND                 "/sbin/arping"
+#define ARPING_DUP_ADDR_CHECK_CMDOPT   "-D -q -c 2"
+#define ARPING_UPDATE_NEIGHBOR_CMDOPT  "-A -c 3"
 
 #define SECTION_RESOLVE                "Resolve"
+#define SECTION_MATCH                  "Match"
 #define SECTION_NETWORK                "Network"
 #define SECTION_DHCP                   "DHCP"
+#define SECTION_ROUTE                  "Route"
+#define SECTION_LINK                   "Link"
 
+#define KEY_NAME                       "Name"
+#define KEY_ADDRESS                    "Address"
+#define KEY_GATEWAY                    "Gateway"
+#define KEY_DEST                       "Destination"
+#define KEY_SRC                        "Source"
+#define KEY_METRIC                     "Metric"
+#define KEY_SCOPE                      "Scope"
+#define KEY_DHCP                       "DHCP"
+#define KEY_DNS                        "DNS"
+#define KEY_USE_DNS                    "UseDNS"
+#define KEY_DOMAINS                    "Domains"
+#define KEY_USE_DOMAINS                "UseDomains"
 #define KEY_IAID                       "IAID"
 #define KEY_DUID_TYPE                  "DUIDType"
 #define KEY_DUID_RAWDATA               "DUIDRawData"
-#define KEY_DNS                        "DNS"
-#define KEY_USE_DNS                    "UseDNS"
+#define KEY_MTU                        "MTUBytes"
+#define KEY_MAC_ADDRESS                "MACAddress"
+#define KEY_UNMANAGED                  "Unmanaged"
+
+#define SECTION_KEY_DELIM              "_"
+
+
+#define RESOLV_CONF_FILENAME           "/etc/resolv.conf"
+#define NTP_CONF_FILENAME              "/etc/ntp.conf"
+#define HOSTNAME_CONF_FILENAME         "/etc/hostname"
+#define FIREWALL_CONF_FILENAME         "/etc/systemd/scripts/iptables"
+#define SYSCTL_CONF_FILENAME           "/etc/sysctl.d/99-sysctl.conf"
+#define STR_NAMESERVER                 "nameserver"
+#define STR_SEARCH                     "search"
+#define STR_SERVER                     "server"
+
+
+#define fDHCP_IPV4         0x00000001
+#define fDHCP_IPV6         0x00000010
+#define fAUTO_IPV6         0x00000020
 
 
 #define bail_on_error(errcode) \
@@ -40,8 +80,5 @@
           goto error; \
        } \
     } while(0)
-
-#define SET_FLAG(v,f) ((v) | (f))
-#define TEST_FLAG(v,f) (((v) & (f)) != 0)
 
 #endif /* __DEFINES_H__ */

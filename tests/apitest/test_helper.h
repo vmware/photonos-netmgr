@@ -12,71 +12,36 @@
  * under the License.
  */
 
-#ifndef __UTILS_H__
-#define __UTILS_H__
-
-#define F_CREATE_CFG_FILE              0x00000001
+#ifndef _UTILS_H_
+#define _UTILS_H
 
 uint32_t
-nm_set_key_value(
-    const char *pszConfigFileName,
+test_file_value(
+    const char *pszFilename,
     const char *pszSection,
     const char *pszKey,
-    const char *pszValue,
-    uint32_t flags
+    const char *pszValue
 );
 
 uint32_t
-nm_add_key_value(
-    const char *pszConfigFileName,
+test_file_value_list(
+    const char *pszFilename,
     const char *pszSection,
     const char *pszKey,
-    const char *pszValue,
-    uint32_t flags
+    const char **ppszValue,
+    size_t valueCount
 );
 
 uint32_t
-nm_delete_key_value(
-    const char *pszConfigFileName,
+test_file_routes(
+    const char *pszFilename,
     const char *pszSection,
     const char *pszKey,
-    const char *pszValue,
-    uint32_t flags
+    const char *pszValue
 );
 
 uint32_t
-nm_get_key_value(
-    const char *pszConfigFileName,
-    const char *pszSection,
-    const char *pszKey,
-    char **ppszValue
-);
-
-uint32_t
-nm_get_systemd_version(
-    uint32_t *psdVersion
-);
-
-uint32_t
-nm_atomic_file_update(
-    const char *pszFileName,
-    const char *pszFileBuf
-);
-
-uint32_t
-nm_run_command(
+system_command(
     const char *pszCommand
 );
-
-uint32_t
-nm_acquire_write_lock(
-    uint32_t timeOut,
-    int *pLockId
-);
-
-uint32_t
-nm_release_write_lock(
-    int lockId
-);
-
-#endif /* __UTILS_H__ */
+#endif

@@ -14,6 +14,8 @@
 
 #pragma once
 
+#define NM_CLI_BASE_ERROR              200U
+
 #define bail_on_error(errcode) \
     do { \
        if (errcode) { \

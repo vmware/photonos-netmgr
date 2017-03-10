@@ -12,11 +12,20 @@
  * under the License.
  */
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdarg.h>
 #include <string.h>
-#include <errno.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
+#include <fcntl.h>
 
 #include "defines.h"
-#include "prototypes.h"
+#include "nm_memory.h"
+#include "common_utils.h"

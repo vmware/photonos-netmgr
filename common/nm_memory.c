@@ -140,6 +140,63 @@ error:
     goto cleanup;
 }
 
+uint32_t
+netmgr_alloc_string_printf(
+    char** ppszDst,
+    const char* pszFmt,
+    ...
+    )
+{
+    uint32_t err = 0;
+    size_t nSize = 0;
+    char* pszDst = NULL;
+    char chDstTest = '\0';
+    va_list argList;
+
+    if (!ppszDst || !pszFmt)
+    {
+        err = EINVAL;
+        bail_on_error(err);
+    }
+
+    //Find size
+    va_start(argList, pszFmt);
+    nSize = vsnprintf(&chDstTest, 1, pszFmt, argList);
+    va_end(argList);
+
+    if (nSize <= 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+    nSize = nSize + 1;
+
+    err = netmgr_alloc(nSize, (void**)&pszDst);
+    bail_on_error(err);
+
+    va_start(argList, pszFmt);
+    nSize = vsnprintf(pszDst, nSize, pszFmt, argList);
+    va_end(argList);
+
+    if (nSize <= 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+    *ppszDst = pszDst;
+
+cleanup:
+    return err;
+
+error:
+    if (ppszDst)
+    {
+        *ppszDst = NULL;
+    }
+    netmgr_free(pszDst);
+    goto cleanup;
+}
+
 void
 netmgr_free(
     void* pMemory
@@ -148,6 +205,27 @@ netmgr_free(
     if (pMemory)
     {
         free(pMemory);
+    }
+}
+
+void
+netmgr_list_free(
+    size_t count,
+    void **ppMemory
+    )
+{
+    size_t i;
+
+    if (ppMemory != NULL)
+    {
+        for (i = 0; i < count; i++)
+        {
+            if (ppMemory[i] != NULL)
+            {
+                netmgr_free(ppMemory[i]);
+            }
+        }
+        netmgr_free(ppMemory);
     }
 }
 

@@ -4,3 +4,5 @@
 #
 m4_include([init.at])
 m4_include([version.at])
+m4_include([dhcp_duid.at])
+m4_include([if_iaid.at])
