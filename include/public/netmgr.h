@@ -15,6 +15,10 @@
 #ifndef __NETMGR_H__
 #define __NETMGR_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define SET_FLAG(v, f) (v) = ((v) | (f))
 #define CLEAR_FLAG(v, f) (v) = ((v) & ~(f))
 #define TEST_FLAG(v, f) (((v) & (f)) != 0)
@@ -198,6 +202,10 @@ nm_get_error_info(
     uint32_t nmErrCode
 );
 
+uint32_t
+nm_touch_network_conf_file(
+    const char *pszInterfaceName,
+    char **ppszFilename);
 
 /*
  * Interface configuration APIs
@@ -574,6 +582,9 @@ nm_restart_ntp_service();
 uint32_t
 nm_reload_firewall_config();
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __NETMGR_H__ */
 
