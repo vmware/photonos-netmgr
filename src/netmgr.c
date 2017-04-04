@@ -608,6 +608,48 @@ error:
     goto cleanup;
 }
 
+uint32_t
+nm_touch_network_conf_file(
+    const char *pszInterfaceName,
+    char **ppszFilename)
+{
+    uint32_t err = 0;
+    char *pszCfgFileName = NULL;
+    int lockId;
+
+    err = nm_acquire_write_lock(0, &lockId);
+    bail_on_error(err);
+
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName))
+    {
+        err = NM_ERR_INVALID_INTERFACE;
+        bail_on_error(err);
+    }
+
+    err = nm_get_network_conf_filename_for_update(pszInterfaceName,
+                                                  &pszCfgFileName);
+    bail_on_error(err);
+
+    if (ppszFilename != NULL)
+    {
+        *ppszFilename = pszCfgFileName;
+    }
+    else
+    {
+        netmgr_free(pszCfgFileName);
+    }
+
+cleanup:
+    nm_release_write_lock(lockId);
+    return err;
+error:
+    if (ppszFilename != NULL)
+    {
+        *ppszFilename = NULL;
+    }
+    netmgr_free(pszCfgFileName);
+    goto cleanup;
+}
 
 /*
  * Interface configuration APIs
@@ -1311,9 +1353,12 @@ nm_do_arping(
         bail_on_error(err);
     }
 
-    err = netmgr_alloc_string_printf(&pszArpingCmd, "%s %s -I %s %s",
-                                     ARPING_COMMAND, pszCommandOptions,
-                                     pszInterfaceName, pszDestIPv4Addr);
+    err = netmgr_alloc_string_printf(&pszArpingCmd,
+                                     "%s %s -I %s %s",
+                                     ARPING_COMMAND,
+                                     pszCommandOptions,
+                                     pszInterfaceName,
+                                     pszDestIPv4Addr);
     bail_on_error(err);
 
     err = nm_run_command(pszArpingCmd);
@@ -2912,8 +2957,8 @@ nm_get_ipv4_addr_gateway(
     char **ppszIpAddrList = NULL, **ppszGwAddrList = NULL;
     size_t ipCount, gwCount;
 
-    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !pMode ||
-        !ppszIPv4AddrPrefix || !ppszIPv4Gateway)
+    if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
+        !(pMode || ppszIPv4AddrPrefix || ppszIPv4Gateway))
     {
         err = NM_ERR_INVALID_PARAMETER;
         bail_on_error(err);
@@ -3001,9 +3046,18 @@ nm_get_ipv4_addr_gateway(
         bail_on_error(err);
     }
 
-    *pMode = ip4Mode;
-    *ppszIPv4AddrPrefix = pszIPv4AddrPrefix;
-    *ppszIPv4Gateway = pszIPv4Gateway;
+    if (pMode)
+    {
+        *pMode = ip4Mode;
+    }
+    if (ppszIPv4AddrPrefix)
+    {
+        *ppszIPv4AddrPrefix = pszIPv4AddrPrefix;
+    }
+    if (ppszIPv4Gateway)
+    {
+        *ppszIPv4Gateway = pszIPv4Gateway;
+    }
 
 cleanup:
     netmgr_list_free(ipCount, (void **)ppszIpAddrList);
