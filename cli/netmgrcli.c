@@ -1116,89 +1116,6 @@ error:
 }
 
 
-static struct option fwRuleOptions[] =
-{
-    {"add",          no_argument,          0,    'a'},
-    {"del",          no_argument,          0,    'd'},
-    {"get",          no_argument,          0,    'g'},
-    {"rule",         required_argument,    0,    'r'},
-    {0, 0, 0, 0}
-};
-
-static uint32_t
-cli_fw_rule(
-    int argc,
-    char **argv,
-    PNETMGR_CMD pCmd
-    )
-{
-    uint32_t err = 0, valid_rule = 0;
-    int nOptionIndex = 0, nOption = 0;
-    CMD_OP op = OP_INVALID;
-
-    opterr = 0;
-    optind = 1;
-    while (1)
-    {
-        nOption = getopt_long(argc,
-                              argv,
-                              "adgr:",
-                              fwRuleOptions,
-                              &nOptionIndex);
-        if (nOption == -1)
-            break;
-
-        switch(nOption)
-        {
-            case 'a':
-                op = OP_ADD;
-                break;
-            case 'd':
-                op = OP_DEL;
-                break;
-            case 'g':
-                op = OP_GET;
-                break;
-            case 'r':
-                if (strlen(optarg) > 0)
-                {
-                    err = netmgrcli_alloc_keyvalue("rule", optarg, pCmd);
-                    valid_rule = 1;
-                }
-                break;
-            case '?':
-                /* Option not handled here. Ignore. */
-                break;
-        }
-        bail_on_error(err);
-    }
-
-    if ((op == OP_INVALID) ||
-        (((op == OP_DEL) || (op == OP_ADD)) && (valid_rule == 0)))
-    {
-        err = EDOM;
-        bail_on_error(err);
-    }
-
-    pCmd->id = CMD_FW_RULE;
-    pCmd->op = op;
-
-cleanup:
-    return err;
-
-error:
-    pCmd->op = OP_INVALID;
-    if(err == EDOM)
-    {
-        fprintf(stderr,
-                "Usage:\nfw_rule --get\n"
-                 "fw_rule --add --rule <Firewall Rule>\n"
-                 "fw_rule --del --rule <Firewall Rule>\n");
-    }
-    goto cleanup;
-}
-
-
 static struct option hostnameOptions[] =
 {
     {"set",          no_argument,          0,    's'},
@@ -1646,35 +1563,35 @@ NETMGRCLI_CMD_MAP cmdMap[] =
      cli_link_info,
      "--set --interface <interface name> --mode <manual|auto> --state <up|down> "
      "--macaddr <mac_address> --mtu <mtu>",
-     "get or set link mac addr, mtu, state, mode per interface"
+     "get or set interface mac address, mtu, link state, or link mode"
     },
     {"ip4_address",
      cli_ip4_address,
      "--set --interface <interface name> --mode <dhcp|static|none> "
      "--addr <IPv4Address/prefix> --gateway <default gateway>",
-     "get or set IPv4 address and default gateway for interface"
+     "get or set interface IPv4 address and optionally default gateway"
     },
     {"ip6_address",
      cli_ip6_address,
      "--add|--del|--set --interface <interface name> --dhcp <1|0> --autoconf <1|0> "
      "--addrlist <IPv6 Address/Prefix list> --gateway <Default IPv6 gateway>",
-     "add or delete IPv6 addresses and default gateway for interface"
+     "add or delete IPv6 address(es) and optionally default gateway for interface"
     },
     {"ip_route",
      cli_ip_route,
      "--add|--del --interface <interface name> --destination <Dest Network/Prefix> "
      "--gateway <Gateway IP Addr> -- metric <Route Metric> --scope <scope>",
-     "add or delete IP routes for the interface"
+     "add or delete static IP route for the interface"
     },
     {"dns_servers",
      cli_dns_servers,
      "--set --mode <dhcp|static> --servers <DNS servers list>",
-     "get or set DNS mode, DNS servers list"
+     "get or set DNS mode, list of DNS servers"
     },
     {"dns_domains",
      cli_dns_domains,
      "--set --del --add --domains <Domains list>",
-     "get or set DNS domains list"
+     "get or set list of DNS domains"
     },
     {"dhcp_duid",
      cli_dhcp_duid,
@@ -1691,26 +1608,21 @@ NETMGRCLI_CMD_MAP cmdMap[] =
      "--set --del --add --servers <NTP servers list>",
      "get or set NTP servers list"
     },
-    {"fw_rule",
-     cli_fw_rule,
-     "--add --del --rule <Firewall Rule>",
-     "add or delete firewall rules"
-    },
     {"hostname",
      cli_hostname,
-     "--set --name <Hostname>",
-     "get or set hostname"
+     "--set --name <hostname>",
+     "get or set system hostname"
     },
     {"wait_for_link",
      cli_wait_for_link,
      "--interface <interface name> --timeout <timeout>",
-     "waits until timeout for the interface to up"
+     "wait for the interface to come up"
     },
     {"wait_for_ip",
      cli_wait_for_ip,
      "--interface <interface name> --timeout <timeout> --addrtype <ipv4,ipv6,"
      "static_ipv4,static_ipv6,dhcp_ipv4,dhcp_ipv6,auto_ipv6,link_local_ipv6>",
-     "waits until timeout for the interface to get a valid IP address"
+     "wait for the interface to acquire a valid IP address"
     },
     {"error_info",
      cli_err_info,
@@ -1721,7 +1633,7 @@ NETMGRCLI_CMD_MAP cmdMap[] =
      cli_net_info,
      "--set --object <ifname or filename> --paramname <param name> "
      "--paramvalue <value>",
-     "get or set network parameters"
+     "get or set network configuration parameters"
     },
 };
 
@@ -1736,14 +1648,13 @@ show_help()
     fprintf(stdout, "For version: netmgr -v or netmgr --version\n");
     fprintf(stdout, "\n");
 
-    fprintf(stdout, "List of commands\n");
+    fprintf(stdout, "List of commands:\n");
     fprintf(stdout, "\n");
 
     for(i = 0; i < nCmdCount; ++i)
     {
-        fprintf(stdout, "%s %s\t%s\n",
+        fprintf(stdout, "%s \t%s\n",
                 cmdMap[i].pszCmdName,
-                cmdMap[i].pszParams,
                 cmdMap[i].pszHelpMessage);
     }
     return 0;
