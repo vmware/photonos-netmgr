@@ -1342,8 +1342,11 @@ cleanup:
     netmgrcli_free_cmd(pCmd);
     return get_cli_error_code(err);
 error:
-    pszErrMsg = nm_get_error_info(err);
-    fprintf(stderr, "Error: %s\n", pszErrMsg);
+    if (err != EDOM)
+    {
+        pszErrMsg = nm_get_error_info(err);
+        fprintf(stderr, "Error: %s\n", pszErrMsg);
+    }
     goto cleanup;
 }
 
