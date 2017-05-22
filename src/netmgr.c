@@ -328,9 +328,15 @@ nm_get_network_conf_filename_match(
                                    SECTION_MATCH,
                                    KEY_NAME,
                                    &pszMatchName);
+            if ((err == NM_ERR_VALUE_NOT_FOUND) ||
+                (err = NM_ERR_BAD_CONFIG_FILE))
+            {
+                /* Ignore cfg file with invalid/missing Match section */
+                err = 0;
+            }
             bail_on_error(err);
 
-            if (nm_regex_match_ifname(pszIfName, pszMatchName) == 0)
+            if (pszMatchName && !nm_regex_match_ifname(pszIfName, pszMatchName))
             {
                 if (pszCfgFileName == NULL)
                 {
