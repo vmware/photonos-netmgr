@@ -329,7 +329,7 @@ nm_get_network_conf_filename_match(
                                    KEY_NAME,
                                    &pszMatchName);
             if ((err == NM_ERR_VALUE_NOT_FOUND) ||
-                (err = NM_ERR_BAD_CONFIG_FILE))
+                (err == NM_ERR_BAD_CONFIG_FILE))
             {
                 /* Ignore cfg file with invalid/missing Match section */
                 err = 0;
@@ -2127,8 +2127,17 @@ nm_get_ip_default_gateway(
     {
         rtMsg = (struct rtmsg *)NLMSG_DATA(((struct nlmsghdr *)nlMsg));
         // TODO: Figure out IPv6
-        if ((rtMsg->rtm_table != RT_TABLE_MAIN) ||
+        if (rtMsg->rtm_table != RT_TABLE_MAIN)
+        {
+            continue;
+        }
+        if (((addrType == STATIC_IPV4) || (addrType == DHCP_IPV4)) &&
             (rtMsg->rtm_family != AF_INET))
+        {
+            continue;
+        }
+        if (((addrType == STATIC_IPV6) || (addrType == DHCP_IPV6) ||
+             (addrType == AUTO_IPV6)) && (rtMsg->rtm_family != AF_INET6))
         {
             continue;
         }
@@ -2142,27 +2151,36 @@ nm_get_ip_default_gateway(
                     if_indextoname(*(int *)RTA_DATA(rtAttr), szIfName);
                     break;
                 case RTA_GATEWAY:
-                    gw4.s_addr = *(uint32_t *)RTA_DATA(rtAttr);
+                    if (rtMsg->rtm_family == AF_INET)
+                    {
+                        gw4.s_addr = *(uint32_t *)RTA_DATA(rtAttr);
+                    }
                     break;
                 case RTA_DST:
-                    dst4.s_addr = *(uint32_t *)RTA_DATA(rtAttr);
+                    if (rtMsg->rtm_family == AF_INET)
+                    {
+                        dst4.s_addr = *(uint32_t *)RTA_DATA(rtAttr);
+                    }
                     break;
                 default:
                     break;
             }
         }
-        if ((dst4.s_addr == 0) && !strcmp(szIfName, pszInterfaceName))
+        if ((addrType == STATIC_IPV4) || (addrType == DHCP_IPV4))
         {
-            if (inet_ntop(AF_INET, &gw4, szGateway, INET6_ADDRSTRLEN) != NULL)
+            if ((dst4.s_addr == 0) && !strcmp(szIfName, pszInterfaceName))
             {
-                err = netmgr_alloc_string(szGateway, &pszGateway);
+                if (inet_ntop(AF_INET, &gw4, szGateway, INET6_ADDRSTRLEN) != NULL)
+                {
+                    err = netmgr_alloc_string(szGateway, &pszGateway);
+                }
+                else
+                {
+                    err = errno;
+                }
+                bail_on_error(err);
+                break;
             }
-            else
-            {
-                err = errno;
-            }
-            bail_on_error(err);
-            break;
         }
     }
 
@@ -3060,9 +3078,17 @@ nm_get_ipv4_addr_gateway(
     {
         *ppszIPv4AddrPrefix = pszIPv4AddrPrefix;
     }
+    else
+    {
+        netmgr_free(pszIPv4AddrPrefix);
+    }
     if (ppszIPv4Gateway)
     {
         *ppszIPv4Gateway = pszIPv4Gateway;
+    }
+    else
+    {
+        netmgr_free(pszIPv4Gateway);
     }
 
 cleanup:
