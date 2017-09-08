@@ -411,7 +411,7 @@ nm_get_network_conf_filename_for_update(
     uint32_t err = 0;
     size_t ifNameLen, matchLen = 0;
     char fName[IFNAMSIZ+strlen(SYSTEMD_NET_PATH)+strlen("00-.network")+1];
-    char *pszFilename = NULL;
+    char *pszFilename = NULL, *pszNewFilename = NULL, *pszCmd = NULL;
 
     // TODO: IS VALID_INTERFACE_NAME needs to check if device actually exists
     if (!IS_VALID_INTERFACE_NAME(pszIfName) || !ppszFilename)
@@ -430,9 +430,6 @@ nm_get_network_conf_filename_for_update(
     ifNameLen = strlen(pszIfName);
     if ((pszFilename == NULL) || (matchLen < ifNameLen))
     {
-        netmgr_free(pszFilename);
-        pszFilename = NULL;
-
         sprintf(fName, "%s00-%s.network", SYSTEMD_NET_PATH, pszIfName);
         if (access(fName, F_OK) == 0)
         {
@@ -441,11 +438,23 @@ nm_get_network_conf_filename_for_update(
             bail_on_error(err);
         }
 
-        err = netmgr_alloc_string(fName, &pszFilename);
+        err = netmgr_alloc_string(fName, &pszNewFilename);
         bail_on_error(err);
 
-        /* Create a conf file dedicated to the interface name */
-        err = nm_set_key_value(pszFilename,
+        /* Create dedicated conf for interface based on best match conf file */
+        if (pszFilename != NULL)
+        {
+            err = netmgr_alloc_string_printf(&pszCmd,
+                                             "/usr/bin/cp -f -p %s %s",
+                                             pszFilename,
+                                             pszNewFilename);
+            bail_on_error(err);
+
+            err = nm_run_command(pszCmd);
+            bail_on_error(err);
+        }
+
+        err = nm_set_key_value(pszNewFilename,
                                SECTION_MATCH,
                                KEY_NAME,
                                pszIfName,
@@ -453,9 +462,11 @@ nm_get_network_conf_filename_for_update(
         bail_on_error(err);
     }
 
-    *ppszFilename = pszFilename;
+    *ppszFilename = pszNewFilename;
 
 cleanup:
+    netmgr_free(pszFilename);
+    netmgr_free(pszCmd);
     return err;
 
 error:
@@ -463,7 +474,6 @@ error:
     {
         *ppszFilename = NULL;
     }
-    netmgr_free(pszFilename);
     goto cleanup;
 }
 
