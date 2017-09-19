@@ -44,7 +44,7 @@ check-local: atconfig $(TESTSUITE)
 	docker build --build-arg NMROOT=$(ABSTOPDIR) -t netmgr_ut . && \
 	docker run -d --name netmgr_unittest --privileged --cap-add=SYS_ADMIN \
             --cap-add=NET_ADMIN --security-opt seccomp=unconfined \
-            --stop-signal=SIGRTMIN+3 --tmpfs --cap-add=/run --tmpfs /run/lock \
+            --stop-signal=SIGRTMIN+3 --tmpfs /run --tmpfs /run/lock \
             -v /sys/fs/cgroup:/sys/fs/cgroup:ro netmgr_ut && sleep 2 && \
 	docker exec -ti netmgr_unittest /netmgr/unittest/run_tests.sh && \
 	docker kill netmgr_unittest && docker rm netmgr_unittest && \
