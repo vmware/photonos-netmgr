@@ -61,10 +61,19 @@ nm_set_key_value(
         err = NM_ERR_BAD_CONFIG_FILE;
         bail_on_error(err);
     }
-    else if ((dwNumSections == 0) && (pszValue != NULL))
+    else if (dwNumSections == 0)
     {
-        err = ini_cfg_add_section(pConfig, pszSection, &pSection);
-        bail_on_error(err);
+        if (pszValue != NULL)
+        {
+            err = ini_cfg_add_section(pConfig, pszSection, &pSection);
+            bail_on_error(err);
+        }
+        else
+        {
+            /* Bug out with success - nothing to set, no section found. */
+            err = 0;
+            goto error;
+        }
     }
     else
     {

@@ -807,6 +807,91 @@ error:
     goto cleanup;
 }
 
+static uint32_t
+cli_set_duid(
+    int argc,
+    char **argv,
+    PNETMGR_CMD pCmd
+    )
+{
+    uint32_t err = 0;
+
+    pCmd->id = CMD_DHCP_DUID;
+    pCmd->op = OP_SET;
+
+    if (argc < 3)
+    {
+        fprintf(stderr, "Usage: set_duid <duid>\n");
+        err = EDOM;
+        bail_on_error(err);
+    }
+
+    if (strlen(argv[2]) > 0)
+    {
+        err = netmgrcli_alloc_keyvalue("duid", argv[2], pCmd);
+    }
+    else
+    {
+        err = netmgrcli_alloc_keyvalue("duid", "", pCmd);
+    }
+    bail_on_error(err);
+
+cleanup:
+    return err;
+
+error:
+    pCmd->op = OP_INVALID;
+    goto cleanup;
+}
+
+static uint32_t
+cli_set_iaid(
+    int argc,
+    char **argv,
+    PNETMGR_CMD pCmd
+    )
+{
+    uint32_t err = 0;
+
+    pCmd->id = CMD_IF_IAID;
+    pCmd->op = OP_SET;
+
+    if (argc < 4)
+    {
+        fprintf(stderr, "Usage: set_iaid <ifname> <iaid>\n");
+        err = EDOM;
+        bail_on_error(err);
+    }
+
+    if (strlen(argv[2]) > 0)
+    {
+        err = netmgrcli_alloc_keyvalue("interface", argv[2], pCmd);
+    }
+    else
+    {
+        fprintf(stderr, "Invalid interface name.\n");
+        err = EDOM;
+    }
+    bail_on_error(err);
+
+    if (strlen(argv[3]) > 0)
+    {
+        err = netmgrcli_alloc_keyvalue("iaid", argv[3], pCmd);
+    }
+    else
+    {
+        err = netmgrcli_alloc_keyvalue("iaid", "", pCmd);
+    }
+    bail_on_error(err);
+
+cleanup:
+    return err;
+
+error:
+    pCmd->op = OP_INVALID;
+    goto cleanup;
+}
+
 
 static struct option dnsServerOptions[] =
 {
@@ -917,6 +1002,18 @@ error:
                  "dns_servers --add|--del --servers <server>\n");
     }
     goto cleanup;
+}
+
+static uint32_t
+cli_get_dns_servers(
+    int argc,
+    char **argv,
+    PNETMGR_CMD pCmd
+    )
+{
+    pCmd->id = CMD_DNS_SERVERS;
+    pCmd->op = OP_GET;
+    return 0;
 }
 
 
@@ -1598,7 +1695,7 @@ NETMGRCLI_CMD_MAP cmdMap[] =
      "--set --duid <DUID string> --interface <interface name>",
      "get or set DHCP DUID, optionally per interface"
     },
-    {"if_iaid",
+    {"if_iaid ",
      cli_if_iaid,
      "--set --iaid <IAID value> --interface <interface name>",
      "get or set interface IAID"
@@ -1635,6 +1732,21 @@ NETMGRCLI_CMD_MAP cmdMap[] =
      "--paramvalue <value>",
      "get or set network configuration parameters"
     },
+    {"set_duid",
+     cli_set_duid,
+     "",
+     "This is deprecated, will be removed in the future. Please use 'dhcp_duid --set'",
+    },
+    {"set_iaid",
+     cli_set_iaid,
+     "",
+     "This is deprecated, will be removed in the future. Please use 'if_iaid --set'",
+    },
+    {"get_dns_servers",
+     cli_get_dns_servers,
+     "",
+     "This is deprecated, will be removed in the future. Please use 'dns_servers --get'",
+    },
 };
 
 static uint32_t
@@ -1653,7 +1765,7 @@ show_help()
 
     for(i = 0; i < nCmdCount; ++i)
     {
-        fprintf(stdout, "%s \t%s\n",
+        fprintf(stdout, "%s\t %s\n",
                 cmdMap[i].pszCmdName,
                 cmdMap[i].pszHelpMessage);
     }
