@@ -481,6 +481,7 @@ error:
     {
         *ppszFilename = NULL;
     }
+    netmgr_free(pszNewFilename);
     goto cleanup;
 }
 
