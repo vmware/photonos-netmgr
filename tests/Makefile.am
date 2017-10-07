@@ -1,5 +1,6 @@
 # The `:;' works around a Bash 3.2 bug when the output is not writeable.
 
+ARCH = `uname -m`
 ABSTOPDIR = `realpath $(PWD)/../../`
 clitestdir = $(srcdir)/clitest
 
@@ -41,7 +42,8 @@ check-local: atconfig $(TESTSUITE)
 	if docker ps -a | grep netmgr_unittest > /dev/null; \
           then docker rm netmgr_unittest; \
         fi && \
-	docker build --build-arg NMROOT=$(ABSTOPDIR) -t netmgr_ut . && \
+	docker build --build-arg NMROOT=$(ABSTOPDIR) --build-arg ARCH=$(ARCH) \
+            -t netmgr_ut . && \
 	docker run -d --name netmgr_unittest --privileged --cap-add=SYS_ADMIN \
             --cap-add=NET_ADMIN --security-opt seccomp=unconfined \
             --stop-signal=SIGRTMIN+3 --tmpfs /run --tmpfs /run/lock \

@@ -21,6 +21,8 @@ case "${host_os}:${host_cpu}" in
 
     linux*:x86_64)
 	;;
+    linux*:aarch64)
+        ;;
     *)
         AC_ERROR("Unsupported operating system - ${host_os}:${host_cpu}")
         ;;
