@@ -6,7 +6,7 @@ Group:   Applications/System
 Vendor:  VMware, Inc.
 License: VMware
 URL:     http://www.vmware.com
-BuildArch: x86_64
+BuildArch: %{_arch}
 
 %description
 Network Management Utilities

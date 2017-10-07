@@ -1,11 +1,12 @@
 FROM vmware/photon
 
+ARG ARCH=x86_64
 ARG NMROOT=/root/netmgmt/
 ENV container docker
 ENV LC_ALL C
 
 # Copying netmgr rpms and tests..
-ADD ./build/rpmbuild/RPMS/x86_64 /netmgr/rpms
+ADD ./build/rpmbuild/RPMS/$ARCH/*.rpm /netmgr/rpms/
 ADD ./tests/files/10-eth0.network /etc/systemd/network/
 ADD ./tests/files/run_tests.sh /netmgr/unittest/
 ADD ./tests/clitest/testsuite /netmgr/unittest/clitest/
