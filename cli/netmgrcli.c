@@ -1695,7 +1695,7 @@ NETMGRCLI_CMD_MAP cmdMap[] =
      "--set --duid <DUID string> --interface <interface name>",
      "get or set DHCP DUID, optionally per interface"
     },
-    {"if_iaid ",
+    {"if_iaid",
      cli_if_iaid,
      "--set --iaid <IAID value> --interface <interface name>",
      "\t get or set interface IAID"
