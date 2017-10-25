@@ -1698,7 +1698,7 @@ NETMGRCLI_CMD_MAP cmdMap[] =
     {"if_iaid ",
      cli_if_iaid,
      "--set --iaid <IAID value> --interface <interface name>",
-     "get or set interface IAID"
+     "\t get or set interface IAID"
     },
     {"ntp_servers",
      cli_ntp_servers,
