@@ -1,15 +1,29 @@
-Summary: Network Management Utilities
+#
+# Copyright © 2016-2018 VMware, Inc.  All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the “License”); you may not
+# use this file except in compliance with the License.  You may obtain a copy
+# of the License at http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an “AS IS” BASIS, without
+# warranties or conditions of any kind, EITHER EXPRESS OR IMPLIED.  See the
+# License for the specific language governing permissions and limitations
+# under the License.
+#
+
+Summary: Photon OS Network Configuration Manager
 Name:    netmgmt
 Version: 1.1.0
 Release: 1
 Group:   Applications/System
 Vendor:  VMware, Inc.
-License: VMware
+License: Apache2.0
 URL:     http://www.vmware.com
 BuildArch: %{_arch}
 
 %description
-Network Management Utilities
+This is a utility to easily configure network settings for PhotonOS or any OS that uses systemd-networkd.
 
 %package devel
 Summary: netmgmt development headers and libraries
