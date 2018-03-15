@@ -1,0 +1,41 @@
+#
+# Copyright © 2016-2018 VMware, Inc.  All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the “License”); you may not
+# use this file except in compliance with the License.  You may obtain a copy
+# of the License at http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an “AS IS” BASIS, without
+# warranties or conditions of any kind, EITHER EXPRESS OR IMPLIED.  See the
+# License for the specific language governing permissions and limitations
+# under the License.
+#
+
+AT_BANNER([netmgr tests start])
+
+AT_SETUP([dhcp_duid])
+AT_KEYWORDS([dhcp_duid])
+m4_define([TEST_DUID], [00:01:11:22:33:44:55:66:77:88])
+m4_define([RESET_DUID], [''])
+
+AT_CHECK([$abs_top_builddir/tools/netmgr/netmgr dhcp_duid --get],
+[2])
+
+AT_CHECK([$abs_top_builddir/tools/netmgr/netmgr dhcp_duid --set --duid TEST_DUID],
+[0],
+[],
+[],
+[$abs_top_builddir/tools/netmgr/netmgr dhcp_duid --set --duid RESET_DUID])
+
+AT_CHECK([$abs_top_builddir/tools/netmgr/netmgr dhcp_duid --get],
+[0],
+[DUID=TEST_DUID
+],
+[],
+[$abs_top_builddir/tools/netmgr/netmgr dhcp_duid --set --duid RESET_DUID])
+
+AT_CHECK([$abs_top_builddir/tools/netmgr/netmgr dhcp_duid --set --duid RESET_DUID],
+[0])
+
+AT_CLEANUP
