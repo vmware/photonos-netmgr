@@ -206,7 +206,7 @@ error:
     if(err == EDOM)
     {
         fprintf(stderr,
-                "Usage:\nlink_info --get --interface <ifame>\n"
+                "Usage:\nlink_info --get --interface <ifname>\n"
                 "link_info --set --interface <ifname> --macaddr <mac_address>"
                 " --mode <manual|auto> --state <up|down> --mtu <mtu>\n");
     }
@@ -318,8 +318,8 @@ error:
     if (err == EDOM)
     {
         fprintf(stderr,
-                "Usage:\nip4_address --get --interface <ifame>\n"
-                "ip4_address --set --interface <ifname> --mode dhcp|static|none"
+                "Usage:\nip4_address --get --interface <ifname>\n"
+                "ip4_address --set --interface <ifname> --mode <dhcp|static|none>"
                 " --addr <IPv4Address/prefix> --gateway <Gateway Address>\n");
     }
     goto cleanup;
@@ -450,8 +450,10 @@ error:
     if (err == EDOM)
     {
         fprintf(stderr,
-                "Usage:\nip6_address --get --interface <ifame>\n"
-                "ip6_address --add|--del --interface <ifame> "
+                "Usage:\nip6_address --get --interface <ifname>\n"
+                "ip6_address --add --interface <ifname> "
+                "--addrlist <IPv6Addr1/prefix,IPv6Addr2/prefix,...>\n"
+                "ip6_address --del --interface <ifname> "
                 "--addrlist <IPv6Addr1/prefix,IPv6Addr2/prefix,...>\n"
                 "ip6_address --set --interface <ifname> --dhcp <1|0> "
                 "--autoconf <1|0>\n");
@@ -611,7 +613,7 @@ error:
     if (err == EDOM)
     {
         fprintf(stderr,
-                "Usage:\nip_route --get --interface <ifame>\n"
+                "Usage:\nip_route --get --interface <ifname>\n"
                 "ip_route --add --interface <ifname> --gateway <GatewayIP>"
                 " --destination <DestinationNetwork/prefix> --metric <N>\n"
                 "ip_route --del --interface <ifname> --destination <DestIP/N>\n");
@@ -707,7 +709,7 @@ error:
     {
         fprintf(stderr,
                 "Usage:\ndhcp_duid --get\n"
-                "dhcp_duid --set --duid '00:01:00:00:11:22:33:44:55:66:77:88'\n");
+                "dhcp_duid --set --duid <duid>\n");
     }
     goto cleanup;
 }
@@ -997,9 +999,10 @@ error:
     if (err == EDOM)
     {
         fprintf(stderr,
-                "Usage:\ndns_servers --get\ndns_servers --set --mode "
-                 "dhcp|static --servers <server1,server2,...>\n"
-                 "dns_servers --add|--del --servers <server>\n");
+                "Usage:\ndns_servers --get\ndns_servers --set "
+                 "--mode <dhcp|static> --servers <server1,server2,...>\n"
+                 "dns_servers --add --servers <server>\n"
+                 "dns_servers --del --servers <server>\n");
     }
     goto cleanup;
 }
@@ -1337,13 +1340,13 @@ cli_wait_for_link(
                 if (strlen(optarg) > 0)
                 {
                     err = netmgrcli_alloc_keyvalue("timeout", optarg, pCmd);
-                    validTimeout = 1;
                 }
                 else
                 {
-                    fprintf(stderr, "Invalid timeout value.\n");
-                    err = EDOM;
+                    fprintf(stderr, "Invalid timeout value, so use by default timeout value 0.\n");
+                    err = netmgrcli_alloc_keyvalue("timeout", 0, pCmd);
                 }
+                validTimeout = 1;
                 break;
             case '?':
                 /* Option not handled here. Ignore. */
@@ -1422,13 +1425,13 @@ cli_wait_for_ip(
                 if (strlen(optarg) > 0)
                 {
                     err = netmgrcli_alloc_keyvalue("timeout", optarg, pCmd);
-                    validTimeout = 1;
                 }
                 else
                 {
-                    fprintf(stderr, "Invalid timeout value.\n");
-                    err = EDOM;
+                    fprintf(stderr, "Invalid timeout value, so use by default timeout value 0.\n");
+                    err = netmgrcli_alloc_keyvalue("timeout", 0, pCmd);
                 }
+                validTimeout = 1;
                 break;
             case 'a':
                 if (strlen(optarg) > 0)
@@ -1754,7 +1757,7 @@ show_help()
 {
     int i = 0;
     int nCmdCount = sizeof(cmdMap)/sizeof(NETMGRCLI_CMD_MAP);
-    fprintf(stdout, "Usage: netmgr command <command options ...>\n");
+    fprintf(stdout, "Usage: netmgr <object> <--get | --set | --add | --del> <command_options>\n");
     fprintf(stdout, "\n");
     fprintf(stdout, "For help: netmgr -h or netmgr --help\n");
     fprintf(stdout, "For version: netmgr -v or netmgr --version\n");

@@ -4421,7 +4421,7 @@ cleanup:
 error:
     if (pMode != NULL)
     {
-        *pMode = DNS_MODE_INVALID;
+        *pMode = DNS_MODE_UNKNOWN;
     }
     goto cleanup;
 }
