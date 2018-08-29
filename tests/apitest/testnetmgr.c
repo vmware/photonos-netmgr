@@ -265,7 +265,7 @@ START_TEST(test_dns_servers)
 {
     uint32_t err = 0;
     size_t i = 0, serverCount = 0, testServerCount = 0;
-    NET_DNS_MODE mode = DNS_MODE_INVALID, testDnsMode = STATIC_DNS;
+    NET_DNS_MODE mode = DNS_MODE_UNKNOWN, testDnsMode = STATIC_DNS;
     char *pszIfName = "eth0", *pszFileName = NULL;
     char **ppszDnsServers = NULL;
     char *pszSearchResolveFile = NULL;

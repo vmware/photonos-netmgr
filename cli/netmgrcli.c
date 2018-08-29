@@ -13,6 +13,7 @@
  */
 
 #include "includes.h"
+#include "string.h"
 
 static uint32_t
 netmgrcli_alloc_cmd(
@@ -142,7 +143,7 @@ cli_link_info(
                 }
                 break;
             case 'm':
-                if (strlen(optarg) > 0)
+                if (!strcmp(optarg, "manual") || !strcmp(optarg, "auto"))
                 {
                     err = netmgrcli_alloc_keyvalue("mode", optarg, pCmd);
                     link_options_present = 1;
@@ -154,7 +155,7 @@ cli_link_info(
                 }
                 break;
             case 't':
-                if (strlen(optarg) > 0)
+                if (!strcmp(optarg, "up") || !strcmp(optarg, "down"))
                 {
                     err = netmgrcli_alloc_keyvalue("state", optarg, pCmd);
                     link_options_present = 1;
@@ -206,7 +207,7 @@ error:
     if(err == EDOM)
     {
         fprintf(stderr,
-                "Usage:\nlink_info --get --interface <ifame>\n"
+                "Usage:\nlink_info --get --interface <ifname>\n"
                 "link_info --set --interface <ifname> --macaddr <mac_address>"
                 " --mode <manual|auto> --state <up|down> --mtu <mtu>\n");
     }
@@ -318,8 +319,8 @@ error:
     if (err == EDOM)
     {
         fprintf(stderr,
-                "Usage:\nip4_address --get --interface <ifame>\n"
-                "ip4_address --set --interface <ifname> --mode dhcp|static|none"
+                "Usage:\nip4_address --get --interface <ifname>\n"
+                "ip4_address --set --interface <ifname> --mode <dhcp|static|none>"
                 " --addr <IPv4Address/prefix> --gateway <Gateway Address>\n");
     }
     goto cleanup;
@@ -396,6 +397,7 @@ cli_ip6_address(
                 }
                 else
                 {
+                    printf ("use --dhcp default value 0.\n");
                     err = netmgrcli_alloc_keyvalue("dhcp", "0", pCmd);
                 }
                 break;
@@ -406,6 +408,7 @@ cli_ip6_address(
                 }
                 else
                 {
+                    printf ("use --autoconf default value 0.\n");
                     err = netmgrcli_alloc_keyvalue("autoconf", "0", pCmd);
                 }
                 break;
@@ -450,8 +453,10 @@ error:
     if (err == EDOM)
     {
         fprintf(stderr,
-                "Usage:\nip6_address --get --interface <ifame>\n"
-                "ip6_address --add|--del --interface <ifame> "
+                "Usage:\nip6_address --get --interface <ifname>\n"
+                "ip6_address --add --interface <ifname> "
+                "--addrlist <IPv6Addr1/prefix,IPv6Addr2/prefix,...>\n"
+                "ip6_address --del --interface <ifname> "
                 "--addrlist <IPv6Addr1/prefix,IPv6Addr2/prefix,...>\n"
                 "ip6_address --set --interface <ifname> --dhcp <1|0> "
                 "--autoconf <1|0>\n");
@@ -611,7 +616,7 @@ error:
     if (err == EDOM)
     {
         fprintf(stderr,
-                "Usage:\nip_route --get --interface <ifame>\n"
+                "Usage:\nip_route --get --interface <ifname>\n"
                 "ip_route --add --interface <ifname> --gateway <GatewayIP>"
                 " --destination <DestinationNetwork/prefix> --metric <N>\n"
                 "ip_route --del --interface <ifname> --destination <DestIP/N>\n");
@@ -707,7 +712,7 @@ error:
     {
         fprintf(stderr,
                 "Usage:\ndhcp_duid --get\n"
-                "dhcp_duid --set --duid '00:01:00:00:11:22:33:44:55:66:77:88'\n");
+                "dhcp_duid --set --duid <duid>\n");
     }
     goto cleanup;
 }
@@ -802,96 +807,10 @@ error:
     {
         fprintf(stderr,
                 "Usage:\nif_iaid --get --interface <IfName>\n"
-                "if_iaid --set --interface <IfName> --iaid '12345'\n");
+                "if_iaid --set --interface <IfName> --iaid <iaid>\n");
     }
     goto cleanup;
 }
-
-static uint32_t
-cli_set_duid(
-    int argc,
-    char **argv,
-    PNETMGR_CMD pCmd
-    )
-{
-    uint32_t err = 0;
-
-    pCmd->id = CMD_DHCP_DUID;
-    pCmd->op = OP_SET;
-
-    if (argc < 3)
-    {
-        fprintf(stderr, "Usage: set_duid <duid>\n");
-        err = EDOM;
-        bail_on_error(err);
-    }
-
-    if (strlen(argv[2]) > 0)
-    {
-        err = netmgrcli_alloc_keyvalue("duid", argv[2], pCmd);
-    }
-    else
-    {
-        err = netmgrcli_alloc_keyvalue("duid", "", pCmd);
-    }
-    bail_on_error(err);
-
-cleanup:
-    return err;
-
-error:
-    pCmd->op = OP_INVALID;
-    goto cleanup;
-}
-
-static uint32_t
-cli_set_iaid(
-    int argc,
-    char **argv,
-    PNETMGR_CMD pCmd
-    )
-{
-    uint32_t err = 0;
-
-    pCmd->id = CMD_IF_IAID;
-    pCmd->op = OP_SET;
-
-    if (argc < 4)
-    {
-        fprintf(stderr, "Usage: set_iaid <ifname> <iaid>\n");
-        err = EDOM;
-        bail_on_error(err);
-    }
-
-    if (strlen(argv[2]) > 0)
-    {
-        err = netmgrcli_alloc_keyvalue("interface", argv[2], pCmd);
-    }
-    else
-    {
-        fprintf(stderr, "Invalid interface name.\n");
-        err = EDOM;
-    }
-    bail_on_error(err);
-
-    if (strlen(argv[3]) > 0)
-    {
-        err = netmgrcli_alloc_keyvalue("iaid", argv[3], pCmd);
-    }
-    else
-    {
-        err = netmgrcli_alloc_keyvalue("iaid", "", pCmd);
-    }
-    bail_on_error(err);
-
-cleanup:
-    return err;
-
-error:
-    pCmd->op = OP_INVALID;
-    goto cleanup;
-}
-
 
 static struct option dnsServerOptions[] =
 {
@@ -949,6 +868,11 @@ cli_dns_servers(
                     err = netmgrcli_alloc_keyvalue("mode", optarg, pCmd);
                     invalidMode = 0;
                 }
+                else
+                {
+                    fprintf(stderr, "Invalid mode name.\n");
+                    err = EDOM;
+                }
                 break;
             case 'i':
                 if (strlen(optarg) > 0)
@@ -997,25 +921,13 @@ error:
     if (err == EDOM)
     {
         fprintf(stderr,
-                "Usage:\ndns_servers --get\ndns_servers --set --mode "
-                 "dhcp|static --servers <server1,server2,...>\n"
-                 "dns_servers --add|--del --servers <server>\n");
+                "Usage:\ndns_servers --get\ndns_servers --set "
+                 "--mode <dhcp|static> --servers <server1,server2,...>\n"
+                 "dns_servers --add --servers <server>\n"
+                 "dns_servers --del --servers <server>\n");
     }
     goto cleanup;
 }
-
-static uint32_t
-cli_get_dns_servers(
-    int argc,
-    char **argv,
-    PNETMGR_CMD pCmd
-    )
-{
-    pCmd->id = CMD_DNS_SERVERS;
-    pCmd->op = OP_GET;
-    return 0;
-}
-
 
 static struct option dnsDomainsOptions[] =
 {
@@ -1334,15 +1246,29 @@ cli_wait_for_link(
                 }
                 break;
             case 't':
-                if (strlen(optarg) > 0)
+                if ((strlen(optarg) > 0) && (optarg[0] != '-'))
+                {
+                    for (int i=0; i < strlen(optarg); i++) {
+                        char c = optarg[i];
+                        if (c < '0' || c > '9') {
+                            validTimeout = 0 & validTimeout;
+                        }
+                        else
+                        {
+                            validTimeout = 1 | validTimeout;
+                        }
+                    }
+                }
+                if (validTimeout)
                 {
                     err = netmgrcli_alloc_keyvalue("timeout", optarg, pCmd);
                     validTimeout = 1;
                 }
                 else
                 {
-                    fprintf(stderr, "Invalid timeout value.\n");
-                    err = EDOM;
+                    printf ("the given timeout value is incorrect, use by default value 0.\n");
+                    err = netmgrcli_alloc_keyvalue("timeout", "0", pCmd);
+                    validTimeout = 1;
                 }
                 break;
             case '?':
@@ -1350,6 +1276,13 @@ cli_wait_for_link(
                 break;
         }
         bail_on_error(err);
+    }
+    
+    if (!validTimeout)
+    {
+        printf ("no setting for timeout, use by default value 0.\n");
+        err = netmgrcli_alloc_keyvalue("timeout", "0", pCmd);
+        validTimeout = 1;
     }
 
     if (!validIfname || !validTimeout)
@@ -1419,15 +1352,29 @@ cli_wait_for_ip(
                 }
                 break;
             case 't':
-                if (strlen(optarg) > 0)
+                if ((strlen(optarg) > 0) && (optarg[0] != '-'))
+                {
+                    for (int i=0; i < strlen(optarg); i++) {
+                        char c = optarg[i];
+                        if (c < '0' || c > '9') {
+                            validTimeout = 0 & validTimeout;
+                        }
+                        else
+                        {
+                            validTimeout = 1 | validTimeout;
+                        }
+                    }
+                }
+                if (validTimeout)
                 {
                     err = netmgrcli_alloc_keyvalue("timeout", optarg, pCmd);
                     validTimeout = 1;
                 }
                 else
                 {
-                    fprintf(stderr, "Invalid timeout value.\n");
-                    err = EDOM;
+                    printf ("the given timeout value is incorrect, use by default value 0.\n");
+                    err = netmgrcli_alloc_keyvalue("timeout", "0", pCmd);
+                    validTimeout = 1;
                 }
                 break;
             case 'a':
@@ -1447,6 +1394,13 @@ cli_wait_for_ip(
                 break;
         }
         bail_on_error(err);
+    }
+
+    if (!validTimeout)
+    {
+        printf ("no setting for timeout, use by default value 0.\n");
+        err = netmgrcli_alloc_keyvalue("timeout", "0", pCmd);
+        validTimeout = 1;
     }
 
     if (!validIfname || !validTimeout || !validAddrType)
@@ -1732,21 +1686,6 @@ NETMGRCLI_CMD_MAP cmdMap[] =
      "--paramvalue <value>",
      "get or set network configuration parameters"
     },
-    {"set_duid",
-     cli_set_duid,
-     "",
-     "This is deprecated, will be removed in the future. Please use 'dhcp_duid --set'",
-    },
-    {"set_iaid",
-     cli_set_iaid,
-     "",
-     "This is deprecated, will be removed in the future. Please use 'if_iaid --set'",
-    },
-    {"get_dns_servers",
-     cli_get_dns_servers,
-     "",
-     "This is deprecated, will be removed in the future. Please use 'dns_servers --get'",
-    },
 };
 
 static uint32_t
@@ -1754,7 +1693,7 @@ show_help()
 {
     int i = 0;
     int nCmdCount = sizeof(cmdMap)/sizeof(NETMGRCLI_CMD_MAP);
-    fprintf(stdout, "Usage: netmgr command <command options ...>\n");
+    fprintf(stdout, "Usage: netmgr <object> <--get | --set | --add | --del> <command_options>\n");
     fprintf(stdout, "\n");
     fprintf(stdout, "For help: netmgr -h or netmgr --help\n");
     fprintf(stdout, "For version: netmgr -v or netmgr --version\n");
