@@ -136,7 +136,7 @@ typedef struct _NET_IP_ROUTE
  */
 typedef enum _NET_DNS_MODE
 {
-    DNS_MODE_INVALID = 0,
+    DNS_MODE_UNKNOWN = 0,
     STATIC_DNS,
     DHCP_DNS,
     DNS_MODE_MAX,
