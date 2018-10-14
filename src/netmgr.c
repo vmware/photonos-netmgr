@@ -6396,103 +6396,53 @@ error:
 uint32_t
 nm_stop_network_service()
 {
-    uint32_t err = 0;
     const char command[] = "systemctl stop systemd-networkd";
 
-    err = nm_run_command(command);
-    bail_on_error(err);
-
-clean:
-    return err;
-error:
-    goto clean;
+    return nm_run_command(command);
 }
 
 uint32_t
 nm_restart_network_service()
 {
-    uint32_t err = 0;
     const char command[] = "systemctl restart systemd-networkd";
 
-    err = nm_run_command(command);
-    bail_on_error(err);
-
-clean:
-    return err;
-error:
-    goto clean;
+    return nm_run_command(command);
 }
 
 uint32_t
 nm_stop_dns_service()
 {
-    uint32_t err = 0;
     const char command[] = "systemctl stop systemd-resolved";
 
-    err = nm_run_command(command);
-    bail_on_error(err);
-
-clean:
-    return err;
-error:
-    goto clean;
+    return nm_run_command(command);
 }
 
 uint32_t
 nm_restart_dns_service()
 {
-    uint32_t err = 0;
     const char command[] = "systemctl restart systemd-resolved";
 
-    err = nm_run_command(command);
-    bail_on_error(err);
-
-clean:
-    return err;
-error:
-    goto clean;
+    return nm_run_command(command);
 }
 
 uint32_t
 nm_stop_ntp_service()
 {
-    uint32_t err = 0;
     const char command[] = "systemctl stop ntpd";
 
-    err = nm_run_command(command);
-    bail_on_error(err);
-
-clean:
-    return err;
-error:
-    goto clean;
+    return nm_run_command(command);
 }
 
 uint32_t
 nm_restart_ntp_service()
 {
-    uint32_t err = 0;
     const char command[] = "systemctl restart ntpd";
 
-    err = nm_run_command(command);
-    bail_on_error(err);
-
-clean:
-    return err;
-error:
-    goto clean;
+    return nm_run_command(command);
 }
 
 uint32_t
 nm_reload_firewall_config()
 {
-    uint32_t err = 0;
-
-    err = nm_run_command(FIREWALL_CONF_FILENAME);
-    bail_on_error(err);
-
-clean:
-    return err;
-error:
-    goto clean;
+    return nm_run_command(FIREWALL_CONF_FILENAME);
 }
