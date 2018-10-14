@@ -691,8 +691,9 @@ nm_update_mac_address(
 )
 {
     uint32_t err = 0;
-    int sockFd = -1, addrLen = 0;
-    struct ifreq ifr;
+    int sockFd = -1;
+    int addrLen = 0;
+    struct ifreq ifr = {};
 
     if (!IS_VALID_INTERFACE_NAME(pszInterfaceName))
     {
@@ -707,8 +708,7 @@ nm_update_mac_address(
         bail_on_error(err);
     }
 
-    memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, pszInterfaceName, strlen(pszInterfaceName));
+    strncpy(ifr.ifr_name, pszInterfaceName, IFNAMSIZ - 1);
     ifr.ifr_hwaddr.sa_family = ARPHRD_ETHER;
     addrLen = sscanf(pszMacAddress, "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx",
                                     &ifr.ifr_hwaddr.sa_data[0],
@@ -807,7 +807,7 @@ nm_get_link_mac_addr(
     uint32_t err = 0;
     int sockFd = -1;
     char *pszMacAddress = NULL;
-    struct ifreq ifr;
+    struct ifreq ifr = {};
 
     if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !ppszMacAddress)
     {
@@ -815,8 +815,7 @@ nm_get_link_mac_addr(
         bail_on_error(err);
     }
 
-    memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, pszInterfaceName, strlen(pszInterfaceName));
+    strncpy(ifr.ifr_name, pszInterfaceName, IFNAMSIZ - 1);
 
     sockFd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockFd < 0)
@@ -1066,7 +1065,7 @@ nm_update_link_mtu(
 {
     uint32_t err = 0;
     int sockFd = -1;
-    struct ifreq ifr;
+    struct ifreq ifr = {};
 
     if (!IS_VALID_INTERFACE_NAME(pszInterfaceName))
     {
@@ -1081,8 +1080,7 @@ nm_update_link_mtu(
         bail_on_error(err);
     }
 
-    memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, pszInterfaceName, strlen(pszInterfaceName));
+    strncpy(ifr.ifr_name, pszInterfaceName, IFNAMSIZ - 1);
 
     if (mtu > 0)
     {
@@ -1126,7 +1124,7 @@ nm_set_link_mtu(
 {
     uint32_t err = 0, err1 = 0, oldMtu = 0;
     char *pszCfgFileName = NULL;
-    char szValue[MAX_LINE] = "";
+    char szValue[MAX_LINE] = {};
     int lockId;
 
     err = nm_acquire_write_lock(0, &lockId);
@@ -1180,7 +1178,7 @@ nm_get_link_mtu(
 {
     uint32_t err = 0;
     int sockFd = -1;
-    struct ifreq ifr;
+    struct ifreq ifr = {};
 
     if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !pMtu)
     {
@@ -1188,8 +1186,7 @@ nm_get_link_mtu(
         bail_on_error(err);
     }
 
-    memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, pszInterfaceName, strlen(pszInterfaceName));
+    strncpy(ifr.ifr_name, pszInterfaceName, IFNAMSIZ - 1);
 
     sockFd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockFd < 0)
@@ -1229,7 +1226,7 @@ nm_update_link_state(
 {
     uint32_t err = 0;
     int sockFd = -1;
-    struct ifreq ifr;
+    struct ifreq ifr = {};
 
     if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
         (linkState >= LINK_STATE_UNKNOWN))
@@ -1238,8 +1235,7 @@ nm_update_link_state(
         bail_on_error(err);
     }
 
-    memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, pszInterfaceName, strlen(pszInterfaceName));
+    strncpy(ifr.ifr_name, pszInterfaceName, IFNAMSIZ - 1);
 
     sockFd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockFd < 0)
@@ -1324,7 +1320,7 @@ nm_get_link_state(
 {
     uint32_t err = 0;
     int sockFd = -1;
-    struct ifreq ifr;
+    struct ifreq ifr = {};
 
     if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !pLinkState)
     {
@@ -1332,8 +1328,7 @@ nm_get_link_state(
         bail_on_error(err);
     }
 
-    memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, pszInterfaceName, strlen(pszInterfaceName));
+    strncpy(ifr.ifr_name, pszInterfaceName, IFNAMSIZ - 1);
 
     sockFd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockFd < 0)
@@ -4092,6 +4087,7 @@ nm_add_static_ip_route(
     uint32_t err = 0;
     uint8_t prefix = 255;
     char szDestAddr[INET6_ADDRSTRLEN+5];
+    char szBufDestAddr[INET6_ADDRSTRLEN+128];
     NET_IP_ROUTE route = {0};
     int lockId;
 
@@ -4132,8 +4128,8 @@ nm_add_static_ip_route(
     }
 
     memcpy(&route, pRoute, sizeof(route));
-    sprintf(szDestAddr, "%s/%hhu", szDestAddr, prefix);
-    route.pszDestNetwork = szDestAddr;
+    sprintf(szBufDestAddr, "%s/%hhu", szDestAddr, prefix);
+    route.pszDestNetwork = szBufDestAddr;
 
     err = nm_add_route_section(&route);
     bail_on_error(err);
@@ -4156,6 +4152,7 @@ nm_delete_static_ip_route(
     uint32_t err = 0;
     uint8_t prefix = 255;
     char szDestAddr[INET6_ADDRSTRLEN+5];
+    char szbufDestAddr[INET6_ADDRSTRLEN+128];
     NET_IP_ROUTE route;
     int lockId;
 
@@ -4185,8 +4182,8 @@ nm_delete_static_ip_route(
     }
 
     memcpy(&route, pRoute, sizeof(route));
-    sprintf(szDestAddr, "%s/%hhu", szDestAddr, prefix);
-    route.pszDestNetwork = szDestAddr;
+    sprintf(szbufDestAddr, "%s/%hhu", szDestAddr, prefix);
+    route.pszDestNetwork = szbufDestAddr;
 
     err = nm_delete_route_section(&route);
     bail_on_error(err);
