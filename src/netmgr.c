@@ -121,7 +121,7 @@ nm_alloc_conf_filename(
 {
     uint32_t err = 0;
     size_t len = 0;
-    char *pszFilename = NULL;
+    _cleanup_(freep) char *pszFilename = NULL;
 
     if (!ppszFilename || !pszPath || !pszFname)
     {
@@ -134,18 +134,11 @@ nm_alloc_conf_filename(
     bail_on_error(err);
 
     sprintf(pszFilename, "%s%s", pszPath, pszFname);
-
     *ppszFilename = pszFilename;
+     pszFilename = NULL;
 
-cleanup:
-    return err;
 error:
-    netmgr_free(pszFilename);
-    if (ppszFilename != NULL)
-    {
-        *ppszFilename = NULL;
-    }
-    goto cleanup;
+    return err;
 }
 
 static uint32_t
@@ -169,8 +162,8 @@ nm_read_conf_file(
 {
     uint32_t err = 0;
     long len;
-    FILE *fp = NULL;
-    char *pszFileBuf = NULL;
+    _cleanup_(fclosep) FILE *fp = NULL;
+    _cleanup_(freep) char *pszFileBuf = NULL;
 
     if (IS_NULL_OR_EMPTY(pszFilename) || !ppszFileBuf)
     {
@@ -184,17 +177,20 @@ nm_read_conf_file(
         err = errno;
         bail_on_error(err);
     }
+
     if (fseek(fp, 0, SEEK_END) != 0)
     {
         err = errno;
         bail_on_error(err);
     }
+
     len = ftell(fp);
     if (len == -1)
     {
         err = errno;
         bail_on_error(err);
     }
+
     if (fseek(fp, 0, SEEK_SET) != 0)
     {
         err = errno;
@@ -214,21 +210,9 @@ nm_read_conf_file(
     }
 
     *ppszFileBuf = pszFileBuf;
-
-cleanup:
-    if (fp != NULL)
-    {
-        fclose(fp);
-    }
-    return err;
-
+    pszFileBuf = NULL;
 error:
-    if (ppszFileBuf != NULL)
-    {
-        *ppszFileBuf = NULL;
-    }
-    netmgr_free(pszFileBuf);
-    goto cleanup;
+    return err;
 }
 
 static uint32_t
@@ -240,7 +224,8 @@ nm_regex_match_ifname(
     regex_t rx;
     regmatch_t rm;
     size_t patternLen, ifNameLen, n;
-    char *q, *pszPattern = NULL;
+    char *q;
+    _cleanup_(freep) char *pszPattern = NULL;
     const char *p;
 
     if (!IS_VALID_INTERFACE_NAME(pszIfName) ||
@@ -278,7 +263,6 @@ nm_regex_match_ifname(
     }
 
 cleanup:
-    netmgr_free(pszPattern);
     regfree(&rx);
     return err;
 error:
@@ -638,8 +622,8 @@ nm_touch_network_conf_file(
     char **ppszFilename)
 {
     uint32_t err = 0;
-    char *pszCfgFileName = NULL;
-    int lockId;
+    _cleanup_(freep) char *pszCfgFileName = NULL;
+    _cleanup_(freelockp) int lockId = -1;
 
     err = nm_acquire_write_lock(0, &lockId);
     bail_on_error(err);
@@ -663,16 +647,8 @@ nm_touch_network_conf_file(
         netmgr_free(pszCfgFileName);
     }
 
-cleanup:
-    nm_release_write_lock(lockId);
-    return err;
 error:
-    if (ppszFilename != NULL)
-    {
-        *ppszFilename = NULL;
-    }
-    netmgr_free(pszCfgFileName);
-    goto cleanup;
+    return err;
 }
 
 /*
@@ -805,8 +781,8 @@ nm_get_link_mac_addr(
 )
 {
     uint32_t err = 0;
-    int sockFd = -1;
-    char *pszMacAddress = NULL;
+    _cleanup_(closep) int sockFd = -1;
+    _cleanup_(freep) char *pszMacAddress = NULL;
     struct ifreq ifr = {};
 
     if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !ppszMacAddress)
@@ -816,7 +792,6 @@ nm_get_link_mac_addr(
     }
 
     strncpy(ifr.ifr_name, pszInterfaceName, IFNAMSIZ - 1);
-
     sockFd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockFd < 0)
     {
@@ -842,20 +817,10 @@ nm_get_link_mac_addr(
     bail_on_error(err);
 
     *ppszMacAddress = pszMacAddress;
+    pszMacAddress = NULL;
 
-cleanup:
-    if (sockFd > -1)
-    {
-        close(sockFd);
-    }
-    return err;
 error:
-    if (ppszMacAddress)
-    {
-        *ppszMacAddress = NULL;
-    }
-    netmgr_free(pszMacAddress);
-    goto cleanup;
+    return err;
 }
 
 static uint32_t
@@ -1319,7 +1284,7 @@ nm_get_link_state(
 )
 {
     uint32_t err = 0;
-    int sockFd = -1;
+    _cleanup_ (closep) int sockFd = -1;
     struct ifreq ifr = {};
 
     if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !pLinkState)
@@ -1346,19 +1311,13 @@ nm_get_link_state(
 
     *pLinkState = TEST_FLAG(ifr.ifr_flags, IFF_UP) ? LINK_UP : LINK_DOWN;
 
-cleanup:
-    if (sockFd > -1)
-    {
-        close(sockFd);
-    }
-    return err;
-
 error:
     if (pLinkState)
     {
         *pLinkState = LINK_STATE_UNKNOWN;
     }
-    goto cleanup;
+
+    return err;
 }
 
 static uint32_t
@@ -1715,6 +1674,7 @@ nm_get_interface_info(
 
     err = netmgr_alloc_string(pszInterfaceName, &pLinkInfo->pszInterfaceName);
     bail_on_error(err);
+
 
     pLinkInfo->pszMacAddress = pszMacAddress;
     pLinkInfo->mtu = mtu;
@@ -5834,7 +5794,7 @@ nm_set_hostname(
 )
 {
     uint32_t err = 0;
-    char *pszCmd = NULL;
+    _cleanup_(freep) char *pszCmd = NULL;
 
     if (IS_NULL_OR_EMPTY(pszHostname))
     {
@@ -5850,11 +5810,8 @@ nm_set_hostname(
     err = nm_run_command(pszCmd);
     bail_on_error(err);
 
-clean:
-    netmgr_free(pszCmd);
-    return err;
 error:
-    goto clean;
+    return err;
 }
 
 uint32_t
@@ -5863,7 +5820,8 @@ nm_get_hostname(
 )
 {
     uint32_t err = 0;
-    char *pszHostname = NULL, *pszNewline = NULL;
+    _cleanup_(freep) char *pszHostname = NULL;
+    char *pszNewline = NULL;
 
     if (!ppszHostname)
     {
@@ -5881,16 +5839,10 @@ nm_get_hostname(
     }
 
     *ppszHostname = pszHostname;
+    pszHostname = NULL;
 
-clean:
+ error:
     return err;
-error:
-    if (ppszHostname)
-    {
-        ppszHostname = NULL;
-    }
-    netmgr_free(pszHostname);
-    goto clean;
 }
 
 uint32_t
