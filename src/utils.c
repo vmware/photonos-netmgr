@@ -319,49 +319,42 @@ nm_get_systemd_version(
     uint32_t *psdVersion
 )
 {
-    uint32_t err = 0, sdVer = 0;
-    char szBuf[MAX_LINE] = {0};
-    FILE *fp = NULL;
+    sd_bus_error bus_error = SD_BUS_ERROR_NULL;
+    sd_bus_message *m = NULL;
+    sd_bus *bus = NULL;
+    const char *version;
+    int err = 0;
 
-    if (!psdVersion)
-    {
-        err = NM_ERR_INVALID_PARAMETER;
-        bail_on_error(err);
-    }
+    /* Connect to the system bus */
+    err = sd_bus_open_system(&bus);
+    if (err < 0)
+            bail_on_error(err);
+    /* Issue the property call*/
+    err = sd_bus_get_property(bus,
+                            "org.freedesktop.systemd1",
+                            "/org/freedesktop/systemd1",
+                            "org.freedesktop.systemd1.Manager",
+                            "Version",
+                            &bus_error,
+                            &m,
+                            "s");
+    if (err < 0)
+            bail_on_error(err);
 
-    fp = popen("/usr/lib/systemd/systemd --v", "r");
-    if (!fp)
-    {
-        err = NM_ERR_VALUE_NOT_FOUND;
-        bail_on_error(err);
-    }
+    /* Parse the respone message */
+    err = sd_bus_message_read(m, "s", &version);
+    if (err < 0)
+            bail_on_error(err);
 
-    if (fgets(szBuf, MAX_LINE, fp) == NULL)
-    {
-        err = NM_ERR_VALUE_NOT_FOUND;
-        bail_on_error(err);
-    }
+    *psdVersion = atoi(version);
+    err = 0;
 
-    if (sscanf(szBuf, "systemd %u", &sdVer) != 1)
-    {
-        err = NM_ERR_VALUE_NOT_FOUND;
-        bail_on_error(err);
-    }
-
-    *psdVersion = sdVer;
-
-clean:
-    if (fp != NULL)
-    {
-        pclose(fp);
-    }
-    return err;
 error:
-    if (psdVersion)
-    {
-        *psdVersion = 0;
-    }
-    goto clean;
+    sd_bus_error_free(&bus_error);
+    sd_bus_message_unref(m);
+    sd_bus_unref(bus);
+
+    return err;
 }
 
 uint32_t

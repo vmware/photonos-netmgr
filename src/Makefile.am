@@ -26,4 +26,4 @@ libnetmgr_la_SOURCES = \
 
 libnetmgr_la_LIBADD = \
     @top_builddir@/common/libcommon.la \
-    -lglib-2.0
+    -lglib-2.0 -lsystemd
