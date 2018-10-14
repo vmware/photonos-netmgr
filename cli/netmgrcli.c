@@ -483,6 +483,7 @@ cli_ip_route(
     uint32_t err = 0, validIfName = 0, validDest = 0, validGW = 0;
     uint8_t prefix = 255;
     char addr[INET6_ADDRSTRLEN+5];
+    char addr_buf[INET6_ADDRSTRLEN+128];
     int nOptionIndex = 0, nOption = 0;
     CMD_OP op = OP_INVALID;
 
@@ -558,8 +559,8 @@ cli_ip_route(
                     err = EDOM;
                     break;
                 }
-                sprintf(addr, "%s/%hhu", addr, prefix);
-                err = netmgrcli_alloc_keyvalue("destination", addr, pCmd);
+                sprintf(addr_buf, "%s/%hhu", addr, prefix);
+                err = netmgrcli_alloc_keyvalue("destination", addr_buf, pCmd);
                 break;
             case 'g':
                 if ((strlen(optarg) > 0) &&
@@ -1902,4 +1903,3 @@ netmgrcli_free_cmd(
         netmgr_free(pCmd);
     }
 }
-
