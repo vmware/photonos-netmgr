@@ -77,7 +77,7 @@ flush_interface_ipaddr(
 {
     uint32_t err = 0;
     int sockFd = -1;
-    struct ifreq ifr;
+    struct ifreq ifr = {};
     struct sockaddr_in sin;
 
     if (IS_NULL_OR_EMPTY(pszInterfaceName) ||
@@ -88,7 +88,7 @@ flush_interface_ipaddr(
     }
 
     memset(&ifr, 0, sizeof(ifr));
-    strncpy(ifr.ifr_name, pszInterfaceName, strlen(pszInterfaceName));
+    strncpy(ifr.ifr_name, pszInterfaceName, IFNAMSIZ - 1);
 
     sockFd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockFd < 0)
@@ -190,7 +190,7 @@ open_netlink_socket(
         err = errno;
         bail_on_error(err);
     }
-    
+
     if (fcntl(sockFd, F_SETFL, O_NONBLOCK) == -1)
     {
         err = errno;
@@ -385,4 +385,3 @@ free_netlink_message_list(
         netmgr_free(pCurrent);
     }
 }
-
