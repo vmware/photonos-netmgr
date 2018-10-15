@@ -5686,9 +5686,19 @@ nm_get_hostname(
     char **ppszHostname
 )
 {
+    sd_bus_error bus_error = SD_BUS_ERROR_NULL;
+    sd_bus_message *m = NULL;
+    const char *pszHostname;
     uint32_t err = 0;
-    _cleanup_(freep) char *pszHostname = NULL;
-    char *pszNewline = NULL;
+    sd_bus *bus = NULL;
+    int r;
+
+    /* Connect to the system bus */
+    err = sd_bus_open_system(&bus);
+    if (err < 0) {
+            err = errno;
+            bail_on_error(err);
+    }
 
     if (!ppszHostname)
     {
@@ -5696,19 +5706,31 @@ nm_get_hostname(
         bail_on_error(err);
     }
 
-    err = nm_read_conf_file(HOSTNAME_CONF_FILENAME, &pszHostname);
-    bail_on_error(err);
-
-    pszNewline = strchr(pszHostname, '\n');
-    if (pszNewline != NULL)
-    {
-        *pszNewline = '\0';
+    r = sd_bus_get_property(bus,
+                            "org.freedesktop.hostname1",
+                            "/org/freedesktop/hostname1",
+                            "org.freedesktop.hostname1",
+                            "StaticHostname",
+                            &bus_error, &m, "s");
+    if (r < 0) {
+        err = errno;
+        bail_on_error(err);
     }
 
-    *ppszHostname = pszHostname;
-    pszHostname = NULL;
+    r = sd_bus_message_read(m, "s", &pszHostname);
+    if (r < 0) {
+        err = errno;
+        bail_on_error(err);
+    }
 
- error:
+    err = netmgr_alloc_string(pszHostname, ppszHostname);
+    bail_on_error(err);
+
+   error:
+    sd_bus_error_free(&bus_error);
+    sd_bus_message_unref(m);
+    sd_bus_unref(bus);
+
     return err;
 }
 
