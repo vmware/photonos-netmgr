@@ -5651,7 +5651,6 @@ error:
     goto clean;
 }
 
-
 /*
  * Misc APIs
  */
@@ -5660,8 +5659,11 @@ nm_set_hostname(
     const char *pszHostname
 )
 {
+    sd_bus_error bus_error = SD_BUS_ERROR_NULL;
+    sd_bus_message *m = NULL;
     uint32_t err = 0;
-    _cleanup_(freep) char *pszCmd = NULL;
+    sd_bus *bus = NULL;
+    int r;
 
     if (IS_NULL_OR_EMPTY(pszHostname))
     {
@@ -5669,15 +5671,30 @@ nm_set_hostname(
         bail_on_error(err);
     }
 
-    err = netmgr_alloc_string_printf(&pszCmd,
-                                     "hostnamectl set-hostname %s",
-                                     pszHostname);
-    bail_on_error(err);
+    /* Connect to the system bus */
+    err = sd_bus_open_system(&bus);
+    if (err < 0) {
+            err = errno;
+            bail_on_error(err);
+    }
 
-    err = nm_run_command(pszCmd);
-    bail_on_error(err);
+    r = sd_bus_call_method(
+                        bus,
+                        "org.freedesktop.hostname1",
+                        "/org/freedesktop/hostname1",
+                        "org.freedesktop.hostname1",
+                        "SetStaticHostname",
+                         &bus_error, NULL,
+                        "sb", pszHostname);
+    if (r < 0) {
+        err = errno;
+        bail_on_error(err);
+    }
 
 error:
+    sd_bus_error_free(&bus_error);
+    sd_bus_message_unref(m);
+    sd_bus_unref(bus);
     return err;
 }
 
