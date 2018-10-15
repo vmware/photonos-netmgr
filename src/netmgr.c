@@ -780,10 +780,9 @@ nm_get_link_mac_addr(
     char **ppszMacAddress
 )
 {
+    _cleanup_(freep) char *pszLine = NULL, *pszPath = NULL;
+    _cleanup_(fclosep) FILE *fp = NULL;
     uint32_t err = 0;
-    _cleanup_(closep) int sockFd = -1;
-    _cleanup_(freep) char *pszMacAddress = NULL;
-    struct ifreq ifr = {};
 
     if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !ppszMacAddress)
     {
@@ -791,33 +790,14 @@ nm_get_link_mac_addr(
         bail_on_error(err);
     }
 
-    strncpy(ifr.ifr_name, pszInterfaceName, IFNAMSIZ - 1);
-    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockFd < 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-
-    err = ioctl(sockFd, SIOCGIFHWADDR, &ifr);
-    if (err != 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-
-    err = netmgr_alloc_string_printf(&pszMacAddress,
-                                     "%02x:%02x:%02x:%02x:%02x:%02x",
-                                     (unsigned char)ifr.ifr_hwaddr.sa_data[0],
-                                     (unsigned char)ifr.ifr_hwaddr.sa_data[1],
-                                     (unsigned char)ifr.ifr_hwaddr.sa_data[2],
-                                     (unsigned char)ifr.ifr_hwaddr.sa_data[3],
-                                     (unsigned char)ifr.ifr_hwaddr.sa_data[4],
-                                     (unsigned char)ifr.ifr_hwaddr.sa_data[5]);
+    err = netmgr_alloc_string_printf(&pszPath, "/sys/class/net/%s/address", pszInterfaceName);
     bail_on_error(err);
 
-    *ppszMacAddress = pszMacAddress;
-    pszMacAddress = NULL;
+    err = nm_read_one_line(pszPath, &pszLine);
+    bail_on_error(err);
+
+    err = netmgr_alloc_string(pszLine, ppszMacAddress);
+    bail_on_error(err);
 
 error:
     return err;
@@ -1141,9 +1121,9 @@ nm_get_link_mtu(
     uint32_t *pMtu
 )
 {
+    _cleanup_(freep) char *pszLine = NULL, *pszPath = NULL;
+    _cleanup_(fclosep) FILE *fp = NULL;
     uint32_t err = 0;
-    int sockFd = -1;
-    struct ifreq ifr = {};
 
     if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !pMtu)
     {
@@ -1151,36 +1131,16 @@ nm_get_link_mtu(
         bail_on_error(err);
     }
 
-    strncpy(ifr.ifr_name, pszInterfaceName, IFNAMSIZ - 1);
+    err = netmgr_alloc_string_printf(&pszPath, "/sys/class/net/%s/mtu", pszInterfaceName);
+    bail_on_error(err);
 
-    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockFd < 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
+    err = nm_read_one_line(pszPath, &pszLine);
+    bail_on_error(err);
 
-    err = ioctl(sockFd, SIOCGIFMTU, &ifr);
-    if (err != 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
+   *pMtu = atoi(pszLine);
 
-    *pMtu = ifr.ifr_mtu;
-
-cleanup:
-    if (sockFd > -1)
-    {
-        close(sockFd);
-    }
-    return err;
 error:
-    if (pMtu)
-    {
-        *pMtu = 0;
-    }
-    goto cleanup;
+    return err;
 }
 
 static uint32_t
@@ -2271,99 +2231,6 @@ error:
 }
 
 static uint32_t
-nm_set_sysctl_procfs_value(
-    const char *pszProcfsPath,
-    const char *pszValue
-)
-{
-    uint32_t err = 0;
-    FILE *pFile = NULL;
-
-    if (IS_NULL_OR_EMPTY(pszProcfsPath) || IS_NULL_OR_EMPTY(pszValue))
-    {
-        err = NM_ERR_INVALID_PARAMETER;
-        bail_on_error(err);
-    }
-
-    pFile = fopen(pszProcfsPath, "w");
-    if (pFile == NULL)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-
-    if (fputs(pszValue, pFile) == EOF)
-    {
-        err = ferror(pFile);
-        bail_on_error(err);
-    }
-
-cleanup:
-    if (pFile != NULL)
-    {
-        fclose(pFile);
-    }
-    return err;
-error:
-    goto cleanup;
-}
-
-static uint32_t
-nm_get_sysctl_procfs_value(
-    const char *pszProcfsPath,
-    char **ppszValue
-)
-{
-    uint32_t err = 0;
-    FILE *pFile = NULL;
-    size_t len = 0;
-    ssize_t lLen = 0;
-    char *p, *pszLine = NULL, *pszValue = NULL;
-
-    if (IS_NULL_OR_EMPTY(pszProcfsPath) || !ppszValue)
-    {
-        err = NM_ERR_INVALID_PARAMETER;
-        bail_on_error(err);
-    }
-
-    pFile = fopen(pszProcfsPath, "r");
-    if (pFile == NULL)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-
-    lLen = getline(&pszLine, &len, pFile);
-    if (lLen < 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-    err = netmgr_alloc_string(pszLine, &pszValue);
-    bail_on_error(err);
-    p = strrchr(pszValue, '\n');
-    if (p != NULL)
-    {
-        *p = '\0';
-    }
-    *ppszValue = pszValue;
-
-cleanup:
-    if (pFile != NULL)
-    {
-        fclose(pFile);
-    }
-    return err;
-error:
-    netmgr_free(pszValue);
-    if (ppszValue)
-    {
-        *ppszValue = NULL;
-    }
-    goto cleanup;
-}
-
-static uint32_t
 nm_get_ipv6_enable(
     const char *pszInterfaceName,
     uint32_t *pEnabled);
@@ -2424,7 +2291,7 @@ nm_set_ip_dhcp_mode(
                            szDhcpValue, 0);
     bail_on_error(err);
 
-    err = nm_set_sysctl_procfs_value(pszProcfsAutov6Path, szAutov6Value);
+    err = nm_write_one_line(pszProcfsAutov6Path, szAutov6Value);
     bail_on_error(err);
 
     err = nm_set_sysctl_persistent_value(pszSysctlAutov6Key, szAutov6Value);
@@ -2504,7 +2371,7 @@ nm_get_ip_dhcp_mode(
                                      pszInterfaceName);
     bail_on_error(err);
 
-    err = nm_get_sysctl_procfs_value(pszProcfsAutov6Path, &pszAutov6Value);
+    err = nm_read_one_line(pszProcfsAutov6Path, &pszAutov6Value);
     if ((err == ENOENT) || (err == NM_ERR_VALUE_NOT_FOUND))
     {
         err = 0;
@@ -3134,7 +3001,7 @@ nm_set_ipv6_enable(
                                      pszInterfaceName);
     bail_on_error(err);
 
-    err = nm_set_sysctl_procfs_value(pszProcfsDisablev6Path, szDisablev6Value);
+    err = nm_write_one_line(pszProcfsDisablev6Path, szDisablev6Value);
     bail_on_error(err);
 
     err = nm_set_sysctl_persistent_value(pszSysctlDisablev6Key,
@@ -3169,7 +3036,7 @@ nm_get_ipv6_enable(
                                      pszInterfaceName);
     bail_on_error(err);
 
-    err = nm_get_sysctl_procfs_value(pszProcfsDisablev6Path, &pszDisableIpv6);
+    err = nm_read_one_line(pszProcfsDisablev6Path, &pszDisableIpv6);
     bail_on_error(err);
 
     if (!strcmp(pszDisableIpv6, "0"))

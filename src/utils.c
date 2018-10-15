@@ -519,3 +519,86 @@ nm_release_write_lock(
 error:
     return err;
 }
+
+uint32_t
+nm_read_one_line(
+    const char *pszPath,
+    char **ppszValue
+)
+{
+    _cleanup_(freep) char *pszLine = NULL;
+    _cleanup_(fclosep) FILE *fp = NULL;
+    uint32_t err = 0;
+    size_t len = MAX_LINE, iLen;
+    char *p;
+
+    if (IS_NULL_OR_EMPTY(pszPath) || !ppszValue)
+    {
+        err = NM_ERR_INVALID_PARAMETER;
+        bail_on_error(err);
+    }
+
+    fp = fopen(pszPath, "r");
+    if (fp == NULL) {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    iLen = netmgr_alloc(MAX_LINE, (void**)&pszLine);
+    if (iLen < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    iLen = getline(&pszLine, &len, fp);
+    if (iLen < 0) {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    /* strip new line */
+    p = strrchr(pszLine, '\n');
+    if (p != NULL)
+         *p = '\0';
+
+    *ppszValue = pszLine;
+    pszLine = NULL;
+
+    err = 0;
+
+ error:
+    return err;
+}
+
+uint32_t
+nm_write_one_line(
+    const char *pszPath,
+    const char *pszValue
+)
+{
+   _cleanup_(fclosep) FILE *pFile = NULL;
+    uint32_t err = 0;
+
+    if (IS_NULL_OR_EMPTY(pszPath) || IS_NULL_OR_EMPTY(pszValue))
+    {
+        err = NM_ERR_INVALID_PARAMETER;
+        bail_on_error(err);
+    }
+
+    pFile = fopen(pszPath, "w");
+    if (pFile == NULL)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    if (fputs(pszValue, pFile) == EOF)
+    {
+        err = ferror(pFile);
+        bail_on_error(err);
+    }
+
+error:
+    return err;
+}

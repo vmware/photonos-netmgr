@@ -79,4 +79,16 @@ nm_release_write_lock(
     int lockId
 );
 
+uint32_t
+nm_read_one_line(
+    const char *pszPath,
+    char **ppszLine
+);
+
+uint32_t
+nm_write_one_line(
+    const char *pszPath,
+    const char *pszValue
+);
+
 #endif /* __UTILS_H__ */
