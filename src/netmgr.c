@@ -6327,8 +6327,8 @@ nm_restart_network_service()
                            "ss",
                            "systemd-networkd.service",
                            "replace");
-    if (r < 0) {
-        printf("Failed to issue method call: %s\n", bus_error.message);
+    if (r < 0)
+    {
         err = r;
         bail_on_error(err);
     }
@@ -6358,21 +6358,22 @@ nm_stop_dns_service()
        bail_on_error(err);
    }
 
-    r = sd_bus_call_method(
-                           bus,
-                           "org.freedesktop.systemd1",
-                           "/org/freedesktop/systemd1",
-                           "org.freedesktop.systemd1.Manager",
-                           "StopUnit",
-                           &bus_error,
-                           &reply,
-                           "ss",
-                           "systemd-resolved.service",
-                           "replace");
-    if (r < 0) {
+   r = sd_bus_call_method(
+                          bus,
+                          "org.freedesktop.systemd1",
+                          "/org/freedesktop/systemd1",
+                          "org.freedesktop.systemd1.Manager",
+                          "StopUnit",
+                          &bus_error,
+                          &reply,
+                          "ss",
+                          "systemd-resolved.service",
+                          "replace");
+   if (r < 0)
+   {
         err = errno;
         bail_on_error(err);
-    }
+   }
 
 error:
     sd_bus_error_free(&bus_error);
@@ -6408,10 +6409,11 @@ nm_restart_dns_service()
                           &reply,
                           "ss", "systemd-resolved.service",
                           "replace");
-    if (r < 0) {
-        err = errno;
-        bail_on_error(err);
-    }
+   if (r < 0)
+   {
+       err = errno;
+       bail_on_error(err);
+   }
 
 error:
     sd_bus_error_free(&bus_error);
@@ -6436,28 +6438,28 @@ nm_stop_ntp_service()
        bail_on_error(err);
    }
 
-    r = sd_bus_call_method(
-                           bus,
-                           "org.freedesktop.systemd1",
-                           "/org/freedesktop/systemd1",
-                           "org.freedesktop.systemd1.Manager",
-                           "StopUnit",
-                           &bus_error,
-                           &reply,
-                           "ss",
-                           "ntpd.service",
-                           "replace");
-    if (r < 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
+   r = sd_bus_call_method(
+                          bus,
+                          "org.freedesktop.systemd1",
+                          "/org/freedesktop/systemd1",
+                          "org.freedesktop.systemd1.Manager",
+                          "StopUnit",
+                          &bus_error,
+                          &reply,
+                          "ss",
+                          "ntpd.service",
+                          "replace");
+   if (r < 0)
+   {
+       err = errno;
+       bail_on_error(err);
+   }
 
 error:
-    sd_bus_error_free(&bus_error);
-    sd_bus_message_unref(reply);
-    sd_bus_unref(bus);
-    return err;
+   sd_bus_error_free(&bus_error);
+   sd_bus_message_unref(reply);
+   sd_bus_unref(bus);
+   return err;
 }
 
 uint32_t
@@ -6478,16 +6480,16 @@ nm_restart_ntp_service()
     }
 
     r = sd_bus_call_method(
-                        bus,
-                        "org.freedesktop.systemd1",
-                        "/org/freedesktop/systemd1",
-                        "org.freedesktop.systemd1.Manager",
-                        "RestartUnit",
-                         &bus_error,
-                        &reply,
-                        "ss",
-                        "ntpd.service",
-                        "replace");
+                           bus,
+                           "org.freedesktop.systemd1",
+                           "/org/freedesktop/systemd1",
+                           "org.freedesktop.systemd1.Manager",
+                           "RestartUnit",
+                           &bus_error,
+                           &reply,
+                           "ss",
+                           "ntpd.service",
+                           "replace");
     if (r < 0)
     {
         err = errno;
