@@ -5660,7 +5660,7 @@ nm_set_hostname(
 )
 {
     sd_bus_error bus_error = SD_BUS_ERROR_NULL;
-    sd_bus_message *m = NULL;
+    sd_bus_message *reply = NULL;
     uint32_t err = 0;
     sd_bus *bus = NULL;
     int r;
@@ -5684,8 +5684,10 @@ nm_set_hostname(
                         "/org/freedesktop/hostname1",
                         "org.freedesktop.hostname1",
                         "SetStaticHostname",
-                         &bus_error, NULL,
-                        "sb", pszHostname);
+                        &bus_error,
+                        &reply,
+                        "sb",
+                        pszHostname);
     if (r < 0) {
         err = errno;
         bail_on_error(err);
@@ -5693,7 +5695,7 @@ nm_set_hostname(
 
 error:
     sd_bus_error_free(&bus_error);
-    sd_bus_message_unref(m);
+    sd_bus_message_unref(reply);
     sd_bus_unref(bus);
     return err;
 }
@@ -5704,7 +5706,7 @@ nm_get_hostname(
 )
 {
     sd_bus_error bus_error = SD_BUS_ERROR_NULL;
-    sd_bus_message *m = NULL;
+    sd_bus_message *reply = NULL;
     const char *pszHostname;
     uint32_t err = 0;
     sd_bus *bus = NULL;
@@ -5712,15 +5714,16 @@ nm_get_hostname(
 
     /* Connect to the system bus */
     err = sd_bus_open_system(&bus);
-    if (err < 0) {
+    if (err < 0)
+    {
             err = errno;
             bail_on_error(err);
     }
 
     if (!ppszHostname)
     {
-        err = NM_ERR_INVALID_PARAMETER;
-        bail_on_error(err);
+           err = NM_ERR_INVALID_PARAMETER;
+           bail_on_error(err);
     }
 
     r = sd_bus_get_property(bus,
@@ -5728,24 +5731,28 @@ nm_get_hostname(
                             "/org/freedesktop/hostname1",
                             "org.freedesktop.hostname1",
                             "StaticHostname",
-                            &bus_error, &m, "s");
-    if (r < 0) {
-        err = errno;
-        bail_on_error(err);
+                            &bus_error,
+                            &reply,
+                            "s");
+    if (r < 0)
+    {
+            err = errno;
+            bail_on_error(err);
     }
 
-    r = sd_bus_message_read(m, "s", &pszHostname);
-    if (r < 0) {
-        err = errno;
-        bail_on_error(err);
+    r = sd_bus_message_read(reply, "s", &pszHostname);
+    if (r < 0)
+    {
+            err = errno;
+            bail_on_error(err);
     }
 
     err = netmgr_alloc_string(pszHostname, ppszHostname);
     bail_on_error(err);
 
-   error:
+ error:
     sd_bus_error_free(&bus_error);
-    sd_bus_message_unref(m);
+    sd_bus_message_unref(reply);
     sd_bus_unref(bus);
 
     return err;
@@ -6247,56 +6254,251 @@ error:
     goto cleanup;
 }
 
-
-/*
- * Service management APIs
- */
+/* Service management APIs  */
 uint32_t
 nm_stop_network_service()
 {
-    const char command[] = "systemctl stop systemd-networkd";
+   sd_bus_error bus_error = SD_BUS_ERROR_NULL;
+   sd_bus_message *reply = NULL;
+   uint32_t err = 0;
+   sd_bus *bus = NULL;
+   int r;
 
-    return nm_run_command(command);
+   /* Connect to the system bus */
+   err = sd_bus_open_system(&bus);
+   if (err < 0)
+   {
+       err = errno;
+       bail_on_error(err);
+   }
+
+   r = sd_bus_call_method(
+                          bus,
+                          "org.freedesktop.systemd1",
+                          "/org/freedesktop/systemd1",
+                          "org.freedesktop.systemd1.Manager",
+                          "StopUnit",
+                          &bus_error,
+                          &reply,
+                          "ss",
+                          "systemd-networkd.service",
+                          "fail");
+   if (r < 0)
+   {
+       printf("Failed to issue method call: %s\n", bus_error.message);
+
+       err = errno;
+       bail_on_error(err);
+   }
+
+error:
+    sd_bus_error_free(&bus_error);
+    sd_bus_message_unref(reply);
+    sd_bus_unref(bus);
+    return err;
 }
 
 uint32_t
 nm_restart_network_service()
 {
-    const char command[] = "systemctl restart systemd-networkd";
+    sd_bus_error bus_error = SD_BUS_ERROR_NULL;
+    sd_bus_message *reply = NULL;
+    uint32_t err = 0;
+    sd_bus *bus = NULL;
+    int r;
 
-    return nm_run_command(command);
+    /* Connect to the system bus */
+    r = sd_bus_open_system(&bus);
+    if (r < 0)
+    {
+        printf("not connected\n");
+        err = r;
+        bail_on_error(err);
+    }
+
+    r = sd_bus_call_method(
+                           bus,
+                           "org.freedesktop.systemd1",
+                           "/org/freedesktop/systemd1",
+                           "org.freedesktop.systemd1.Manager",
+                           "RestartUnit",
+                           &bus_error,
+                           &reply,
+                           "ss",
+                           "systemd-networkd.service",
+                           "replace");
+    if (r < 0) {
+        printf("Failed to issue method call: %s\n", bus_error.message);
+        err = r;
+        bail_on_error(err);
+    }
+
+error:
+    sd_bus_error_free(&bus_error);
+    sd_bus_message_unref(reply);
+    sd_bus_unref(bus);
+
+    return err;
 }
 
 uint32_t
 nm_stop_dns_service()
 {
-    const char command[] = "systemctl stop systemd-resolved";
+   sd_bus_error bus_error = SD_BUS_ERROR_NULL;
+   sd_bus_message *reply = NULL;
+   uint32_t err = 0;
+   sd_bus *bus = NULL;
+   int r;
 
-    return nm_run_command(command);
+    /* Connect to the system bus */
+   err = sd_bus_open_system(&bus);
+   if (err < 0)
+   {
+       err = errno;
+       bail_on_error(err);
+   }
+
+    r = sd_bus_call_method(
+                           bus,
+                           "org.freedesktop.systemd1",
+                           "/org/freedesktop/systemd1",
+                           "org.freedesktop.systemd1.Manager",
+                           "StopUnit",
+                           &bus_error,
+                           &reply,
+                           "ss",
+                           "systemd-resolved.service",
+                           "replace");
+    if (r < 0) {
+        err = errno;
+        bail_on_error(err);
+    }
+
+error:
+    sd_bus_error_free(&bus_error);
+    sd_bus_message_unref(reply);
+    sd_bus_unref(bus);
+    return err;
 }
 
 uint32_t
 nm_restart_dns_service()
 {
-    const char command[] = "systemctl restart systemd-resolved";
+   sd_bus_error bus_error = SD_BUS_ERROR_NULL;
+   sd_bus_message *reply = NULL;
+   uint32_t err = 0;
+   sd_bus *bus = NULL;
+   int r;
 
-    return nm_run_command(command);
+    /* Connect to the system bus */
+   err = sd_bus_open_system(&bus);
+   if (err < 0)
+   {
+       err = errno;
+       bail_on_error(err);
+   }
+
+   r = sd_bus_call_method(
+                          bus,
+                          "org.freedesktop.systemd1",
+                          "/org/freedesktop/systemd1",
+                          "org.freedesktop.systemd1.Manager",
+                          "RestartUnit",
+                          &bus_error,
+                          &reply,
+                          "ss", "systemd-resolved.service",
+                          "replace");
+    if (r < 0) {
+        err = errno;
+        bail_on_error(err);
+    }
+
+error:
+    sd_bus_error_free(&bus_error);
+    sd_bus_message_unref(reply);
+    sd_bus_unref(bus);
+    return err;
 }
 
 uint32_t
 nm_stop_ntp_service()
 {
-    const char command[] = "systemctl stop ntpd";
+   sd_bus_error bus_error = SD_BUS_ERROR_NULL;
+   sd_bus_message *reply = NULL;
+   uint32_t err = 0;
+   sd_bus *bus = NULL;
+   int r;
 
-    return nm_run_command(command);
+    /* Connect to the system bus */
+   err = sd_bus_open_system(&bus);
+   if (err < 0) {
+       err = errno;
+       bail_on_error(err);
+   }
+
+    r = sd_bus_call_method(
+                           bus,
+                           "org.freedesktop.systemd1",
+                           "/org/freedesktop/systemd1",
+                           "org.freedesktop.systemd1.Manager",
+                           "StopUnit",
+                           &bus_error,
+                           &reply,
+                           "ss",
+                           "ntpd.service",
+                           "replace");
+    if (r < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+error:
+    sd_bus_error_free(&bus_error);
+    sd_bus_message_unref(reply);
+    sd_bus_unref(bus);
+    return err;
 }
 
 uint32_t
 nm_restart_ntp_service()
 {
-    const char command[] = "systemctl restart ntpd";
+    sd_bus_error bus_error = SD_BUS_ERROR_NULL;
+    sd_bus_message *reply = NULL;
+    uint32_t err = 0;
+    sd_bus *bus = NULL;
+    int r;
 
-    return nm_run_command(command);
+    /* Connect to the system bus */
+    err = sd_bus_open_system(&bus);
+    if (err < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+    r = sd_bus_call_method(
+                        bus,
+                        "org.freedesktop.systemd1",
+                        "/org/freedesktop/systemd1",
+                        "org.freedesktop.systemd1.Manager",
+                        "RestartUnit",
+                         &bus_error,
+                        &reply,
+                        "ss",
+                        "ntpd.service",
+                        "replace");
+    if (r < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
+
+error:
+    sd_bus_error_free(&bus_error);
+    sd_bus_message_unref(reply);
+    sd_bus_unref(bus);
+    return err;
 }
 
 uint32_t

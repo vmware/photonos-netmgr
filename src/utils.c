@@ -324,13 +324,16 @@ nm_get_systemd_version(
     sd_bus *bus = NULL;
     const char *version;
     int err = 0;
+    int r;
 
     /* Connect to the system bus */
-    err = sd_bus_open_system(&bus);
-    if (err < 0)
-            bail_on_error(err);
+    r = sd_bus_open_system(&bus);
+    if (r < 0) {
+        err = r;
+        bail_on_error(err);
+    }
     /* Issue the property call*/
-    err = sd_bus_get_property(bus,
+    r = sd_bus_get_property(bus,
                             "org.freedesktop.systemd1",
                             "/org/freedesktop/systemd1",
                             "org.freedesktop.systemd1.Manager",
@@ -338,16 +341,21 @@ nm_get_systemd_version(
                             &bus_error,
                             &m,
                             "s");
-    if (err < 0)
-            bail_on_error(err);
+    if (r < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
 
     /* Parse the respone message */
-    err = sd_bus_message_read(m, "s", &version);
-    if (err < 0)
-            bail_on_error(err);
+    r = sd_bus_message_read(m, "s", &version);
+    if (r < 0)
+    {
+        err = errno;
+        bail_on_error(err);
+    }
 
     *psdVersion = atoi(version);
-    err = 0;
 
 error:
     sd_bus_error_free(&bus_error);
