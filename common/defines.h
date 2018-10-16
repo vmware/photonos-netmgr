@@ -20,3 +20,19 @@
           goto error; \
        } \
     } while(0)
+
+#define _cleanup_(_x) __attribute__((__cleanup__(_x)))
+
+static inline void freep(void *p) {
+        free(*(void **)p);
+}
+
+static inline void closep(int *fd) {
+        if (*fd >= 0)
+                close(*fd);
+}
+
+static inline void fclosep(FILE **fp) {
+        if (*fp)
+                fclose(*fp);
+}

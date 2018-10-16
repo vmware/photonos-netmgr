@@ -12,8 +12,7 @@
  * under the License.
  */
 
-#ifndef __UTILS_H__
-#define __UTILS_H__
+#pragma once
 
 #define F_CREATE_CFG_FILE              0x00000001
 
@@ -90,5 +89,3 @@ nm_write_one_line(
     const char *pszPath,
     const char *pszValue
 );
-
-#endif /* __UTILS_H__ */

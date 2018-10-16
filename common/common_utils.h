@@ -12,8 +12,7 @@
  * under the License.
  */
 
-#ifndef __COMMON_UTILS_H__
-#define __COMMON_UTILS_H__
+#pragma once
 
 #define IS_VALID_INTERFACE_NAME(_pstr) \
     ((_pstr) && (*_pstr) && (strnlen(_pstr, IFNAMSIZ) < IFNAMSIZ))
@@ -50,7 +49,7 @@ get_prefix_from_netmask(
 );
 
 uint32_t
-open_netlink_socket(
+netlink_socket_open(
     uint32_t netLinkGroup,
     int *pSockFd
 );
@@ -65,5 +64,3 @@ void
 free_netlink_message_list(
     NETLINK_MESSAGE *pNetLinkMsg
 );
-
-#endif /* __COMMON_UTILS_H__ */

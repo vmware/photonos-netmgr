@@ -12,10 +12,12 @@
  * under the License.
  */
 
+#pragma once
+
 typedef struct _KEYVALUE_INI
 {
     char * pszKey;
-    char * pszValue; 
+    char * pszValue;
 
     struct _KEYVALUE_INI * pNext;
 

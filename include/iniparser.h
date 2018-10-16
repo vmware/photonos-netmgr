@@ -12,8 +12,7 @@
  * under the License.
  */
 
-#ifndef __INI_PARSER_H
-#define __INI_PARSER_H
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,7 +25,7 @@ typedef struct _CONFIG_INI * PCONFIG_INI;
 uint32_t
 ini_cfg_read(
     const char*  pszPath,
-    PCONFIG_INI* ppConfig 
+    PCONFIG_INI* ppConfig
     );
 
 uint32_t
@@ -127,6 +126,3 @@ ini_cfg_free_config(
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* _INI_PARSER_H */
-

@@ -12,6 +12,8 @@
  * under the License.
  */
 
+#pragma once
+
 #include <config.h>
 
 #include <glib.h>
@@ -34,6 +36,8 @@
 #include <iniparser.h>
 #include "../common/common_utils.h"
 #include "../common/nm_memory.h"
+#include "../common/nm_netlink.h"
+#include "../common/includes.h"
 #include "defines.h"
 #include "structs.h"
 #include "prototypes.h"

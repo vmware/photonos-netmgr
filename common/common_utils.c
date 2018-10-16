@@ -162,68 +162,6 @@ error:
     goto cleanup;
 }
 
-uint32_t
-open_netlink_socket(
-    uint32_t netLinkGroup,
-    int *pSockFd
-)
-{
-    uint32_t err = 0;
-    int sockFd = -1, reuseAddr = 1;
-    struct sockaddr_nl addr;
-
-    if (!pSockFd)
-    {
-        err = EINVAL;
-    }
-    bail_on_error(err);
-
-    sockFd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
-    if (sockFd < 0)
-    {
-        err = EINVAL;
-        bail_on_error(err);
-    }
-
-    if (setsockopt(sockFd, SOL_SOCKET, SO_REUSEADDR, &reuseAddr, sizeof(int)))
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-
-    if (fcntl(sockFd, F_SETFL, O_NONBLOCK) == -1)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-
-    memset((void *)&addr, 0, sizeof(addr));
-    addr.nl_family = AF_NETLINK;
-    addr.nl_pid = getpid();
-    addr.nl_groups = netLinkGroup;
-
-    if (bind(sockFd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-
-    *pSockFd = sockFd;
-
-cleanup:
-    return err;
-error:
-    if (sockFd > -1)
-    {
-        close(sockFd);
-    }
-    if (pSockFd)
-    {
-        *pSockFd = -1;
-    }
-    goto cleanup;
-}
-
 static uint32_t
 fill_netlink_msg(
     struct nlmsghdr *nlHdr,

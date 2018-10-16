@@ -12,8 +12,7 @@
  * under the License.
  */
 
-#ifndef __DEFINES_H__
-#define __DEFINES_H__
+#pragma once
 
 #include "utils.h"
 
@@ -74,33 +73,7 @@
 #define fDHCP_IPV6         0x00000010
 #define fAUTO_IPV6         0x00000020
 
-
-#define bail_on_error(errcode) \
-    do { \
-       if (errcode) { \
-          goto error; \
-       } \
-    } while(0)
-
-#define _cleanup_(_x) __attribute__((__cleanup__(_x)))
-
-static inline void freep(void *p) {
-        free(*(void **)p);
-}
-
-static inline void closep(int *fd) {
-        if (*fd >= 0)
-                close(*fd);
-}
-
-static inline void fclosep(FILE **fp) {
-        if (*fp)
-                fclose(*fp);
-}
-
 static inline void freelockp(int *lockId) {
         if (*lockId)
                 nm_release_write_lock(*lockId);
 }
-
-#endif /* __DEFINES_H__ */
