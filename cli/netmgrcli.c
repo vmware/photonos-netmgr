@@ -206,7 +206,7 @@ error:
     if(err == EDOM)
     {
         fprintf(stderr,
-                "Usage:\nlink_info --get --interface <ifame>\n"
+                "Usage:\nlink_info --get --interface <ifname>\n"
                 "link_info --set --interface <ifname> --macaddr <mac_address>"
                 " --mode <manual|auto> --state <up|down> --mtu <mtu>\n");
     }
@@ -318,7 +318,7 @@ error:
     if (err == EDOM)
     {
         fprintf(stderr,
-                "Usage:\nip4_address --get --interface <ifame>\n"
+                "Usage:\nip4_address --get --interface <ifname>\n"
                 "ip4_address --set --interface <ifname> --mode dhcp|static|none"
                 " --addr <IPv4Address/prefix> --gateway <Gateway Address>\n");
     }
@@ -450,8 +450,8 @@ error:
     if (err == EDOM)
     {
         fprintf(stderr,
-                "Usage:\nip6_address --get --interface <ifame>\n"
-                "ip6_address --add|--del --interface <ifame> "
+                "Usage:\nip6_address --get --interface <ifname>\n"
+                "ip6_address --add|--del --interface <ifname> "
                 "--addrlist <IPv6Addr1/prefix,IPv6Addr2/prefix,...>\n"
                 "ip6_address --set --interface <ifname> --dhcp <1|0> "
                 "--autoconf <1|0>\n");
@@ -611,7 +611,7 @@ error:
     if (err == EDOM)
     {
         fprintf(stderr,
-                "Usage:\nip_route --get --interface <ifame>\n"
+                "Usage:\nip_route --get --interface <ifname>\n"
                 "ip_route --add --interface <ifname> --gateway <GatewayIP>"
                 " --destination <DestinationNetwork/prefix> --metric <N>\n"
                 "ip_route --del --interface <ifname> --destination <DestIP/N>\n");
