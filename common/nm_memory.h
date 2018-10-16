@@ -14,6 +14,8 @@
 
 // memory.c
 
+#pragma once
+
 #define IS_NULL_OR_EMPTY(_pstr)  (!(_pstr) || !(*(_pstr)))
 
 uint32_t

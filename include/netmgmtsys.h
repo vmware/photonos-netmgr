@@ -12,6 +12,8 @@
  * under the License.
  */
 
+#pragma once
+
 #ifdef HAVE_PTHREAD_H
 #include <pthread.h>
 #endif
@@ -91,4 +93,3 @@
 #ifdef HAVE_LIMITS_H
 #include <limits.h>
 #endif
-

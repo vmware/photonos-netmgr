@@ -12,6 +12,8 @@
  * under the License.
  */
 
+#pragma once
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,3 +31,4 @@
 #include "defines.h"
 #include "nm_memory.h"
 #include "common_utils.h"
+#include "nm_netlink.h"

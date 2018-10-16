@@ -12,8 +12,7 @@
  * under the License.
  */
 
-#ifndef __CONSTANTS_H__
-#define __CONSTANTS_H__
+#pragma once
 
 #define MAX_DUID_SIZE                  128
 #define DEFAULT_MTU_VALUE              1500
@@ -34,7 +33,3 @@ static const char* const duid_type_table[_DUID_TYPE_MAX] = {
     [DUID_TYPE_LL]   = "link-layer",
     [DUID_TYPE_UUID] = "uuid",
 };
-
-#endif /* __CONSTANTS_H__ */
-
-

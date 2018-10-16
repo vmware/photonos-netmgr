@@ -666,10 +666,15 @@ nm_update_mac_address(
     const char *pszMacAddress
 )
 {
-    uint32_t err = 0;
-    int sockFd = -1;
-    int addrLen = 0;
-    struct ifreq ifr = {};
+    uint32_t err = 0, addrLen = 0;
+    _cleanup_(closep) int sockFd = -1;
+    uint8_t mac[ETH_ALEN] = {};
+    netlink_link nlMsg = {
+                          .nlHdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg)),
+                          .nlHdr.nlmsg_flags = NLM_F_REQUEST,
+                          .nlHdr.nlmsg_type = RTM_SETLINK,
+                          .linkInfo.ifi_family = AF_UNSPEC,
+    };
 
     if (!IS_VALID_INTERFACE_NAME(pszInterfaceName))
     {
@@ -677,50 +682,27 @@ nm_update_mac_address(
         bail_on_error(err);
     }
 
-    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockFd < 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
+    err = netlink_socket_open(0, &sockFd);
+    bail_on_error(err);
 
-    strncpy(ifr.ifr_name, pszInterfaceName, IFNAMSIZ - 1);
-    ifr.ifr_hwaddr.sa_family = ARPHRD_ETHER;
+    nlMsg.linkInfo.ifi_index = if_nametoindex(pszInterfaceName);
     addrLen = sscanf(pszMacAddress, "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx",
-                                    &ifr.ifr_hwaddr.sa_data[0],
-                                    &ifr.ifr_hwaddr.sa_data[1],
-                                    &ifr.ifr_hwaddr.sa_data[2],
-                                    &ifr.ifr_hwaddr.sa_data[3],
-                                    &ifr.ifr_hwaddr.sa_data[4],
-                                    &ifr.ifr_hwaddr.sa_data[5]);
-    if (addrLen != ETHER_ADDR_LEN)
+                     &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
+
+    if (addrLen != ETH_ALEN)
     {
         err = NM_ERR_INVALID_ADDRESS;
         bail_on_error(err);
     }
 
-    err = nm_update_link_state(pszInterfaceName, LINK_DOWN);
+    err = netlink_add_attr(&nlMsg.nlHdr, IFLA_ADDRESS, &mac, ETH_ALEN);
     bail_on_error(err);
 
-    err = ioctl(sockFd, SIOCSIFHWADDR, &ifr);
-    if (err != 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-
-    err = nm_update_link_state(pszInterfaceName, LINK_UP);
+    err = netlink_socket_send_message(sockFd, &nlMsg, nlMsg.nlHdr.nlmsg_len);
     bail_on_error(err);
-
-cleanup:
-    if (sockFd > -1)
-    {
-        close(sockFd);
-    }
-    return err;
 
 error:
-    goto cleanup;
+    return err;
 }
 
 uint32_t
@@ -1009,8 +991,13 @@ nm_update_link_mtu(
 )
 {
     uint32_t err = 0;
-    int sockFd = -1;
-    struct ifreq ifr = {};
+    _cleanup_(closep) int sockFd = -1;
+    netlink_link nlMsgLink = {
+                          .nlHdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg)),
+                          .nlHdr.nlmsg_flags = NLM_F_REQUEST,
+                          .nlHdr.nlmsg_type = RTM_SETLINK,
+                          .linkInfo.ifi_family = AF_UNSPEC,
+        };
 
     if (!IS_VALID_INTERFACE_NAME(pszInterfaceName))
     {
@@ -1018,47 +1005,18 @@ nm_update_link_mtu(
         bail_on_error(err);
     }
 
-    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockFd < 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-
-    strncpy(ifr.ifr_name, pszInterfaceName, IFNAMSIZ - 1);
-
-    if (mtu > 0)
-    {
-        ifr.ifr_mtu = mtu;
-    }
-    else
-    {
-        ifr.ifr_mtu = DEFAULT_MTU_VALUE;
-    }
-
-    err = nm_update_link_state(pszInterfaceName, LINK_DOWN);
+    err = netlink_socket_open(0, &sockFd);
     bail_on_error(err);
 
-    err = ioctl(sockFd, SIOCSIFMTU, &ifr);
-    if (err != 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-
-    err = nm_update_link_state(pszInterfaceName, LINK_UP);
+    nlMsgLink.linkInfo.ifi_index = if_nametoindex(pszInterfaceName);
+    err = netlink_add_attr_uint32(&nlMsgLink.nlHdr, IFLA_MTU, mtu);
     bail_on_error(err);
 
-cleanup:
-    if (sockFd > -1)
-    {
-        close(sockFd);
-    }
-    return err;
+    err = netlink_socket_send_message(sockFd, &nlMsgLink, nlMsgLink.nlHdr.nlmsg_len);
+    bail_on_error(err);
 
 error:
-    goto cleanup;
-
+    return err;
 }
 
 uint32_t
@@ -1149,9 +1107,17 @@ nm_update_link_state(
     NET_LINK_STATE linkState
 )
 {
+    NET_LINK_STATE linkStateCurrent = LINK_STATE_UNKNOWN;
+    _cleanup_(closep) int sockFd = -1;
+    netlink_link nlMsgLink = {
+                          .nlHdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg)),
+                          .nlHdr.nlmsg_flags = NLM_F_REQUEST,
+                          .nlHdr.nlmsg_type = RTM_SETLINK,
+                          .linkInfo.ifi_family = AF_UNSPEC,
+                          .linkInfo.ifi_change = 0,
+                          .linkInfo.ifi_flags = 0
+    };
     uint32_t err = 0;
-    int sockFd = -1;
-    struct ifreq ifr = {};
 
     if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) ||
         (linkState >= LINK_STATE_UNKNOWN))
@@ -1160,59 +1126,40 @@ nm_update_link_state(
         bail_on_error(err);
     }
 
-    strncpy(ifr.ifr_name, pszInterfaceName, IFNAMSIZ - 1);
+    err = nm_get_link_state(pszInterfaceName, &linkStateCurrent);
+    bail_on_error(err);
 
-    sockFd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockFd < 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
+    err = netlink_socket_open(0, &sockFd);
+    bail_on_error(err);
 
-    err = ioctl(sockFd, SIOCGIFFLAGS, &ifr);
-    if (err != 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
+    nlMsgLink.linkInfo.ifi_index = if_nametoindex(pszInterfaceName);
 
     switch (linkState)
     {
         case LINK_UP:
-            if (TEST_FLAG(ifr.ifr_flags, IFF_UP))
+            if (linkStateCurrent != LINK_UP)
             {
-                goto cleanup;
+                SET_FLAG(nlMsgLink.linkInfo.ifi_change, IFF_UP);
+                SET_FLAG(nlMsgLink.linkInfo.ifi_flags, IFF_UP);
             }
-            SET_FLAG(ifr.ifr_flags, IFF_UP | IFF_BROADCAST |
-                     IFF_RUNNING | IFF_MULTICAST);
             break;
         case LINK_DOWN:
-            if (!TEST_FLAG(ifr.ifr_flags, IFF_UP))
+            if (linkStateCurrent != LINK_DOWN)
             {
-                goto cleanup;
+                SET_FLAG(nlMsgLink.linkInfo.ifi_change, IFF_UP);
+                CLEAR_FLAG(nlMsgLink.linkInfo.ifi_flags, IFF_UP);
             }
-            CLEAR_FLAG(ifr.ifr_flags, IFF_UP);
             break;
         default:
             err = NM_ERR_INVALID_PARAMETER;
     }
     bail_on_error(err);
 
-    err = ioctl(sockFd, SIOCSIFFLAGS, &ifr);
-    if (err != 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
+    err = netlink_socket_send_message(sockFd, &nlMsgLink, nlMsgLink.nlHdr.nlmsg_len);
+    bail_on_error(err);
 
-cleanup:
-    if (sockFd > -1)
-    {
-        close(sockFd);
-    }
-    return err;
 error:
-    goto cleanup;
+    return err;
 }
 
 uint32_t
@@ -1243,9 +1190,9 @@ nm_get_link_state(
     NET_LINK_STATE *pLinkState
 )
 {
-    uint32_t err = 0;
     _cleanup_ (closep) int sockFd = -1;
     struct ifreq ifr = {};
+    uint32_t err = 0;
 
     if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !pLinkState)
     {
@@ -1723,7 +1670,6 @@ nm_free_link_info(
     }
 }
 
-
 /*
  * IP Address configuration APIs
  */
@@ -1999,16 +1945,21 @@ nm_get_ip_default_gateway(
     char **ppszGateway
 )
 {
-    uint32_t err = 0;
-    static int msgSeq = 0;
-    int sockFd = -1, readLen, msgLen = 0, rtLen, pId;
-    struct nlmsghdr *nlHdr, *nlMsg;
-    struct rtmsg *rtMsg;
+    char *pszGateway = NULL ,szGateway[INET6_ADDRSTRLEN] = {}, szIfName[IFNAMSIZ] = {};
+    _cleanup_(closep) int sockFd = -1;
+    char szMsgBuf[NETLINK_BUFSIZE] = {};
+    struct in_addr gw4 = {}, dst4 = {};
+    ssize_t readSize = 0, rtLen = 0;
+    struct nlmsghdr *nlMsgRoute;
     struct rtattr *rtAttr;
-    struct in_addr dst4 = {0}, gw4 = {0};
-#define BUFSIZE 8192
-    char *pszMsgBuf, szIfName[IFNAMSIZ] = {0}, szMsgBuf[BUFSIZE] = {0};
-    char *pszGateway = NULL, szGateway[INET6_ADDRSTRLEN] = {0};
+    struct rtmsg *rtMsg;
+    uint32_t err = 0;
+    netlink_route routeMsg = {
+                              .nlHdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg)),
+                              .nlHdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP,
+                              .nlHdr.nlmsg_type = RTM_GETROUTE,
+                              .rtInfo.rtm_family = AF_INET,
+    };
 
     if (!IS_VALID_INTERFACE_NAME(pszInterfaceName) || !ppszGateway)
     {
@@ -2016,56 +1967,16 @@ nm_get_ip_default_gateway(
         bail_on_error(err);
     }
 
-    if ((sockFd = socket(PF_NETLINK, SOCK_DGRAM, NETLINK_ROUTE)) < 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
+    err = netlink_socket_open(0, &sockFd);
+    bail_on_error(err);
 
-    pszMsgBuf = szMsgBuf;
-    nlMsg = (struct nlmsghdr *)pszMsgBuf;
-    rtMsg = (struct rtmsg *)NLMSG_DATA(nlMsg);
-    nlMsg->nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
-    nlMsg->nlmsg_type = RTM_GETROUTE;
-    SET_FLAG(nlMsg->nlmsg_flags, (NLM_F_DUMP | NLM_F_REQUEST));
-    nlMsg->nlmsg_seq = msgSeq++;
-    pId = nlMsg->nlmsg_pid = getpid();
+    err = netlink_call(sockFd, &routeMsg, routeMsg.nlHdr.nlmsg_len, &szMsgBuf, NETLINK_BUFSIZE, &readSize);
+    bail_on_error(err);
 
-    if (send(sockFd, nlMsg, nlMsg->nlmsg_len, 0) < 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-
-    do
-    {
-        if ((readLen = recv(sockFd, pszMsgBuf, (BUFSIZE - msgLen), 0)) < 0)
-        {
-            err = errno;
-            bail_on_error(err);
-        }
-        nlHdr = (struct nlmsghdr *)pszMsgBuf;
-        if ((NLMSG_OK(nlHdr, readLen) == 0) ||
-            (nlHdr->nlmsg_type == NLMSG_ERROR))
-        {
-            err = errno;
-            bail_on_error(err);
-        }
-        if (nlHdr->nlmsg_type == NLMSG_DONE)
-        {
-            break;
-        }
-        pszMsgBuf += readLen;
-        msgLen += readLen;
-        if (!TEST_FLAG(nlHdr->nlmsg_flags, NLM_F_MULTI))
-        {
-            break;
-        }
-    } while ((nlHdr->nlmsg_seq != msgSeq) || (nlHdr->nlmsg_pid != pId));
-
-    for (; NLMSG_OK(nlMsg, msgLen); nlMsg = NLMSG_NEXT(nlMsg, msgLen))
-    {
-        rtMsg = (struct rtmsg *)NLMSG_DATA(((struct nlmsghdr *)nlMsg));
+    nlMsgRoute = (struct nlmsghdr *) &szMsgBuf;
+    for (; NLMSG_OK(nlMsgRoute, readSize); nlMsgRoute = NLMSG_NEXT(nlMsgRoute, readSize))
+     {
+        rtMsg = (struct rtmsg *)NLMSG_DATA(((struct nlmsghdr *)nlMsgRoute));
         // TODO: Figure out IPv6
         if (rtMsg->rtm_table != RT_TABLE_MAIN)
         {
@@ -2082,7 +1993,7 @@ nm_get_ip_default_gateway(
             continue;
         }
         rtAttr = (struct rtattr *)RTM_RTA(rtMsg);
-        rtLen = RTM_PAYLOAD(nlMsg);
+        rtLen = RTM_PAYLOAD(nlMsgRoute);
         for (; RTA_OK(rtAttr, rtLen); rtAttr = RTA_NEXT(rtAttr, rtLen))
         {
             switch (rtAttr->rta_type)
@@ -2122,24 +2033,17 @@ nm_get_ip_default_gateway(
                 break;
             }
         }
+     }
+
+    if (inet_ntop(AF_INET, &gw4, szGateway, INET6_ADDRSTRLEN) != NULL)
+    {
+        err = netmgr_alloc_string(szGateway, &pszGateway);
     }
 
     *ppszGateway = pszGateway;
 
-cleanup:
-    if (sockFd > -1)
-    {
-        close(sockFd);
-    }
-    return err;
-
 error:
-    if (ppszGateway)
-    {
-        *ppszGateway = NULL;
-    }
-    netmgr_free(pszGateway);
-    goto cleanup;
+    return err;
 }
 
 static uint32_t
@@ -4717,7 +4621,7 @@ nm_delete_dns_domain(
     const char *pszDnsDomain
 )
 {
-    uint32_t err = 0;
+    uint32_t err = 0, sdVersion = 0;
     char *pszCfgFileName = NULL;
     char szSectionName[MAX_LINE];
     char *pszCurrentDnsDomains = NULL;
@@ -4735,8 +4639,10 @@ nm_delete_dns_domain(
         bail_on_error(err);
     }
 
-    if (!system("/usr/lib/systemd/systemd --v | grep systemd | \
-                 cut -d' ' -f2 | grep 2[0-2][0-8] > /dev/null"))
+    err = nm_get_systemd_version(&sdVersion);
+    bail_on_error(err);
+
+    if (sdVersion <= 228)
     {
         /* systemd version <= 228 */
         if (pszInterfaceName == NULL)
@@ -4809,7 +4715,7 @@ nm_set_dns_domains(
     const char **ppszDnsDomains
 )
 {
-    uint32_t err = 0;
+    uint32_t err = 0, sdVersion = 0;
     char *pszCfgFileName = NULL;
     char szSectionName[MAX_LINE];
     char *pszDnsDomainsValue = NULL;
@@ -4818,8 +4724,11 @@ nm_set_dns_domains(
     err = nm_acquire_write_lock(0, &lockId);
     bail_on_error(err);
 
-    if (!system("/usr/lib/systemd/systemd --v | grep systemd | \
-                 cut -d' ' -f2 | grep 2[0-2][0-8] > /dev/null"))
+
+    err = nm_get_systemd_version(&sdVersion);
+    bail_on_error(err);
+
+    if (sdVersion <= 228)
     {
         /* systemd version <= 228 */
         if (pszInterfaceName == NULL)
@@ -5788,7 +5697,7 @@ nm_wait_for_link_up(
         goto cleanup;
     }
 
-    err = open_netlink_socket(RTMGRP_LINK, &sockFd);
+    err = netlink_socket_open(RTMGRP_LINK, &sockFd);
     bail_on_error(err);
 
     if (timeout > 0)
@@ -5993,7 +5902,7 @@ nm_wait_for_ip(
         netLinkGroups |= RTMGRP_IPV6_IFADDR;
     }
 
-    err = open_netlink_socket(netLinkGroups, &sockFd);
+    err = netlink_socket_open(netLinkGroups, &sockFd);
     bail_on_error(err);
 
     if (timeout > 0)
@@ -6311,7 +6220,6 @@ nm_restart_network_service()
     r = sd_bus_open_system(&bus);
     if (r < 0)
     {
-        printf("not connected\n");
         err = r;
         bail_on_error(err);
     }
@@ -6433,7 +6341,8 @@ nm_stop_ntp_service()
 
     /* Connect to the system bus */
    err = sd_bus_open_system(&bus);
-   if (err < 0) {
+   if (err < 0)
+   {
        err = errno;
        bail_on_error(err);
    }
