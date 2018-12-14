@@ -1,6 +1,6 @@
 AC_PREREQ(2.59)
 
-AC_INIT([netmgmt], [1.1.0], [support@vmware.com])
+AC_INIT([netmgmt], [1.2.0], [support@vmware.com])
 AC_CANONICAL_SYSTEM
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 

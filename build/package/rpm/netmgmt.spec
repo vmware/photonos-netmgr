@@ -14,7 +14,7 @@
 
 Summary: Photon OS Network Configuration Manager
 Name:    netmgmt
-Version: 1.1.0
+Version: 1.2.0
 Release: 1
 Group:   Applications/System
 Vendor:  VMware, Inc.
@@ -77,6 +77,8 @@ cd build && make install DESTDIR=$RPM_BUILD_ROOT
 # %doc ChangeLog README COPYING
 
 %changelog
+*   Thu Dec 13 2018 Michelle Wang <michellew@vmware.com> 1.2.0-1
+-   Bump version to 1.2.0
 *   Sun Mar 05 2017 Vinay Kulkarni <kulkarniv@vmware.com> 1.1.0-1
 -   Bump version to 1.1.0
 *   Wed Nov 02 2016 Vinay Kulkarni <kulkarniv@vmware.com> 1.0.5-1
