@@ -996,8 +996,16 @@ cli_dns_domains(
                 /* --domains option */
                 if (strlen(optarg) > 0)
                 {
-                    err = netmgrcli_alloc_keyvalue("domains", optarg, pCmd);
-                    domains_option_present = 1;
+                    if (strlen(optarg) > 256)
+                    {
+                        fprintf(stderr, "Domain name is longer than 256 charactors.\n");
+                        err = EDOM;
+                    }
+                    else
+                    {
+                        err = netmgrcli_alloc_keyvalue("domains", optarg, pCmd);
+                        domains_option_present = 1;
+                    }
                 }
                 break;
             case '?':
@@ -1026,10 +1034,10 @@ error:
     if(err == EDOM)
     {
         fprintf(stderr,
-                "Usage:\ndns_domains --get\ndns_domains --set "
+                "Usage:\ndns_domains --get\ndns_domains --set --interface <IfName> "
                  "--domains <domain1,domain2,...>\n"
-                 "dns_domains --add --domains <domain1,domain2,..>\n"
-                 "dns_domains --del --domains <domain1>\n");
+                 "dns_domains --add --interface <IfName> --domains <domain1,domain2,..>\n"
+                 "dns_domains --del --interface <IfName> --domains <domain1>\n");
     }
     goto cleanup;
 }
