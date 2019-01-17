@@ -20,9 +20,6 @@ AT_KEYWORDS([if_iaid])
 m4_define([TEST_IAID],[12345])
 m4_define([RESET_IAID],[0])
 
-AT_CHECK([$abs_top_builddir/tools/netmgr/netmgr if_iaid --get --interface eth0],
-[2])
-
 AT_CHECK([$abs_top_builddir/tools/netmgr/netmgr if_iaid --set --interface eth0 --iaid TEST_IAID],
 [0],
 [],
