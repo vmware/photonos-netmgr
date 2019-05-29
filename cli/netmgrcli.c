@@ -487,7 +487,7 @@ cli_ip_route(
 {
     uint32_t err = 0, validIfName = 0, validDest = 0, validGW = 0;
     uint8_t prefix = 255;
-    char addr[INET6_ADDRSTRLEN+5];
+    char addr[INET6_ADDRSTRLEN+5], destAddr[INET6_ADDRSTRLEN+128];
     int nOptionIndex = 0, nOption = 0;
     CMD_OP op = OP_INVALID;
 
@@ -563,8 +563,9 @@ cli_ip_route(
                     err = EDOM;
                     break;
                 }
-                sprintf(addr, "%s/%hhu", addr, prefix);
-                err = netmgrcli_alloc_keyvalue("destination", addr, pCmd);
+
+                sprintf(destAddr, "%s/%hhu", addr, prefix);
+                err = netmgrcli_alloc_keyvalue("destination", destAddr, pCmd);
                 break;
             case 'g':
                 if ((strlen(optarg) > 0) &&
@@ -1277,7 +1278,7 @@ cli_wait_for_link(
         }
         bail_on_error(err);
     }
-    
+
     if (!validTimeout)
     {
         printf ("no setting for timeout, use by default value 0.\n");
@@ -1841,4 +1842,3 @@ netmgrcli_free_cmd(
         netmgr_free(pCmd);
     }
 }
-
