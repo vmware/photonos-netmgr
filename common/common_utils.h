@@ -39,7 +39,7 @@ is_ipv6_autoconf_addr(const char *pszIpAddr, const char *pszMacAddr);
 
 uint32_t
 flush_interface_ipaddr(
-    const char *pszInterfaceName
+    const char *ifname
 );
 
 uint32_t

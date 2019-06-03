@@ -130,8 +130,8 @@ cmd_link_info(PNETMGR_CMD pCmd)
                     "MacAddress", "Mode", "MTU", "State");
             while (pCurNetLinkInfo)
             {
-                fprintf(stdout, "%-10s\t", pCurNetLinkInfo->pszInterfaceName);
-                fprintf(stdout, "%-17s\t", pCurNetLinkInfo->pszMacAddress);
+                fprintf(stdout, "%-10s\t", pCurNetLinkInfo->ifname);
+                fprintf(stdout, "%-17s\t", pCurNetLinkInfo->mac);
                 fprintf(stdout, "%-10s\t",
                         nm_link_mode_to_string(pCurNetLinkInfo->mode));
                 fprintf(stdout, "%-10u\t", pCurNetLinkInfo->mtu);
@@ -421,7 +421,7 @@ cleanup:
             {
                 continue;
             }
-            netmgr_free(ppIpAddrList[i]->pszInterfaceName);
+            netmgr_free(ppIpAddrList[i]->ifname);
             netmgr_free(ppIpAddrList[i]->pszIPAddrPrefix);
         }
         netmgr_list_free(count, (void **)ppIpAddrList);
@@ -441,7 +441,7 @@ cmd_ip_route(PNETMGR_CMD pCmd)
     char *pszMetric = NULL, *pszScope = NULL;
     NET_IP_ROUTE ipRoute = {0}, **ppRoutesList = NULL;
 
-    netmgrcli_find_cmdopt(pCmd, "interface", &ipRoute.pszInterfaceName);
+    netmgrcli_find_cmdopt(pCmd, "interface", &ipRoute.ifname);
 
     switch (pCmd->op)
     {
@@ -498,7 +498,7 @@ cmd_ip_route(PNETMGR_CMD pCmd)
             break;
 
         case OP_GET:
-            err = nm_get_static_ip_routes(ipRoute.pszInterfaceName, &count,
+            err = nm_get_static_ip_routes(ipRoute.ifname, &count,
                                           &ppRoutesList);
             fprintf(stdout, "Static IP Routes:\n");
             for (i = 0; i < count; i++)
@@ -1349,4 +1349,3 @@ error:
     }
     goto cleanup;
 }
-

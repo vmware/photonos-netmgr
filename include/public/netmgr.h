@@ -66,8 +66,8 @@ typedef enum _NET_LINK_STATE
 typedef struct _NET_LINK_INFO
 {
     struct _NET_LINK_INFO *pNext;
-    char *pszInterfaceName;
-    char *pszMacAddress;
+    char *ifname;
+    char *mac;
     uint32_t mtu;
     NET_LINK_MODE mode;
     NET_LINK_STATE state;
@@ -102,7 +102,7 @@ typedef enum _NET_ADDR_TYPE
 
 typedef struct _NET_IP_ADDR
 {
-    char *pszInterfaceName;
+    char *ifname;
     NET_ADDR_TYPE type;
     char *pszIPAddrPrefix;
 } NET_IP_ADDR, *PNET_IP_ADDR;
@@ -121,7 +121,7 @@ typedef enum _NET_ROUTE_SCOPE
 
 typedef struct _NET_IP_ROUTE
 {
-    char *pszInterfaceName;
+    char *ifname;
     char *pszDestNetwork;
     char *pszSourceNetwork;
     char *pszGateway;
@@ -205,7 +205,7 @@ nm_get_error_info(
 
 uint32_t
 nm_touch_network_conf_file(
-    const char *pszInterfaceName,
+    const char *ifname,
     char **ppszFilename);
 
 /*
@@ -214,65 +214,65 @@ nm_touch_network_conf_file(
 // Override the 'factory/nvram' mac address. mtu=0 -> use default 1500
 uint32_t
 nm_set_link_mac_addr(
-    const char *pszInterfaceName,
-    const char *pszMacAddress
+    const char *ifname,
+    const char *mac
 );
 
 uint32_t
 nm_get_link_mac_addr(
-    const char *pszInterfaceName,
-    char **ppszMacAddress
+    const char *ifname,
+    char **mac
 );
 
 uint32_t
 nm_set_link_mode(
-    const char *pszInterfaceName,
+    const char *ifname,
     NET_LINK_MODE mode
 );
 
 uint32_t
 nm_get_link_mode(
-    const char *pszInterfaceName,
+    const char *ifname,
     NET_LINK_MODE *pLinkMode
 );
 
 uint32_t
 nm_set_link_mtu(
-    const char *pszInterfaceName,
+    const char *ifname,
     uint32_t mtu
 );
 
 uint32_t
 nm_get_link_mtu(
-    const char *pszInterfaceName,
+    const char *ifname,
     uint32_t *pMtu
 );
 
 uint32_t
 nm_set_link_state(
-    const char *pszInterfaceName,
+    const char *ifname,
     NET_LINK_STATE state
 );
 
 uint32_t
 nm_get_link_state(
-    const char *pszInterfaceName,
+    const char *ifname,
     NET_LINK_STATE *pLinkState
 );
 
 uint32_t
 nm_ifup(
-    const char *pszInterfaceName
+    const char *ifname
 );
 
 uint32_t
 nm_ifdown(
-    const char *pszInterfaceName
+    const char *ifname
 );
 
 uint32_t
 nm_get_link_info(
-    const char *pszInterfaceName,
+    const char *ifname,
     NET_LINK_INFO **ppLinkInfo
 );
 
@@ -288,7 +288,7 @@ nm_free_link_info(
 //TODO: Support address for virtual interface e.g. "eth1:0"
 uint32_t
 nm_set_ipv4_addr_gateway(
-    const char *pszInterfaceName,
+    const char *ifname,
     NET_IPV4_ADDR_MODE mode,
     const char *pszIPv4AddrPrefix,
     const char *pszIPv4Gateway
@@ -296,7 +296,7 @@ nm_set_ipv4_addr_gateway(
 
 uint32_t
 nm_get_ipv4_addr_gateway(
-    const char *pszInterfaceName,
+    const char *ifname,
     NET_IPV4_ADDR_MODE *pMode,
     char **ppszIPv4AddrPrefix,
     char **ppszIPv4Gateway
@@ -304,33 +304,33 @@ nm_get_ipv4_addr_gateway(
 
 uint32_t
 nm_add_static_ipv6_addr(
-    const char *pszInterfaceName,
+    const char *ifname,
     const char *pszIPv6AddrPrefix
 );
 
 uint32_t
 nm_delete_static_ipv6_addr(
-    const char *pszInterfaceName,
+    const char *ifname,
     const char *pszIPv6AddrPrefix
 );
 
 uint32_t
 nm_set_ipv6_addr_mode(
-    const char *pszInterfaceName,
+    const char *ifname,
     uint32_t enableDhcp,
     uint32_t enableAutoconf
 );
 
 uint32_t
 nm_get_ipv6_addr_mode(
-    const char *pszInterfaceName,
+    const char *ifname,
     uint32_t *pDhcpEnabled,
     uint32_t *pAutoconfEnabled
 );
 
 uint32_t
 nm_get_ip_addr(
-    const char *pszInterfaceName,
+    const char *ifname,
     uint32_t addrTypes,
     size_t *pCount,
     NET_IP_ADDR ***pppIpAddrList
@@ -338,13 +338,13 @@ nm_get_ip_addr(
 
 uint32_t
 nm_set_ipv6_gateway(
-    const char *pszInterfaceName,
+    const char *ifname,
     const char *pszIPv6Gateway
 );
 
 uint32_t
 nm_get_ipv6_gateway(
-    const char *pszInterfaceName,
+    const char *ifname,
     char **ppszIPv6Gateway
 );
 
@@ -364,7 +364,7 @@ nm_delete_static_ip_route(
 
 uint32_t
 nm_get_static_ip_routes(
-    const char *pszInterfaceName,
+    const char *ifname,
     size_t *pCount,
     NET_IP_ROUTE ***pppRouteList
 );
@@ -375,7 +375,7 @@ nm_get_static_ip_routes(
  */
 uint32_t
 nm_set_dns_servers(
-    const char *pszInterfaceName,
+    const char *ifname,
     NET_DNS_MODE mode,
     size_t count,
     const char **ppszDnsServers
@@ -383,19 +383,19 @@ nm_set_dns_servers(
 
 uint32_t
 nm_add_dns_server(
-    const char *pszInterfaceName,
+    const char *ifname,
     const char *pszDnsServer
 );
 
 uint32_t
 nm_delete_dns_server(
-    const char *pszInterfaceName,
+    const char *ifname,
     const char *pszDnsServer
 );
 
 uint32_t
 nm_get_dns_servers(
-    const char *pszInterfaceName,
+    const char *ifname,
     NET_DNS_MODE *pMode,
     size_t *pCount,
     char ***pppszDnsServers
@@ -403,26 +403,26 @@ nm_get_dns_servers(
 
 uint32_t
 nm_set_dns_domains(
-    const char *pszInterfaceName,
+    const char *ifname,
     size_t count,
     const char **ppszDnsDomains
 );
 
 uint32_t
 nm_add_dns_domain(
-    const char *pszInterfaceName,
+    const char *ifname,
     const char *pszDnsDomain
 );
 
 uint32_t
 nm_delete_dns_domain(
-    const char *pszInterfaceName,
+    const char *ifname,
     const char *pszDnsDomain
 );
 
 uint32_t
 nm_get_dns_domains(
-    const char *pszInterfaceName,
+    const char *ifname,
     size_t *pCount,
     char ***pppszDnsDomains
 );
@@ -433,25 +433,25 @@ nm_get_dns_domains(
  */
 uint32_t
 nm_set_iaid(
-    const char *pszInterfaceName,
+    const char *ifname,
     uint32_t iaid
 );
 
 uint32_t
 nm_get_iaid(
-    const char *pszInterfaceName,
+    const char *ifname,
     uint32_t *pIaid
 );
 
 uint32_t
 nm_set_duid(
-    const char *pszInterfaceName,
+    const char *ifname,
     const char *pszDuid
 );
 
 uint32_t
 nm_get_duid(
-    const char *pszInterfaceName,
+    const char *ifname,
     char **ppszDuid
 );
 
@@ -533,13 +533,13 @@ nm_get_hostname(
 
 uint32_t
 nm_wait_for_link_up(
-    const char *pszInterfaceName,
+    const char *ifname,
     uint32_t timeout
 );
 
 uint32_t
 nm_wait_for_ip(
-    const char *pszInterfaceName,
+    const char *ifname,
     uint32_t timeout,
     NET_ADDR_TYPE addrTypes
 );
@@ -588,4 +588,3 @@ nm_reload_firewall_config();
 #endif
 
 #endif /* __NETMGR_H__ */
-
