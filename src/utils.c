@@ -314,56 +314,6 @@ error:
     return err;
 }
 
-uint32_t
-nm_get_systemd_version(
-    uint32_t *psdVersion
-)
-{
-    sd_bus_error bus_error = SD_BUS_ERROR_NULL;
-    sd_bus_message *m = NULL;
-    sd_bus *bus = NULL;
-    const char *version;
-    int err = 0;
-    int r;
-
-    /* Connect to the system bus */
-    r = sd_bus_open_system(&bus);
-    if (r < 0) {
-        err = r;
-        bail_on_error(err);
-    }
-    /* Issue the property call*/
-    r = sd_bus_get_property(bus,
-                            "org.freedesktop.systemd1",
-                            "/org/freedesktop/systemd1",
-                            "org.freedesktop.systemd1.Manager",
-                            "Version",
-                            &bus_error,
-                            &m,
-                            "s");
-    if (r < 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-
-    /* Parse the respone message */
-    r = sd_bus_message_read(m, "s", &version);
-    if (r < 0)
-    {
-        err = errno;
-        bail_on_error(err);
-    }
-
-    *psdVersion = atoi(version);
-
-error:
-    sd_bus_error_free(&bus_error);
-    sd_bus_message_unref(m);
-    sd_bus_unref(bus);
-
-    return err;
-}
 
 uint32_t
 nm_atomic_file_update(

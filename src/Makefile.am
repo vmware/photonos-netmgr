@@ -22,7 +22,8 @@ AM_CFLAGS += $(GLIB_CFLAGS)
 libnetmgr_la_SOURCES = \
     iniparser.c \
     netmgr.c \
-    utils.c
+    utils.c \
+    nm-dbus.c
 
 libnetmgr_la_LIBADD = \
     @top_builddir@/common/libcommon.la \

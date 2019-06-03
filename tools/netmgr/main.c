@@ -13,7 +13,7 @@
  */
 
 #include "includes.h"
-
+#include "../src/nm_dbus.h"
 
 static uint32_t
 get_cli_error_code(uint32_t nmErrCode)

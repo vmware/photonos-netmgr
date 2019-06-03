@@ -52,11 +52,6 @@ nm_get_key_value(
 );
 
 uint32_t
-nm_get_systemd_version(
-    uint32_t *psdVersion
-);
-
-uint32_t
 nm_atomic_file_update(
     const char *pszFileName,
     const char *pszFileBuf

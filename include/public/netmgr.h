@@ -521,15 +521,6 @@ nm_get_firewall_rules(
 /*
  * Misc APIs
  */
-uint32_t
-nm_set_hostname(
-    const char *pszHostname
-);
-
-uint32_t
-nm_get_hostname(
-    char **ppszHostname
-);
 
 uint32_t
 nm_wait_for_link_up(
@@ -562,26 +553,7 @@ nm_get_network_param(
 /*
  * Service management APIs
  */
-uint32_t
-nm_stop_network_service();
-
-uint32_t
-nm_restart_network_service();
-
-uint32_t
-nm_stop_dns_service();
-
-uint32_t
-nm_restart_dns_service();
-
-uint32_t
-nm_stop_ntp_service();
-
-uint32_t
-nm_restart_ntp_service();
-
-uint32_t
-nm_reload_firewall_config();
+int nm_reload_firewall_config();
 
 #ifdef __cplusplus
 }
